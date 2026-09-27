@@ -819,10 +819,7 @@ func potFor(who Persona, seed *big.Int) *brew.Pot {
 // `second-opinion`.
 func ThemeStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := Ceiling()
-		if limit != nil {
-			ceil = *limit
-		}
+		ceil := ceilingOr(limit)
 		return Clamp(SecondOpinion, ceil), nil
 	}
 	return Resolve(requested, nil, limit)
@@ -1147,7 +1144,7 @@ func RunAsk(ctx context.Context, conn *pool.Conn, plan *AskPlan, run ThemeRun) (
 	turn, err := Converse(ctx, mode, Request{
 		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,
-			closingFor(plan.Carried, plan.History, plan.Told),
+			closingFor(plan.Carried, plan.History, plan.Told, drawOpeningAngle()),
 			frameFor(readingFor(who, plan.Seed), potFor(who, plan.Seed), plan.Told)),
 		Stance: plan.Effective,
 		// No deck source, and the nil is the point rather than a default
@@ -1243,15 +1240,20 @@ var OpeningAngles = []string{
 	"the kind of villain -- or hero -- they catch themselves rooting for",
 }
 
-// openingAngle draws one. A variable so a corpus can hold it still.
+// drawOpeningAngle draws one, at the one place a conversation opens.
 //
 // **Not `mt19937`.** The draw rides OS-seeded randomness -- there is no seed
 // to reproduce and nothing downstream depends on which opening comes out.
-// What a corpus needs is only that it can pin one, which a package var gives
-// it.
+//
+// It used to be a package-level `var` a test could swap, and [closingFor]
+// took the angle from wherever that variable pointed. That made pinning the
+// corpus's angle a *write* to state the whole binary shares -- already inside
+// a `t.Parallel()` test, where `-race` was one overlapping run away from
+// reporting it. The angle is a parameter now, so a corpus pins one by handing
+// it over.
 //
 //nolint:gosec // a die, not a secret: it varies which of seven openings a conversation starts from
-var openingAngle = func() string { return OpeningAngles[rand.IntN(len(OpeningAngles))] }
+func drawOpeningAngle() string { return OpeningAngles[rand.IntN(len(OpeningAngles))] }
 
 // closingFor is what to ask the model for, given how far along the
 // conversation is.
@@ -1260,7 +1262,9 @@ var openingAngle = func() string { return OpeningAngles[rand.IntN(len(OpeningAng
 // out, so "what is still missing" is the same answer the button is computed
 // from. A mode that thought it had heard something the readiness check
 // disagreed with would ask the wrong next question.
-func closingFor(grounded []Slot, transcript []TranscriptTurn, told []string) string {
+// The `angle` is the one drawn for this conversation, and it is used only on
+// the opening turn; a caller mid-conversation may hand over anything.
+func closingFor(grounded []Slot, transcript []TranscriptTurn, told []string, angle string) string {
 	if len(transcript) == 0 {
 		// The angle is drawn here rather than left to the model. One fixed
 		// opening instruction produced one recognisable opening question, and
@@ -1272,7 +1276,7 @@ func closingFor(grounded []Slot, transcript []TranscriptTurn, told []string) str
 			"-- not about Magic, and not a list. Introduce yourself in a " +
 			"sentence first so they know what this is. Tonight, open from " +
 			"this angle rather than whatever you usually reach for: " +
-			openingAngle() + "."
+			angle + "."
 	}
 	// The ground already covered, so the no-repeats rule is followable rather
 	// than aspirational. After the conversation itself, before the ask.

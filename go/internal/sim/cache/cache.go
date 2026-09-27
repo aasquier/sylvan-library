@@ -151,30 +151,41 @@ var (
 //
 // Computed once per process. The files cannot change under a running binary.
 func Fingerprint() string {
-	fingerprintOnce.Do(func() {
-		digest := sha256.New()
-		for _, pkg := range engineSources {
-			names, err := fs.Glob(pkg.fs, "*")
-			if err != nil {
-				fingerprintVal = ""
-				return
-			}
-			sort.Strings(names)
-			for _, name := range names {
-				body, err := fs.ReadFile(pkg.fs, name)
-				if err != nil {
-					fingerprintVal = ""
-					return
-				}
-				// The path is hashed as well as the body, so renaming a file
-				// is a change and two files swapping contents is a change.
-				digest.Write([]byte(pkg.name + "/" + name + "\x00"))
-				digest.Write(body)
-			}
-		}
-		fingerprintVal = hex.EncodeToString(digest.Sum(nil))
-	})
+	fingerprintOnce.Do(func() { fingerprintVal = fingerprintOf(engineSources) })
 	return fingerprintVal
+}
+
+// fingerprintOf is the digest itself, over whichever list it is handed.
+//
+// **Split out of [Fingerprint] so that the two tests of this mechanism need
+// nothing of the process.** The list and the memo behind them were both
+// package-level, so proving that every named package actually moves the
+// digest — the mutation test ADR 18's second consequence rests on — meant
+// swapping three globals and putting them back, which made those two tests
+// serial and left any test running beside them reading a fingerprint computed
+// over a list somebody else was holding. A pure function of a list is the same
+// claim with nothing shared: the memo above stays the one place the real list
+// is hashed, and a test hands in its own.
+func fingerprintOf(sources []engineSource) string {
+	digest := sha256.New()
+	for _, pkg := range sources {
+		names, err := fs.Glob(pkg.fs, "*")
+		if err != nil {
+			return ""
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			body, err := fs.ReadFile(pkg.fs, name)
+			if err != nil {
+				return ""
+			}
+			// The path is hashed as well as the body, so renaming a file
+			// is a change and two files swapping contents is a change.
+			digest.Write([]byte(pkg.name + "/" + name + "\x00"))
+			digest.Write(body)
+		}
+	}
+	return hex.EncodeToString(digest.Sum(nil))
 }
 
 // Input is every argument of `tier1.Run` that changes its output, plus the

@@ -160,8 +160,10 @@ func TestTheShelfIsNotReportedEmptyOnAVolumeThatDidNotMount(t *testing.T) {
 // **A reader on an unmountable volume reports emptiness, not a fault.**
 //
 // Recorded rather than approved of, the same way
-// `TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero` records `data
-// snapshot`'s. The rule producing it is a good one: a read must never acquire
+// `data snapshot` used to be the third of these until 2026-09-24, when Aaron
+// ruled that a writer over no pool refuses
+// (`TestASnapshotOnAFreshMachineRefusesRatherThanReportingZero`); the two
+// readers below keep the other rule. The rule producing it is a good one: a read must never acquire
 // a database, so an absent `app.db` is an empty history rather than an error,
 // which is what a laptop before its first write wants.
 //

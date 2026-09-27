@@ -34,7 +34,7 @@ func (r *writeRig) writeDeck(t *testing.T, slug, text string) {
 }
 
 // The promotion fixture: a curated green deck whose board card -- Craterhoof
-// Behemoth -- is in the 21-card fixture pool, legal in Commander, and inside
+// Behemoth -- is in the fixture pool, legal in Commander, and inside
 // Goreclaw's identity, which is what lets the happy path reach the editor.
 const promotionFixture = `slug: promotion
 name: Promotion Fixture

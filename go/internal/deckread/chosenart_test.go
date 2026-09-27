@@ -17,7 +17,7 @@ import (
 // default printing while the deck file plainly says otherwise, which reads as
 // the site ignoring what somebody typed.
 //
-// The two ids below are real rows in the 21-card fixture, read out of it
+// The two ids below are real rows in the fixture, read out of it
 // rather than invented (`internal/pool/pooltest/testdata`). A printing id is
 // the one kind of card fact a test may hold, because it identifies a row
 // rather than asserting anything about what the card does.

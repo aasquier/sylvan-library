@@ -62,6 +62,23 @@ type Config struct {
 	// PoolPath is the card pool file, sized by the storage view and never
 	// opened by it.
 	PoolPath string
+	// SetsFeed is where `/api/sets/upcoming` asks about sets that have not
+	// been printed yet. Zero takes [ScryfallSets], the way
+	// [pool.RefreshOptions.IndexURL] takes [pool.BulkIndex] -- and for the
+	// same reason, which `sets.go` argues where the constant stands: a
+	// package variable a test swapped was shared state, and every test that
+	// touched it had to run alone.
+	SetsFeed string
+	// BulkIndex is where the admin library refresh asks for the bulk files.
+	// Zero takes [pool.BulkIndex].
+	//
+	// The refresh button's own job body is five hundred megabytes and several
+	// minutes against the real feed, so without this field the whole of
+	// [API.gatherTheLibrary] -- the seal, the five progress beats, the counts
+	// it reports and the three sentences it fails with -- could only ever run
+	// in production. It is the same field on the same journey `pool.Refresh`
+	// already takes it on; this hands it down rather than inventing a seam.
+	BulkIndex string
 	// Traffic is the visitor ledger's recorder, shared with the door so the
 	// stats view's read flushes the same buffer the door fills. Nil records
 	// nothing and summarises an empty ledger.
@@ -195,6 +212,12 @@ type API struct {
 	traffic     *traffic.Recorder
 	fly         *flymetrics.Panel
 
+	// setsFeed and bulkIndex are the two places this package reaches
+	// Scryfall, as values rather than as package variables -- see
+	// [Config.SetsFeed] and [Config.BulkIndex].
+	setsFeed  string
+	bulkIndex string
+
 	// The upcoming-sets answer, held for the day it was fetched on -- a
 	// process-lifetime cache, kept as marshalled
 	// bytes so a replay is byte-identical.
@@ -222,6 +245,12 @@ func New(cfg Config) *API {
 	if cfg.Fly == nil {
 		cfg.Fly = &flymetrics.Panel{Log: cfg.Logger}
 	}
+	if cfg.SetsFeed == "" {
+		cfg.SetsFeed = ScryfallSets
+	}
+	if cfg.BulkIndex == "" {
+		cfg.BulkIndex = pool.BulkIndex
+	}
 	a := &API{log: cfg.Logger, pool: cfg.Pool, db: cfg.AppDB, writeDB: cfg.AppWriteDB,
 		dbPath: cfg.AppDBPath, decksDir: cfg.DecksDir, scryfallDir: cfg.ScryfallDir,
 		dataDir: cfg.DataDir, poolPath: cfg.PoolPath, traffic: cfg.Traffic,
@@ -233,7 +262,8 @@ func New(cfg Config) *API {
 		claudeLedger: cfg.ClaudeLedger, matchLedgerOf: cfg.MatchLedger,
 		forgeClient: cfg.ForgeWorker,
 		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
-		claude: cfg.Claude, forge: cfg.Forge}
+		claude: cfg.Claude, forge: cfg.Forge,
+		setsFeed: cfg.SetsFeed, bulkIndex: cfg.BulkIndex}
 	a.playCore = a.playForgeMatch
 	return a
 }

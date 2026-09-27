@@ -23,7 +23,7 @@ import (
 // The cards the clauses are tested *against* are invented, exactly as
 // `companioncheck_test.go` invents its companions and for the same reason: what
 // is being asserted is that the check reads the shape of a sentence and the
-// shape of a type line, not that any particular Angel is red. The 21-card
+// shape of a type line, not that any particular Angel is red. The fixture
 // fixture pool carries no Mystery Booster commander and no off-identity Angel,
 // so a golden-corpus case could not reach this code at all.
 //

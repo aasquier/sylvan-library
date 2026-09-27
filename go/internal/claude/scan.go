@@ -85,16 +85,17 @@ const ScanDefaultPreset = "consultant"
 // off a picture. It resolves so the call happens, not so it changes, which is
 // why it takes the narrowest preset that is not `off`.
 //
-// **And `/api/claude` does not ask it**, which is the very thing this
-// function exists to prevent. The dial's surface table names `theme` and
-// `research` and was never extended when ADR 34 landed, so `?surface=scan`
-// answers `off`. See `dialSurfaces`; recorded, not fixed.
+// **And `/api/claude` asks it now, which it did not when ADR 34 landed.** The
+// dial's surface table held only `theme` and `research`, so `?surface=scan`
+// answered `off` and this function was unreachable from the door -- the
+// failure this whole function exists to prevent, reached anyway by the one
+// route that publishes the dial. `dialSurfaces` names `scan` and `intake`, and
+// `surfaceStanceFor` dispatches here; `TestEveryDecklessSurfaceResolvesToItsOwnDefault`
+// is what holds that true, since a doc comment is not a test and this comment
+// claimed the opposite for some time after it stopped being so.
 func ScanStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := Ceiling()
-		if limit != nil {
-			ceil = *limit
-		}
+		ceil := ceilingOr(limit)
 		preset, err := Preset(ScanDefaultPreset)
 		if err != nil {
 			return Stance{}, err
@@ -206,11 +207,9 @@ func strictB64Decode(s string) ([]byte, error) {
 			return nil, errNotBase64
 		}
 	}
-	// An all-padding string has an empty body and non-zero padding: that
-	// counts as leading padding and is refused.
-	if body == "" && len(s) > 0 {
-		return nil, errNotBase64
-	}
+	// An all-padding string cannot reach here: its length is a multiple of
+	// four and it is nothing but `=`, so it carries at least four of them
+	// and the padding count above has already refused it.
 	return base64.StdEncoding.DecodeString(s)
 }
 

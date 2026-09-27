@@ -1,0 +1,25 @@
+#!/bin/sh
+# A JVM that is a shell script: the stand-in `forgebout_test.go` points
+# `tier3.Settings.Java` at so `mtglab sim forge` can be driven end to end on a
+# machine with no Forge and no Java on it.
+#
+# **One file, committed, rather than one written per test.** Each of them
+# answers the version probe the runner insists on and then plays whatever the
+# test scripted -- and the scripted half is a file in the test's own Forge
+# home, because the *first* execution of a newly written executable costs
+# several seconds on a loaded macOS box, `javaMajor` gives the probe thirty,
+# and eight tests each minting their own binary turned that ceiling into a
+# coin toss under `go test ./...`. One executable is execed once and cached
+# from then on; what differs per test is data.
+#
+# The runner sets the subprocess's working directory to the Forge home
+# (`tier3.spawn`), which is what makes `./fakeforge.sh` below resolve to the
+# right test's script.
+
+if [ "$1" = "-version" ]; then
+  # `java -version` writes to stderr. Has done for decades.
+  echo 'openjdk version "21.0.1" 2023-10-17' 1>&2
+  exit 0
+fi
+
+exec /bin/sh ./fakeforge.sh "$@"

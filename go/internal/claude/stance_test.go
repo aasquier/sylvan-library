@@ -185,38 +185,98 @@ func TestParsingAStanceMatchesTheCorpusIncludingItsRefusals(t *testing.T) {
 	}
 }
 
-// TestTheCeilingReadsTheEnvironmentAsRecorded covers the two rows that carry
-// the design: unset means uncapped, and unreadable means OFF. Failing closed is
+// TestTheCeilingReadsItsSettingAsRecorded covers the two rows that carry the
+// design: unset means uncapped, and unreadable means OFF. Failing closed is
 // the decision — a typo in a deployment variable costs a feature, never opens
 // one — and it is one `return` away from failing open.
-func TestTheCeilingReadsTheEnvironmentAsRecorded(t *testing.T) {
-	// **Serial**: it calls `t.Setenv(CeilingEnv)` per corpus row, and `os.Unsetenv`s it
-	// for the rows where the variable is absent -- a raw process write with no
-	// `t.Cleanup` behind it at all, which Go
-	// panics on inside a parallel test -- the environment is one slot for the
-	// whole process, so two tests setting it at once are one test reading the
-	// other's deployment.
-	//
-	// It is also the one test that could not become parallel even if the
-	// ceiling were a value, because **the environment is what it is about**:
-	// the recorded reading of `MTGLAB_CLAUDE_STANCE_CEILING` is the subject,
-	// not the setup.
+//
+// The corpus's `env` column is a *string, where nil is the variable being
+// absent. `os.Getenv` cannot tell absent from blank, so both arrive at
+// [CeilingFrom] as the empty string and the two rows are the same question
+// asked twice — which is exactly why the reading is worth having as a pure
+// function: the deployment is now a value this test holds, not a slot it
+// takes away from every other test in the binary.
+func TestTheCeilingReadsItsSettingAsRecorded(t *testing.T) {
+	t.Parallel()
 	c := loadStanceCorpus(t)
 	for _, row := range c.Ceilings {
-		if row.Env == nil {
-			os.Unsetenv(CeilingEnv)
-		} else {
-			t.Setenv(CeilingEnv, *row.Env)
+		raw, env := "", "<unset>"
+		if row.Env != nil {
+			raw, env = *row.Env, *row.Env
 		}
-		if got, want := Ceiling(), row.Ceiling.stance(); got != want {
-			env := "<unset>"
-			if row.Env != nil {
-				env = *row.Env
-			}
+		if got, want := CeilingFrom(raw), row.Ceiling.stance(); got != want {
 			t.Errorf("ceiling with %q: got %+v, corpus %+v", env, got, want)
 		}
 	}
-	os.Unsetenv(CeilingEnv)
+}
+
+// TestAMissingLimitFallsToTheSameCeilingSettingsDo is the seam the twelve
+// serial tests in this package were paying for, asserted as itself.
+//
+// Two nil-fallbacks used to disagree about where they read from: [Settings]
+// answered Collaborator out of its own code, and every `limit *Stance`
+// parameter answered whatever the process happened to export. They are one
+// reading now, and a drift between them would be invisible — a deployment
+// that capped one surface and not another.
+func TestAMissingLimitFallsToTheSameCeilingSettingsDo(t *testing.T) {
+	t.Parallel()
+	if got := ceilingOr(nil); got != Collaborator {
+		t.Errorf("no limit at all resolved to %+v, want collaborator", got)
+	}
+	if got := (Settings{}).ceiling(); got != ceilingOr(nil) {
+		t.Errorf("Settings falls to %+v where a nil limit falls to %+v", got, ceilingOr(nil))
+	}
+	for _, name := range PresetNames {
+		want, err := Preset(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := ceilingOr(&want); got != want {
+			t.Errorf("a %s limit resolved to %+v", name, got)
+		}
+		if got := (Settings{Ceiling: &want}).ceiling(); got != want {
+			t.Errorf("Settings with a %s ceiling resolved to %+v", name, got)
+		}
+	}
+}
+
+// TestASettingsBuiltFromTheEnvironmentAlwaysCarriesACeiling holds the one
+// promise [ceilingOr] rests on.
+//
+// Nil is a legitimate ceiling — it means the built-in default, and it is what
+// a test that says nothing about a cap gets. What would be a fault is a
+// *serving* process reaching that branch, because then a deployment that set
+// MTGLAB_CLAUDE_STANCE_CEILING would go uncapped with nothing failing. So the
+// composition root's own reader fills it on every row, including the one
+// where the variable is absent and the filled value is the default anyway.
+func TestASettingsBuiltFromTheEnvironmentAlwaysCarriesACeiling(t *testing.T) {
+	t.Parallel()
+	deployments := []map[string]string{
+		{},
+		{CeilingEnv: ""},
+		{CeilingEnv: "off"},
+		{CeilingEnv: "consultant"},
+		{CeilingEnv: "not-a-preset"},
+		{CeilingEnv: "collaborator", modelEnv: "some-model", apiKeyEnv: "k"},
+	}
+	for _, env := range deployments {
+		set := SettingsFromLookup(lookup(env))
+		if set.Ceiling == nil {
+			t.Fatalf("a Settings built from %v carries no ceiling", env)
+		}
+		if got, want := *set.Ceiling, CeilingFrom(env[CeilingEnv]); got != want {
+			t.Errorf("%v: ceiling %+v, want %+v", env, got, want)
+		}
+		if got, want := set.ceiling(), *set.Ceiling; got != want {
+			t.Errorf("%v: the threaded ceiling %+v is not the stored one %+v", env, got, want)
+		}
+	}
+}
+
+// lookup is a deployment as a value: the `getenv` every `…FromLookup` takes,
+// backed by a map instead of by the process.
+func lookup(env map[string]string) func(string) string {
+	return func(name string) string { return env[name] }
 }
 
 // statused is the one field DefaultFor reads. A nil pointer stands for a deck
@@ -255,16 +315,11 @@ func TestTheDeckDefaultAgreesWithTheCorpus(t *testing.T) {
 // mapping that names only some axes, and a ceiling that cannot be parsed all
 // land at or below OFF's level on every axis. It is what makes "a malformed
 // request can only ever be quieter" a property rather than three coincidences.
+// The three fallbacks are described rather than installed: the unreadable
+// ceiling is a string handed to [CeilingFrom], and the deployment it produces
+// is then handed back down as the `limit` every caller already takes.
 func TestOffIsTheFloorOfEveryFallback(t *testing.T) {
-	// **Serial**: it calls `t.Setenv(CeilingEnv)` to an unparseable value, which is one of
-	// the three fallbacks it holds to the same floor, which Go
-	// panics on inside a parallel test -- the environment is one slot for the
-	// whole process, so two tests setting it at once are one test reading the
-	// other's deployment.
-	//
-	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
-	// than reading the process, which is what ADR 39/40 did for every other
-	// piece of configuration in this package.
+	t.Parallel()
 	partial, err := StanceFromObj(json.RawMessage(`{"write":"applies"}`))
 	if err != nil {
 		t.Fatalf("partial mapping: %v", err)
@@ -272,17 +327,33 @@ func TestOffIsTheFloorOfEveryFallback(t *testing.T) {
 	if partial.Initiative != Off.Initiative || partial.Scope != Off.Scope {
 		t.Errorf("unnamed axes did not fall to OFF: %+v", partial)
 	}
-	t.Setenv(CeilingEnv, "not-a-preset")
-	if got := Ceiling(); got != Off {
-		t.Errorf("an unreadable ceiling must fail closed, got %+v", got)
+	capped := CeilingFrom("not-a-preset")
+	if capped != Off {
+		t.Errorf("an unreadable ceiling must fail closed, got %+v", capped)
 	}
 	// And the clamp that follows from it: at an OFF ceiling nothing may call.
-	resolved, err := Resolve("collaborator", nil, nil)
+	resolved, err := Resolve("collaborator", nil, &capped)
 	if err != nil {
 		t.Fatalf("resolving under an off ceiling: %v", err)
 	}
 	if resolved.AllowsCalls() {
 		t.Errorf("an off ceiling still allowed calls: %+v", resolved)
+	}
+	// And every deckless surface's own default is under the same floor -- the
+	// four that fall back through `ceilingOr` rather than through Resolve.
+	for name, stanceFor := range map[string]func(any, *Stance) (Stance, error){
+		"research": ResearchStanceFor,
+		"scan":     ScanStanceFor,
+		"intake":   IntakeStanceFor,
+		"theme":    ThemeStanceFor,
+	} {
+		got, err := stanceFor(nil, &capped)
+		if err != nil {
+			t.Fatalf("%s under an off ceiling: %v", name, err)
+		}
+		if got.AllowsCalls() {
+			t.Errorf("%s still called under an off ceiling: %+v", name, got)
+		}
 	}
 }
 

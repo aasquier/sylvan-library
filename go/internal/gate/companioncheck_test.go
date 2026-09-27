@@ -10,7 +10,7 @@ import (
 )
 
 // The companion check, driven with hand-built records rather than through the
-// 21-card pool.
+// fixture pool.
 //
 // The pool fixture holds no companion, so the gate's companion branch has
 // only ever been reached far enough to return early. That is a real hole:

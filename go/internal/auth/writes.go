@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"net/url"
@@ -68,18 +69,62 @@ func PingWritable(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// A transaction that cannot end cleanly takes its connection with it.
+//
+// Both shapes below run on a pinned [sql.Conn], and the pin is what makes
+// them correct: `exclusive`'s hand-written BEGIN IMMEDIATE cannot be handed
+// to another caller mid-transaction, and `inTx`'s COMMIT lands on the
+// connection that began it. The pin is also where the failure that used to
+// live here hid. When the COMMIT fails -- SQLITE_BUSY past the timeout, a
+// full disk, a volume that detached mid-write -- or when a ROLLBACK after a
+// failed step fails the same way, the driver's transaction is **still open
+// on that connection**, and `database/sql` returns the connection to the
+// pool anyway. Every later statement on it then runs inside a transaction
+// nobody will ever commit: reads answer perfectly well, writes go nowhere,
+// and the next BEGIN IMMEDIATE is refused with "cannot start a transaction
+// within a transaction". With one connection in the pool (`OpenReadWrite`)
+// that is the whole handle -- a live instance that keeps answering while
+// writing nothing, until restart. The test that found it had to roll the
+// stale transaction back by hand between cases to stay green
+// (`halfwritten_test.go`), which is how it was noticed.
+//
+// [discard] is the fix, and it is the only honest one: `database/sql`
+// closes a connection rather than pooling it when the driver reports
+// [driver.ErrBadConn], and [sql.Conn.Raw] is the documented way to say so
+// from outside the driver. SQLite rolls back whatever a closing connection
+// still held, and the next caller gets a fresh connection with no history.
+// A second ROLLBACK would be the cheaper-looking move and is wrong twice:
+// it fails for the same reason the first statement did, and a ROLLBACK that
+// happens to succeed leaves a connection that just proved unreliable in the
+// pool for the next write to find out about.
+func discard(conn *sql.Conn) {
+	_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+}
+
 // inTx is a deferred transaction -- opened on the first
 // statement, committed on a clean return and rolled back on anything else.
 func inTx(ctx context.Context, db *sql.DB, fn func(*sql.Tx) error) error {
-	tx, err := db.BeginTx(ctx, nil)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
+		if rollback := tx.Rollback(); rollback != nil {
+			discard(conn)
+			return errors.Join(err, fmt.Errorf("the rollback failed: %w", rollback))
+		}
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		discard(conn)
+		return err
+	}
+	return nil
 }
 
 // exclusive is a transaction that takes the write lock
@@ -113,11 +158,13 @@ func exclusive(ctx context.Context, db *sql.DB, fn func(*sql.Conn) error) error 
 	}
 	if err := fn(conn); err != nil {
 		if _, rollback := conn.ExecContext(ctx, "ROLLBACK"); rollback != nil {
+			discard(conn)
 			return errors.Join(err, fmt.Errorf("the rollback failed: %w", rollback))
 		}
 		return err
 	}
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		discard(conn)
 		return fmt.Errorf("commit: %w", err)
 	}
 	return nil

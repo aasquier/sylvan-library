@@ -16,18 +16,21 @@ import (
 // Finding Forge, which is every failure a Tier 3 run hits before a card is
 // ever played.
 //
-// **Most of these run in parallel now.** They did not until ADR 40: the
-// discovery functions read `MTGLAB_FORGE_HOME`, `MTGLAB_JAVA` and
-// `MTGLAB_FORGE_PROFILE` from the process, so a test could only describe a
-// machine by writing the process -- `t.Setenv`, which Go panics on inside a
-// parallel test. A [Settings] literal says the same thing to one caller
-// instead of to every goroutine in the binary.
+// **All of these run in parallel**, and the road here was three separate
+// injections. ADR 40 took the first: the discovery functions read
+// `MTGLAB_FORGE_HOME`, `MTGLAB_JAVA` and `MTGLAB_FORGE_PROFILE` from the
+// process, so a test could only describe a machine by writing the process --
+// `t.Setenv`, which Go panics on inside a parallel test. A [Settings] literal
+// says the same thing to one caller instead of to every goroutine in the
+// binary.
 //
-// The ones still serial hold something shared and say so where they stand:
-// the coverage index is package-level state (guarded, so `-race` is quiet --
-// it is `ClearIndex` and the hit counters that collide, which nothing but a
-// reading of the test would report), two Java tests write `PATH`, which is
-// genuinely the process's, and one is about [LoadSettings] itself.
+// The other two were left behind and are closed here. The coverage index was
+// package-level state with a `ClearIndex` for the suite to call, so the five
+// tests that asked what it had remembered needed the whole process; it is a
+// [CardIndex] now and each of them builds its own. And the JVM search called
+// `exec.LookPath`, so the only way to describe a machine with no Java on it was
+// to empty the `PATH` of every test in the binary; [Settings.PathList] is that
+// list as a value.
 //
 // The distinction the messages draw is the one that matters and the one a
 // first attempt got wrong: **a missing directory is not an unreadable one**.
@@ -44,6 +47,13 @@ import (
 // opening brace. A function call has no such problem, and reads as the
 // sentence the test means.
 func installedAt(home string) Settings { return Settings{Home: home} }
+
+// remembering is [installedAt] with a card index of its own -- one machine's
+// memory, belonging to one test, which is the whole of what used to be a
+// package-level map and a `ClearIndex`.
+func remembering(home string) Settings {
+	return Settings{Home: home, Index: NewCardIndex()}
+}
 
 // fakeForge builds a Forge distribution good enough for every check that does
 // not need a JVM: a versioned desktop jar and a cardsfolder zip holding the
@@ -190,14 +200,11 @@ func TestTheForgeVersionIsReadOffTheJarName(t *testing.T) {
 
 // The card index is read from Forge's own scripts, and the reader skips
 // everything that is not a card script.
-// **Serial**: it shares the package-level coverage index, which is guarded
-// (so `-race` is quiet) but not partitioned -- `ClearIndex` and the hit
-// counters are what collide, and only a reading of the test would report it.
 func TestTheCardIndexIsReadFromForgesOwnScripts(t *testing.T) {
-	ClearIndex()
+	t.Parallel()
 	home := fakeForge(t, "1.6.50", "Llanowar Elves", "Sol Ring", "Forest")
 
-	names, err := installedAt(home).ImplementedNames()
+	names, err := remembering(home).ImplementedNames()
 	if err != nil {
 		t.Fatalf("reading the index: %v", err)
 	}
@@ -218,26 +225,34 @@ func TestTheCardIndexIsReadFromForgesOwnScripts(t *testing.T) {
 // The index is cached on (path, mtime, size), so upgrading Forge in place
 // invalidates it rather than serving a stale answer -- which matters
 // precisely because an upgrade is when coverage changes.
-// **Serial**: it shares the package-level coverage index, which is guarded
-// (so `-race` is quiet) but not partitioned -- `ClearIndex` and the hit
-// counters are what collide, and only a reading of the test would report it.
 func TestTheCardIndexIsCachedAndAnUpgradeInvalidatesIt(t *testing.T) {
-	ClearIndex()
+	t.Parallel()
 	home := fakeForge(t, "1.6.50", "Llanowar Elves")
+	machine := remembering(home)
 
-	if _, err := installedAt(home).ImplementedNames(); err != nil {
+	if _, err := machine.ImplementedNames(); err != nil {
 		t.Fatal(err)
 	}
-	hits, misses := IndexStats()
+	hits, misses := machine.Index.Stats()
 	if hits != 0 || misses != 1 {
 		t.Fatalf("the first read was %d hits and %d misses", hits, misses)
 	}
 
-	if _, err := installedAt(home).ImplementedNames(); err != nil {
+	if _, err := machine.ImplementedNames(); err != nil {
 		t.Fatal(err)
 	}
-	if hits, misses = IndexStats(); hits != 1 || misses != 1 {
+	if hits, misses = machine.Index.Stats(); hits != 1 || misses != 1 {
 		t.Fatalf("the second read was %d hits and %d misses -- the cache never hit", hits, misses)
+	}
+
+	// A copy of the settings is the same machine, so it shares the memory: the
+	// index is carried by pointer precisely because `Settings` is copied by
+	// value everywhere and one distribution must not be scanned twice.
+	if _, err := machine.At(home).ImplementedNames(); err != nil {
+		t.Fatal(err)
+	}
+	if hits, _ = machine.Index.Stats(); hits != 2 {
+		t.Errorf("a copy of the settings missed the index (hits=%d)", hits)
 	}
 
 	// An upgrade in place: same path, different bytes.
@@ -246,21 +261,47 @@ func TestTheCardIndexIsCachedAndAnUpgradeInvalidatesIt(t *testing.T) {
 		nowPlus(t, 120), nowPlus(t, 120)); err != nil {
 		t.Fatal(err)
 	}
-	names, err := installedAt(home).ImplementedNames()
+	names, err := machine.ImplementedNames()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !names["Craterhoof Behemoth"] {
 		t.Error("the upgraded distribution served the stale index")
 	}
-	if _, misses = IndexStats(); misses != 2 {
+	if _, misses = machine.Index.Stats(); misses != 2 {
 		t.Errorf("an upgrade did not miss the cache (misses=%d)", misses)
 	}
+}
 
-	// And the register clears, the way every registered cache does.
-	ClearIndex()
-	if hits, misses = IndexStats(); hits != 0 || misses != 0 {
-		t.Errorf("after clearing: %d hits, %d misses", hits, misses)
+// A machine with no index reads the card scripts every time rather than
+// crashing on the memory it does not have -- which is what a [Settings] literal
+// is, and what every test in this file that asks once relies on.
+func TestSettingsWithNoIndexReadTheScriptsEveryTime(t *testing.T) {
+	t.Parallel()
+	home := fakeForge(t, "1.6.50", "Llanowar Elves")
+	forgetful := installedAt(home)
+	if forgetful.Index != nil {
+		t.Fatal("a bare Settings literal arrived with an index")
+	}
+	for i := range 2 {
+		names, err := forgetful.ImplementedNames()
+		if err != nil {
+			t.Fatalf("read %d: %v", i+1, err)
+		}
+		if !names["Llanowar Elves"] {
+			t.Errorf("read %d lost the card", i+1)
+		}
+	}
+	// Nil counts nothing, because nothing happened to a cache that is not
+	// there -- and a caller asking is not a caller crashing.
+	if hits, misses := forgetful.Index.Stats(); hits != 0 || misses != 0 {
+		t.Errorf("a nil index reported %d hits and %d misses", hits, misses)
+	}
+	// And the loaded configuration always has one, which is what makes the
+	// deployed worker scan its 33,000 card scripts once rather than per
+	// request.
+	if LoadSettingsFrom(lookup(nil)).Index == nil {
+		t.Error("a loaded configuration carries no card index")
 	}
 }
 
@@ -302,11 +343,8 @@ func TestEveryMissingForgeMessageNamesTheVariableThatFixesIt(t *testing.T) {
 // A cardsfolder that is not a zip costs the whole pre-flight rather than
 // being silently read as empty -- an empty index would report every card in
 // every deck as unimplemented, which reads as a deck problem.
-// **Serial**: it shares the package-level coverage index, which is guarded
-// (so `-race` is quiet) but not partitioned -- `ClearIndex` and the hit
-// counters are what collide, and only a reading of the test would report it.
 func TestAnUnreadableCardsfolderIsRefusedRatherThanReadAsEmpty(t *testing.T) {
-	ClearIndex()
+	t.Parallel()
 	home := t.TempDir()
 	path := filepath.Join(home, cardsfolder)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
@@ -315,7 +353,7 @@ func TestAnUnreadableCardsfolderIsRefusedRatherThanReadAsEmpty(t *testing.T) {
 	if err := os.WriteFile(path, []byte("this is not a zip"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := installedAt(home).ImplementedNames(); err == nil {
+	if _, err := remembering(home).ImplementedNames(); err == nil {
 		t.Fatal("a corrupt cardsfolder was read as an empty index")
 	} else if !strings.Contains(err.Error(), "unreadable") {
 		t.Errorf("the refusal said %q", err)
@@ -324,18 +362,15 @@ func TestAnUnreadableCardsfolderIsRefusedRatherThanReadAsEmpty(t *testing.T) {
 
 // The pre-flight reads a zip and needs no Java at all, which is what makes it
 // the cheap check an API can run on a request thread.
-// **Serial**: it shares the package-level coverage index, which is guarded
-// (so `-race` is quiet) but not partitioned -- `ClearIndex` and the hit
-// counters are what collide, and only a reading of the test would report it.
 func TestThePreFlightRunsWithoutAJVMAndNamesWhatIsMissing(t *testing.T) {
-	ClearIndex()
+	t.Parallel()
 	home := fakeForge(t, "1.6.50", "Sol Ring", "Forest")
 
 	covered := &deck.Deck{Slug: "covered",
 		Commander: []string{"Sol Ring"},
 		Cards:     []deck.CardEntry{{Name: "Forest"}},
 	}
-	reports, err := installedAt(home).CheckCoverage([]*deck.Deck{covered})
+	reports, err := remembering(home).CheckCoverage([]*deck.Deck{covered})
 	if err != nil {
 		t.Fatalf("a fully covered deck failed the pre-flight: %v", err)
 	}
@@ -372,11 +407,8 @@ func TestThePreFlightRunsWithoutAJVMAndNamesWhatIsMissing(t *testing.T) {
 // The pre-flight counts each distinct card once, so a deck with four Forests
 // is one check rather than four -- and the commander and companion are
 // checked alongside the 99.
-// **Serial**: it shares the package-level coverage index, which is guarded
-// (so `-race` is quiet) but not partitioned -- `ClearIndex` and the hit
-// counters are what collide, and only a reading of the test would report it.
 func TestThePreFlightCountsEachCardOnceAndIncludesTheCommandZone(t *testing.T) {
-	ClearIndex()
+	t.Parallel()
 	home := fakeForge(t, "1.6.50", "Sol Ring", "Forest", "Kaheera, the Orphanguard")
 	companion := "Kaheera, the Orphanguard"
 
@@ -387,7 +419,7 @@ func TestThePreFlightCountsEachCardOnceAndIncludesTheCommandZone(t *testing.T) {
 			{Name: "Forest"}, {Name: "Forest"}, {Name: "Forest"},
 		},
 	}
-	index, err := installedAt(home).ImplementedNames()
+	index, err := remembering(home).ImplementedNames()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -483,24 +515,36 @@ func TestTheProfileRefusesWithoutADistribution(t *testing.T) {
 	}
 }
 
+// lookup is an environment described rather than installed: the
+// `func(string) string` [LoadSettingsFrom] reads, backed by a map this test
+// owns. Absent is the empty string, which is what [os.Getenv] says too.
+func lookup(env map[string]string) func(string) string {
+	return func(name string) string { return env[name] }
+}
+
 // The environment overrides exist so an operator can point at an install this
 // code would never have guessed, and each falls back to the same
 // `~/.local/share/mtglab` layout.
 //
-// **Serial on purpose, and the only test here that is about the environment
-// at all.** [LoadSettings] is the one reader in the process (ADR 40), so this
-// is where reading it is tested; everything else in this file describes a
-// machine with a literal and never touches the process it runs in.
+// **The only test here that is about the environment at all.**
+// [LoadSettingsFrom] is the one reader in the process (ADR 40), so this is
+// where reading it is tested; everything else in this file describes a machine
+// with a literal. It parallelises because the environment it reads is a map
+// rather than the process -- the injection ADR 39 gave `config.LoadFrom`,
+// arriving here last.
 func TestTheOverridesWinAndTheFallbacksAgreeOnTheLayout(t *testing.T) {
-	t.Setenv("MTGLAB_FORGE_HOME", "/somewhere/else")
-	t.Setenv("MTGLAB_FORGE_PROFILE", "/profile/here")
-	t.Setenv("MTGLAB_JAVA", "/jvm/here")
-	t.Setenv("MTGLAB_FORGE_MACHINE", "another-worker")
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "9999")
-	// A trailing slash is trimmed here rather than at every call site --
-	// otherwise the client would request every path with a double slash.
-	t.Setenv("MTGLAB_FORGE_WORKER_URL", "http://shim.internal:8080/")
-	loaded := LoadSettings()
+	t.Parallel()
+	loaded := LoadSettingsFrom(lookup(map[string]string{
+		"MTGLAB_FORGE_HOME":      "/somewhere/else",
+		"MTGLAB_FORGE_PROFILE":   "/profile/here",
+		"MTGLAB_JAVA":            "/jvm/here",
+		"MTGLAB_FORGE_MACHINE":   "another-worker",
+		"MTGLAB_FORGE_SHIM_PORT": "9999",
+		// A trailing slash is trimmed here rather than at every call site --
+		// otherwise the client would request every path with a double slash.
+		"MTGLAB_FORGE_WORKER_URL": "http://shim.internal:8080/",
+		"PATH":                    "/usr/local/bin:/usr/bin",
+	}))
 	for _, c := range []struct{ what, got, want string }{
 		{"the Forge home", loaded.Home, "/somewhere/else"},
 		{"the profile", loaded.Profile, "/profile/here"},
@@ -515,14 +559,17 @@ func TestTheOverridesWinAndTheFallbacksAgreeOnTheLayout(t *testing.T) {
 	if loaded.ShimPort != 9999 {
 		t.Errorf("the port override lost: %d", loaded.ShimPort)
 	}
-
-	for _, name := range []string{"MTGLAB_FORGE_HOME", "MTGLAB_FORGE_PROFILE",
-		"MTGLAB_JAVA", "MTGLAB_FORGE_MACHINE", "MTGLAB_FORGE_SHIM_PORT",
-		"MTGLAB_FORGE_WORKER_URL"} {
-		t.Setenv(name, "")
+	// The executable search path is carried whole rather than parsed here: the
+	// JVM hunt walks it, and this is the one read of it.
+	if loaded.PathList != "/usr/local/bin:/usr/bin" {
+		t.Errorf("the search path is %q", loaded.PathList)
 	}
-	base := filepath.Join(homeDir(), ".local", "share", "mtglab")
-	fell := LoadSettings()
+
+	// An environment that says nothing at all, which is a laptop that exported
+	// nothing -- and whose home this test now gets to name.
+	home := t.TempDir()
+	base := filepath.Join(home, ".local", "share", "mtglab")
+	fell := LoadSettingsFrom(lookup(map[string]string{"HOME": home}))
 	if fell.Home != filepath.Join(base, "forge") {
 		t.Errorf("the default Forge home is %q", fell.Home)
 	}
@@ -553,17 +600,55 @@ func TestTheOverridesWinAndTheFallbacksAgreeOnTheLayout(t *testing.T) {
 	}
 	// An unparseable port is a typo, and reads as unset rather than as zero --
 	// which would bind the shim to whatever the kernel handed out.
-	t.Setenv("MTGLAB_FORGE_SHIM_PORT", "banana")
-	if got := LoadSettings().ShimPort; got != DefaultShimPort {
-		t.Errorf("an unparseable port resolved to %d, want the default", got)
+	typo := LoadSettingsFrom(lookup(map[string]string{
+		"MTGLAB_FORGE_SHIM_PORT":    "banana",
+		"MTGLAB_FORGE_IDLE_SECONDS": "   ",
+		"MTGLAB_FORGE_MEMORY_MB":    "lots",
+	}))
+	if typo.ShimPort != DefaultShimPort {
+		t.Errorf("an unparseable port resolved to %d, want the default", typo.ShimPort)
+	}
+	if typo.IdleSeconds != DefaultIdleSeconds || typo.MemoryMB != DefaultMemoryMB {
+		t.Errorf("the other two numbers fell to %d and %d", typo.IdleSeconds, typo.MemoryMB)
+	}
+
+	// The rest of the block, each read once, because a variable that is read
+	// nowhere is indistinguishable from one that is read wrong.
+	rest := LoadSettingsFrom(lookup(map[string]string{
+		"MTGLAB_FORGE_SHIM_HOST":  "127.0.0.1",
+		"MTGLAB_FORGE_SHIM_TOKEN": "  a-bearer  ",
+		"MTGLAB_FORGE_WORKER":     "1",
+		"MTGLAB_FLY_API_TOKEN":    "a-deploy-token",
+		"MTGLAB_SCRIBE_CLASSES":   "/opt/scribe",
+	}))
+	if rest.ShimHost != "127.0.0.1" {
+		t.Errorf("the shim host is %q", rest.ShimHost)
+	}
+	// Trimmed, because a header value with a stray newline in it is a header
+	// the far side refuses for a reason nobody can see.
+	if rest.ShimToken != "a-bearer" {
+		t.Errorf("the shim token is %q", rest.ShimToken)
+	}
+	if !rest.WorkerEnabled || !rest.Configured() {
+		t.Errorf("the dial and a token did not configure a worker: %+v", rest.WorkerEnabled)
+	}
+	if rest.ScribeClasses != "/opt/scribe" {
+		t.Errorf("the scribe classes are %q", rest.ScribeClasses)
 	}
 }
 
-// homeDir falls back to `$HOME` when the user database cannot answer, which
-// is the container's shape rather than a laptop's.
-func TestHomeDirAlwaysAnswers(t *testing.T) {
+// A home directory is answered from the lookup first and from the user
+// database second, which is the container's shape rather than a laptop's --
+// and the reason the second half is there at all is that a machine may have no
+// `HOME` and still have a user.
+func TestTheHomeDirectoryIsReadFromTheLookupFirst(t *testing.T) {
 	t.Parallel()
-	if got := homeDir(); got == "" {
+	if got := homeDirFrom(lookup(map[string]string{"HOME": "/home/squire"})); got != "/home/squire" {
+		t.Errorf("the lookup's home lost: %q", got)
+	}
+	// Nothing in the lookup falls through to the user database, which on every
+	// machine this project runs on answers something.
+	if got := homeDirFrom(lookup(nil)); got == "" {
 		t.Error("no home directory at all")
 	}
 }
@@ -586,23 +671,20 @@ func TestAJavaThatWillNotAnswerIsNotACandidate(t *testing.T) {
 // and a candidate that could not be probed renders as `None`, the served
 // message's long-standing spelling of "could not tell".
 func TestNoJavaAnywhereListsWhatWasTried(t *testing.T) {
-	// **Serial**: it calls `t.Setenv("PATH", ...)`, which Go panics on inside
-	// a parallel test -- and here the process's own `PATH` is the point rather
-	// than the setup. The search this drives looks along it, so emptying it is
-	// the only way to ask what happens on a machine with no JVM from a machine
-	// that may well have one. Nothing can make this parallel; a second test
-	// running beside it would be running with no `PATH`.
+	t.Parallel()
 	// A file that exists and is not a JVM, so the probe fails rather than
 	// the stat.
 	fake := filepath.Join(t.TempDir(), "java")
 	if err := os.WriteFile(fake, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil { //nolint:gosec // a test's own temp dir
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", t.TempDir()) // nothing named java on it; genuinely the process's
-
-	_, err := Settings{Java: fake, BundledJDK: t.TempDir()}.JavaBinary()
+	// A search path with nothing named java on it -- said as a value, which is
+	// the whole of why this no longer has to empty the process's own.
+	_, err := Settings{
+		Java: fake, BundledJDK: t.TempDir(), PathList: t.TempDir(),
+	}.JavaBinary()
 	if err == nil {
-		t.Skip("this machine has a Java new enough to satisfy the search")
+		t.Fatal("a machine with no JVM on any candidate path found one")
 	}
 	if !errors.Is(err, ErrForgeNotInstalled) {
 		t.Errorf("the refusal is %T, want ErrForgeNotInstalled", err)
@@ -620,18 +702,51 @@ func TestNoJavaAnywhereListsWhatWasTried(t *testing.T) {
 // With nothing on any candidate path at all, the refusal still reads as a
 // sentence rather than trailing off after "Checked:".
 func TestARefusalWithNothingToListStillReads(t *testing.T) {
-	// **Serial**, for its neighbour's reason: `t.Setenv("PATH", ...)`, and the
-	// emptied `PATH` is the fixture rather than an artefact of one.
-	t.Setenv("PATH", t.TempDir())
-
+	t.Parallel()
 	_, err := Settings{
 		Java:       filepath.Join(t.TempDir(), "nope"),
 		BundledJDK: t.TempDir(),
 	}.JavaBinary()
 	if err == nil {
-		t.Skip("this machine found a JVM anyway")
+		t.Fatal("a machine with nothing on any path found a JVM")
 	}
 	if !strings.Contains(err.Error(), "Checked: nothing") {
 		t.Errorf("with no candidates the refusal said %q", err)
+	}
+}
+
+// The search path is walked in order and only an executable file on it counts
+// -- a directory called `java`, or a data file, is not a JVM, and neither is an
+// empty entry.
+func TestTheJavaSearchWalksTheGivenPathInOrder(t *testing.T) {
+	t.Parallel()
+	first, second := t.TempDir(), t.TempDir()
+	// A directory named java on the first entry, which must be stepped over
+	// rather than handed back as a binary.
+	if err := os.Mkdir(filepath.Join(first, "java"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// And a file on the second that is not executable.
+	plain := t.TempDir()
+	if err := os.WriteFile(filepath.Join(plain, "java"), []byte("notes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	real := filepath.Join(second, "java")
+	if err := os.WriteFile(real, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil { //nolint:gosec // a test's own temp dir
+		t.Fatal(err)
+	}
+
+	// An empty entry is skipped rather than resolved against the working
+	// directory, which is what a trailing colon on a real `PATH` means.
+	list := strings.Join([]string{first, plain, "", second}, string(os.PathListSeparator))
+	found, ok := Settings{PathList: list}.javaOnPath()
+	if !ok {
+		t.Fatal("the executable at the end of the path was not found")
+	}
+	if found != real {
+		t.Errorf("the search found %q, want %q", found, real)
+	}
+	if _, ok := (Settings{}).javaOnPath(); ok {
+		t.Error("an empty search path produced a JVM")
 	}
 }

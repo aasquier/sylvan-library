@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// `cards show` against the 21-card pool: rule 1's lookup as a command.
+// `cards show` against the fixture pool: rule 1's lookup as a command.
 //
 // Every test here is parallel, which is new (ADR 40): pointing the command at
 // a fixture pool used to mean exporting MTGLAB_DATA_DIR onto the process, and

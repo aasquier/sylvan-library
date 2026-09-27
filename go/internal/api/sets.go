@@ -11,11 +11,19 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/wire"
 )
 
-// scryfallSets and setsUserAgent are `service.SCRYFALL_SETS` and
-// `service.USER_AGENT`, verbatim. The URL is a var for exactly one caller:
-// the tests point it at a local server, the way the Claude client's tests
-// ride ANTHROPIC_BASE_URL rather than growing a production seam.
-var scryfallSets = "https://api.scryfall.com/sets"
+// ScryfallSets and setsUserAgent are `service.SCRYFALL_SETS` and
+// `service.USER_AGENT`, verbatim.
+//
+// **It was a package-level `var`, and the three tests that swapped it were
+// three of this tree's serial tests.** Swapping a
+// package variable is shared state whatever the comment above it says: Go
+// accepts `t.Parallel()` on such a test and the collision is silent, so one
+// test's assertions run against another test's stub and `-race` sees it only
+// when the two happen to overlap. The shape that fixes it is the one
+// [pool.RefreshOptions.IndexURL] already had for exactly this reason — a
+// field whose zero value takes this constant — so [Config.SetsFeed] is that
+// field and nothing swaps anything.
+const ScryfallSets = "https://api.scryfall.com/sets"
 
 const setsUserAgent = "mtg-lab/0.1 (local personal deckbuilding tool)"
 
@@ -43,7 +51,7 @@ func (a *API) upcomingSets(w http.ResponseWriter, r *http.Request) {
 	}
 	a.setsMu.Unlock()
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, scryfallSets, nil)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, a.setsFeed, nil)
 	if err != nil {
 		a.fail(w, "sets", err)
 		return

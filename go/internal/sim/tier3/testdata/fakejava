@@ -1,0 +1,30 @@
+#!/bin/sh
+# The stand-in JVM the tier 3 tests hand to Settings.Java.
+#
+# Committed rather than written by each test, on purpose. A freshly written
+# executable is the one thing this suite cannot mint safely: on a Mac its
+# first run pays a security scan that took six seconds idle and blew a
+# thirty-second version probe under load, and on Linux a script one parallel
+# test has just written can be exec'd by another while a third still holds
+# the write end open across its own fork -- "text file busy" -- which
+# javaMajor reads as "no JVM here". Both reported as `Java None`, which reads
+# like a broken JVM rather than like a test minting binaries. So this file
+# is the executable, once, and everything a test varies is DATA it writes
+# beside the Forge home it hands the same Settings: spawn makes that home
+# the subprocess's working directory, so the segments are found by name.
+#
+# It answers `-version` the way a real JVM does (on stderr, with a major the
+# probe accepts), counts its invocations in `fakejava.runs`, and hands the
+# command line on to `fakejava.segmentN.sh` for the N-th run -- a bout that
+# clocks out a game starts a second JVM, and the count is how a test can
+# tell one from two. The trailing `:` keeps this shell alive behind the
+# segment it started, which is the deployed shape: the thing playing the
+# games is a grandchild of the process spawn holds.
+if [ "$1" = "-version" ]; then
+  echo 'openjdk version "21.0.1" 2023-10-17' 1>&2
+  exit 0
+fi
+n=1
+if [ -f fakejava.runs ]; then n=$(( $(cat fakejava.runs) + 1 )); fi
+echo $n > fakejava.runs
+/bin/sh "./fakejava.segment$n.sh" "$@" ; :

@@ -162,35 +162,27 @@ func TestASnapshotAppendsTodaysPricesAndCountsThem(t *testing.T) {
 	}
 }
 
-// **A snapshot on a machine with no pool mints one and reports zero.**
+// A snapshot over a machine with no pool refuses rather than reporting zero.
 //
-// That is the current behaviour, pinned here rather than approved of: the
-// writer creates the DuckDB file when it is absent, which is how `data
-// refresh` bootstraps a fresh machine, and the snapshot then finds no prices
-// and says so with a zero exit code.
-//
-// The operational risk is worth naming where somebody will read it. If the
-// volume ever failed to mount, `MTGLAB_DATA_DIR` would point at an empty
-// directory, this would create an empty pool on the container's own disk, and
-// the runbook would see "snapshotted 0 prices for today" and a green exit --
-// while the real price history sat untouched on the volume that is not there.
-// Whether that should refuse instead is a decision rather than a bug fix, so
-// this test records what happens today and fails the day it changes.
-func TestASnapshotOnAFreshMachineMintsAPoolAndReportsZero(t *testing.T) {
+// It used to mint an empty pool on the way through and print `snapshotted 0
+// prices for today`, green -- on an instance whose volume did not mount, a
+// fresh database on the container's own disk and a cron line that read as
+// "there were no prices" where the truth was "there is no pool". Aaron ruled
+// on 2026-09-24 that it says the true sentence, in the words every other
+// pool-backed command uses for a pool it cannot read.
+func TestASnapshotOnAFreshMachineRefusesRatherThanReportingZero(t *testing.T) {
 	t.Parallel()
 	d := scratchDeployment(t)
 
 	out, err := d.run(t, "data", "snapshot")
-	if err != nil {
-		t.Fatalf("a fresh machine failed the snapshot: %v", err)
+	if err == nil {
+		t.Fatalf("a fresh machine snapshotted nothing and called it a day: %q", out)
 	}
-	if !strings.Contains(out, "snapshotted 0") {
-		t.Errorf("a fresh machine snapshotted %q", strings.TrimSpace(out))
+	if !strings.Contains(err.Error(), "no card pool yet") {
+		t.Errorf("the refusal does not say there is no pool: %v", err)
 	}
-	// It minted the pool on the way through, which is the half worth
-	// knowing: nothing about the output says the volume was empty.
-	if _, statErr := os.Stat(d.DBPath()); statErr != nil {
-		t.Errorf("the snapshot did not create the pool it reported on: %v", statErr)
+	if strings.Contains(out, "snapshotted") {
+		t.Errorf("a refused snapshot still reported a count: %q", strings.TrimSpace(out))
 	}
 }
 

@@ -79,20 +79,47 @@ type Transport func(url string, headers map[string]string) (int, []byte, error)
 
 // Panel is the cached view. One lives on the API for the process lifetime —
 // a process-wide cache with a home rather than a global.
+//
+// The three settings below are the same seam the transport and the clock
+// already were, and they arrived for the same reason: every one of them used
+// to be read off the process at the moment it was wanted, so the only way to
+// describe a configured instance in a test was to install one on the whole
+// binary with [testing.T.Setenv] — which Go refuses inside a parallel test,
+// and which held all four of this package's tests serial. Nil and empty still
+// ask the process, because that is what the composition root wants and what a
+// deployment does; a test hands in a value and never touches the environment.
 type Panel struct {
 	Transport Transport // nil means real HTTP
 	Now       func() time.Time
-	Log       *slog.Logger
+	// Token is asked for the read-only Fly credential on every fetch that
+	// misses the cache. A function rather than a string because **read
+	// fresh, never held** is a property this panel keeps on purpose: a token
+	// filled in after the process booted takes effect on the next look
+	// rather than at the next restart, which is the behaviour
+	// TestUnconfiguredHidesAndIsNotCached describes. Nil asks the process
+	// for FLY_METRICS_TOKEN.
+	Token func() string
+	// App and Org name the instance the queries ask Fly about. Empty asks
+	// the process (FLY_APP_NAME, FLY_ORG_SLUG) and falls back to this app's
+	// own names — unlike the token these cannot change under a live
+	// container, so a string is the honest shape.
+	App, Org string
+	Log      *slog.Logger
 
 	mu     sync.Mutex
 	at     time.Time
 	cached wire.OrderedMap
 }
 
-// Token is the read-only Fly token, or empty — read fresh, never held, and
-// blank counts as absent (an empty string presented as a credential is how
-// a 401 gets mistaken for a bug).
-func Token() string { return strings.TrimSpace(os.Getenv("FLY_METRICS_TOKEN")) }
+// token is the read-only Fly token, or empty — blank counts as absent (an
+// empty string presented as a credential is how a 401 gets mistaken for a
+// bug).
+func (p *Panel) token() string {
+	if p.Token != nil {
+		return strings.TrimSpace(p.Token())
+	}
+	return strings.TrimSpace(os.Getenv("FLY_METRICS_TOKEN"))
+}
 
 // Authorization is the header value for secret — scheme included, or added.
 // A value already carrying a scheme (first word, no underscore) goes out
@@ -141,7 +168,7 @@ func (p *Panel) Fetch() wire.OrderedMap {
 	}
 	p.mu.Unlock()
 
-	secret := Token()
+	secret := p.token()
 	if secret == "" {
 		// Not cached: configuring the token should take effect on the next
 		// look rather than five minutes later.
@@ -162,8 +189,8 @@ func (p *Panel) Fetch() wire.OrderedMap {
 		"User-Agent":    userAgent,
 	}
 
-	app := envOr("FLY_APP_NAME", "sylvan-library")
-	org := envOr("FLY_ORG_SLUG", "personal")
+	app := valueOr(p.App, "FLY_APP_NAME", "sylvan-library")
+	org := valueOr(p.Org, "FLY_ORG_SLUG", "personal")
 	base := "https://api.fly.io/prometheus/" + org + "/api/v1/query"
 
 	values := wire.OrderedMap{}
@@ -261,7 +288,13 @@ func settleEdge(values map[string]*float64) {
 	}
 }
 
-func envOr(name, fallback string) string {
+// valueOr prefers what the panel was handed, then what the process was told,
+// then the name this app answers to — three sources in the order of how
+// deliberately each was chosen.
+func valueOr(given, name, fallback string) string {
+	if given != "" {
+		return given
+	}
 	if v := os.Getenv(name); v != "" {
 		return v
 	}

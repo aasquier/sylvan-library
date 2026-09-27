@@ -147,6 +147,24 @@ func snapshotInto(catalog string) string {
 // for the reason [rebuild] gives -- those are the only moment the numbers
 // change at all.
 func SnapshotPrices(ctx context.Context, db *sql.DB) (int64, error) {
+	// A pool with no printings in it is not a pool with no prices. The
+	// writer that opened this handle mints the file and its schema if they
+	// are absent -- on a machine whose volume did not mount that is a fresh,
+	// empty database on the container's own disk -- and the INSERT below
+	// would happily copy nothing into `price_history` and report
+	// `snapshotted 0 prices`, green. "There were no prices" and "there is
+	// no pool" are different sentences, and only one of them is true; this
+	// is the one command a cron runs unattended, so it says the true one, in
+	// the words every other pool-backed command uses. A `printings` table
+	// that is not there at all is the same answer, which is why the count's
+	// own failure folds into it rather than surfacing as a query error.
+	var printings int64
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM printings").Scan(&printings); err != nil {
+		return 0, fmt.Errorf("snapshot: %w", ErrNoPool)
+	}
+	if printings == 0 {
+		return 0, fmt.Errorf("snapshot: %w", ErrNoPool)
+	}
 	if _, err := db.ExecContext(ctx, snapshotInto("")); err != nil {
 		return 0, fmt.Errorf("snapshot: %w", err)
 	}

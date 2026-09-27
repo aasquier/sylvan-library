@@ -2,6 +2,9 @@ package pool_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,6 +131,151 @@ func TestAnIndexThatWillNotDecodeSaysItWasTheIndex(t *testing.T) {
 	}
 	if scryfall.downloads == 0 {
 		t.Fatal("the fixture never reached the stub, so this proves nothing")
+	}
+}
+
+// anIndexServing is the bulk index with one entry in it, exactly as given, so
+// a test can serve the index Scryfall would serve if it changed its mind about
+// how a download is named.
+func anIndexServing(t *testing.T, entry map[string]any) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{entry}})
+		}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// An index entry with no download URL on it is refused loudly, naming the keys
+// it did carry. Scryfall has renamed this field once already -- `download_uri`
+// to `jsonl_download_uri`, which is why both are read -- and the next time it
+// happens the refresh has to say *what it was handed* rather than fetching an
+// empty string and parking a zero-byte file under today's date.
+func TestAnIndexEntryWithNoDownloadURLNamesWhatItDidCarry(t *testing.T) {
+	t.Parallel()
+	index := anIndexServing(t, map[string]any{
+		"type": "oracle_cards", "updated_at": bulkUpdatedAt,
+		"the_new_name_for_it": "https://example.invalid/oracle.jsonl",
+	})
+	dest := t.TempDir()
+	_, err := pool.DownloadBulkFrom(context.Background(), index.URL,
+		"oracle_cards", dest)
+	if err == nil {
+		t.Fatal("an index entry with no download URL was followed")
+	}
+	if !strings.Contains(err.Error(), "the_new_name_for_it") {
+		t.Errorf("the refusal does not say what the entry actually held, which "+
+			"is the whole diagnosis: %v", err)
+	}
+	entries, err := os.ReadDir(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("the refused download parked %d files anyway", len(entries))
+	}
+}
+
+// A URL that is not one -- from the index, or handed to the index fetch itself
+// -- is refused where it is read, rather than at a request nobody can make.
+func TestAURLThatCannotBeRequestedIsRefusedAtOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	// The download URL, off the index.
+	index := anIndexServing(t, map[string]any{
+		"type": "oracle_cards", "updated_at": bulkUpdatedAt,
+		"jsonl_download_uri": "http://exa\x7fmple.invalid/oracle.jsonl",
+	})
+	if _, err := pool.DownloadBulkFrom(ctx, index.URL, "oracle_cards",
+		t.TempDir()); err == nil {
+		t.Error("a download URL with a control character in it was requested")
+	}
+	// And the index URL, which is the caller's own.
+	if _, err := pool.DownloadBulkFrom(ctx, "http://exa\x7fmple.invalid/bulk-data",
+		"oracle_cards", t.TempDir()); err == nil {
+		t.Error("an index URL with a control character in it was requested")
+	}
+}
+
+// A source that cannot be reached at all is a refusal naming the download, so
+// the phase a caller reads is the gathering one and the sentence a player
+// reads is about the source rather than about their library.
+func TestASourceThatCannotBeReachedIsRefusedAsADownload(t *testing.T) {
+	t.Parallel()
+	// Port 1 is reserved and nothing listens on it: a connection refused
+	// rather than a status, which is a different branch from a 500.
+	index := anIndexServing(t, map[string]any{
+		"type": "oracle_cards", "updated_at": bulkUpdatedAt,
+		"jsonl_download_uri": "http://127.0.0.1:1/oracle_cards.jsonl",
+	})
+	_, err := pool.DownloadBulkFrom(context.Background(), index.URL,
+		"oracle_cards", t.TempDir())
+	if err == nil {
+		t.Fatal("a download from a port nothing listens on succeeded")
+	}
+	if !strings.Contains(err.Error(), "bulk download") {
+		t.Errorf("the refusal does not say what was being done: %v", err)
+	}
+}
+
+// A shelf that will not take a new file refuses before a byte is read, and a
+// body that stops mid-stream leaves nothing under the real name. Both are the
+// volume filling up, which is the thing a 500MB refresh actually meets.
+func TestAShelfThatWillNotTakeTheFileAndABodyThatStopsBothLeaveNothing(t *testing.T) {
+	t.Parallel()
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory, so there is no refusal")
+	}
+	ctx := context.Background()
+
+	// The shelf itself is read-only: the directory is there, and nothing new
+	// may be created in it.
+	shut := t.TempDir()
+	body := []byte(strings.Repeat(`{"name":"Fixture Chef"}`+"\n", 50))
+	scryfall := newStubScryfall(t, "oracle-cards.jsonl", body)
+	if err := os.Chmod(shut, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(shut, 0o750) })
+	if _, err := pool.DownloadBulkFrom(ctx, scryfall.URL+"/bulk-data",
+		"oracle_cards", shut); err == nil {
+		t.Fatal("a file was created in a directory that refuses new ones")
+	}
+
+	// And a body that stops halfway: the `.part` goes with it, so the next
+	// refresh's dated skip has nothing to mistake for a complete copy.
+	cut := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/bulk-data") {
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{
+					map[string]any{"type": "oracle_cards", "updated_at": bulkUpdatedAt,
+						"jsonl_download_uri": "http://" + r.Host + "/files/oracle.jsonl"},
+				}})
+				return
+			}
+			// Promise a long file and deliver part of one. The part has to be
+			// big enough to leave the server's own write buffer, or the
+			// abort below reaches the client as a connection that never
+			// answered rather than as a body that stopped.
+			w.Header().Set("Content-Length", "10000000")
+			_, _ = w.Write([]byte(strings.Repeat(`{"name":"Fixture Chef"}`+"\n", 2000)))
+			// Abort rather than finish: the client's copy ends short.
+			panic(http.ErrAbortHandler)
+		}))
+	t.Cleanup(cut.Close)
+
+	dest := t.TempDir()
+	if _, err := pool.DownloadBulkFrom(ctx, cut.URL+"/bulk-data",
+		"oracle_cards", dest); err == nil {
+		t.Fatal("a body that stopped halfway was accepted as a download")
+	}
+	entries, err := os.ReadDir(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		t.Errorf("a cut-off download left %q behind", e.Name())
 	}
 }
 

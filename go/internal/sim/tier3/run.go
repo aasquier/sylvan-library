@@ -65,10 +65,36 @@ func javaMajor(binary string) (int, bool) {
 	return n, true
 }
 
+// javaOnPath is the first executable named `java` along a path list, which is
+// what [os/exec.LookPath] does for the process's own `PATH`.
+//
+// Written out rather than delegated because the list is a value here
+// ([Settings.PathList]) and `LookPath` has no form that takes one: it reads the
+// environment, so a test asking "what does a machine with no JVM anywhere say"
+// had to empty the `PATH` of every goroutine in the binary to ask it.
+//
+// The executable bit is checked for the same reason `LookPath` checks it — a
+// directory or a data file called `java` is not a JVM — and the probe one level
+// up still has to agree before anything runs.
+func (s Settings) javaOnPath() (string, bool) {
+	for _, dir := range filepath.SplitList(s.PathList) {
+		if dir == "" {
+			continue
+		}
+		candidate := filepath.Join(dir, "java")
+		info, err := os.Stat(candidate) //nolint:gosec // an operator's own PATH, never a request value
+		if err == nil && !info.IsDir() && info.Mode().Perm()&0o111 != 0 {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
 // JavaBinary is a JVM new enough to run Forge.
 //
 // `MTGLAB_JAVA` wins, then the JDK unpacked beside the distribution, then
-// whatever is on PATH. The PATH entry is checked rather than trusted.
+// whatever is on [Settings.PathList]. The path entry is checked rather than
+// trusted.
 func (s Settings) JavaBinary() (string, error) {
 	var candidates []string
 	if s.Java != "" {
@@ -77,7 +103,7 @@ func (s Settings) JavaBinary() (string, error) {
 	candidates = append(candidates,
 		filepath.Join(s.BundledJDK, "Contents", "Home", "bin", "java"),
 		filepath.Join(s.BundledJDK, "bin", "java"))
-	if found, err := exec.LookPath("java"); err == nil {
+	if found, ok := s.javaOnPath(); ok {
 		candidates = append(candidates, found)
 	}
 
@@ -304,8 +330,8 @@ type RunOptions struct {
 	// read loop ends the way it does on the whole-subprocess timeout.
 	//
 	// **This exists because nobody could stop a match once it started**, and
-	// that is how a worker became a zombie on the deployed instance
-	// (2026-08-30). The app's side of a bout was cancelled mid-match; the shim
+	// that is how a worker became a zombie on the deployed instance.
+	// The app's side of a bout was cancelled mid-match; the shim
 	// went on playing for whoever was no longer listening, counted itself busy
 	// the whole time, and so its idle watchdog never stopped the machine —
 	// every bout after it queued behind a match with no audience. The only
@@ -349,7 +375,7 @@ const bootAllowance = 60 * time.Second
 // wait ends, the game plays on, and because the executor's thread is not a
 // daemon it also keeps the JVM alive after `main` has returned.
 //
-// That is the hole this closes, and it was live: on 2026-08-31 a game of a
+// That is the hole this closes, and it was live: a game of a
 // ten-game bout on the deployed arena ran fifteen minutes past a three-hundred
 // second clock. Nothing cut it. The app's silence budget was right not to — the
 // game narrated the whole way, and [StallBudget] bounds silence — and every
@@ -457,7 +483,7 @@ func (e *timedOut) Is(target error) bool { return target == ErrTimedOut }
 // playing what remains. The bout that comes back is whole: `Games` rows, one of
 // them a clock-out. Nine finished games are not thrown away to report the tenth
 // — which is what every ceiling in this package did before, and what a bout on
-// the deployed arena came within minutes of on 2026-08-31.
+// the deployed arena came within minutes of.
 func (s Settings) RunGames(decks []*deck.Deck, opt RunOptions) (*SimRun, error) {
 	if len(decks) < 2 {
 		return nil, errors.New("a game needs at least two decks")

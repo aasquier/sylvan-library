@@ -22,7 +22,13 @@ func dataCommand(cfg config.Config) *cobra.Command {
 		Use:   "data",
 		Short: "Fetch and load the card pool",
 	}
-	cmd.AddCommand(dataRefreshCommand(cfg), dataSnapshotCommand(cfg), dataBackupCommand(cfg))
+	// Scryfall's bulk index is named once, here, where the tree is assembled:
+	// [dataRefreshCommand] takes it as an argument for the same reason
+	// [pool.RefreshOptions] carries it as a field rather than reading a
+	// package variable — a stand-in index is how the whole refresh can be run
+	// without the network, and a global a test swapped would be shared state.
+	cmd.AddCommand(dataRefreshCommand(cfg, pool.BulkIndex),
+		dataSnapshotCommand(cfg), dataBackupCommand(cfg))
 	return cmd
 }
 
@@ -118,7 +124,12 @@ func sayTheSweep(out io.Writer, swept pool.SweepCounts) {
 	fmt.Fprintf(out, "swept %s (%s bytes freed)\n", older, commas(swept.Bytes))
 }
 
-func dataRefreshCommand(cfg config.Config) *cobra.Command {
+// dataRefreshCommand is `mtglab data refresh`, asking `index` for the bulk
+// files. The composition root passes Scryfall's own ([pool.BulkIndex]); a test
+// passes an [net/http/httptest.Server] serving two small files, which is what
+// lets the printing below — every line of it, in order — be read rather than
+// assumed.
+func dataRefreshCommand(cfg config.Config, index string) *cobra.Command {
 	var oracleOnly bool
 	cmd := &cobra.Command{
 		Use:   "refresh",
@@ -135,6 +146,7 @@ func dataRefreshCommand(cfg config.Config) *cobra.Command {
 				DBPath:      cfg.DBPath(),
 				ScryfallDir: cfg.ScryfallDir(),
 				OracleOnly:  oracleOnly,
+				IndexURL:    index,
 			}, pool.RefreshWatcher{
 				Waiting: func() { sayWaiting(out) },
 				Gathering: func(kind string) {
