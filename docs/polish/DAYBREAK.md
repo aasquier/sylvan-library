@@ -31,30 +31,6 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 
 ---
 
-## Open — a walk before a merge (commandment 16)
-
-**Red: PR #481 is green and parked — commandment 17's focus clause made
-checkable, and the twenty-one controls it found dressed.** Two art-picker
-tiles were genuinely silent to the keyboard (an inline `outline` outranks
-every focus ring); ten classes — `.card-action`, `.menu-row`, `.nav-link`,
-`.wordmark`, `.shelf-learn`, `.reader-tile`, `.art-pick-tile`,
-`.wheel-folded`, `.wheel-fold-btn`, `.wheel-spin-btn` — answered hover and
-left focus to the browser's default ring; all now share their hover reply
-with `:focus-visible` and wear `.btn`'s vine ring. · *Cost of leaving it:*
-keyboard users get the OS blue line on this site's dark rooms, and the guard
-sits unmerged so the next inline `outline` lands unnoticed. ·
-**Recommendation:** walk and merge. `mtglab-ui` on 8765, then **Tab, never
-click** (Chrome draws `:focus-visible` for the keyboard only): `/` — Tab once
-(wordmark rings, tree shivers 700ms), Tab on (each nav link rings, its
-underline sprouts); gear → Tab (menu rows ring inset); any deck → Card actions
-bar → Tab across; deck → Change art → Tab into the tiles (lift + ring; on
-Trostani, Card art → Command Tower, the chosen tile keeps its blue ring under
-a vine halo); the folded wheel at the deck's foot → Tab, Enter, Tab to Fold
-away and Spin the wheel (glint crosses, 0.7s); `/new` → Help me decide →
-Different reader → Tab onto a reader tile; `/` → From the shelves → Another
-until "In the Learn room →" shows, Tab to it. Ledger: Red, 2026-09-19 (the
-entry rides #481 itself).
-
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and
@@ -109,18 +85,6 @@ that moves no pixels — or close it as a desktop-first ruling; either answer
 ends a finding re-measured four runs running. Ledger: Green, 2026-08-24 (the
 browser facet's queued item 3); re-measured 2026-09-19.
 
-**Red: `/api/health` reports the pool and the process, never `app.db` or the
-volume's free space, so a corrupt auth database or a full disk leaves it
-green.** · *Cost of leaving it:* every login can fail behind a passing check.
-· **Recommendation:** "yes" — add `app_db` (does it open), `disk_free_mb` and
-`schema_version` to the body and keep the status 200 (Fly stops routing on a
-failing check, and with one machine that turns "logins are broken" into "the
-site is down"), and it becomes the next Red run's first fix rather than a
-queued idea; it is a ruling only because the free-space read is
-platform-shaped and the arm64 leg of CI is the only full proof, so it lands
-as its own watched PR. Ledger: Red, the queued list carried in the 2026-09-05
-entry, item 3; re-verified 2026-09-19.
-
 **Red: the "drill older than the newest migration" rule cannot be satisfied,
 and the drill that proved it is walked and recorded.** Snapshot retention is
 five days; a snapshot can only ever rehearse a rung landed in the last five
@@ -133,17 +97,43 @@ refuse; say "checklist" instead if you want the five-day drill named beside
 2026-09-19 (the drill and the retention finding are recorded there as Red
 records carried by Cleanup).
 
-**Red: a merge queue — its ledger trigger ("the next time more than two PRs
-are open at once") fired today, with three Dependabot PRs and #481 open
-together.** Protection is `strict`, so every merge invalidates the others and
-costs each a branch update and a full re-run (~7 minutes of CI apiece,
-which is what landing the Dependabot trio one at a time costs). · *Cost of
-leaving it:* about
-twenty CI minutes on the one morning a month Dependabot batches, and nothing
-otherwise — serial rainbows never collide. · **Recommendation:** "close" —
-a merge queue changes the contributor workflow to save a monthly twenty
-minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
-list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
+**White: the coverage floor's 1.6-point gap — should it track the tree, or stay
+anchored at 95?** You asked on 2026-09-24 for "the tree at 96 and the gate at
+95" and `ci.yml` records that as a deliberate margin, so a diff can cost a few
+tenths of honest refactoring without going red. The tree now measures 96.7 and
+both readings of your ruling are defensible: hold 95.0 as a number, or keep the
+~1.6 gap as the tree climbs. · *Cost of leaving it:* nothing today — the gate
+works either way; it only matters the day the tree passes 97 and nobody knows
+whether a click is owed. · **Recommendation:** "margin" — leave 95.0 alone
+until the tree reaches 97.0, then click to 95.5 and keep the gap, because what
+you asked for was slack for refactoring and slack does not shrink as a
+codebase grows. Say "anchor" if you meant 95 as a floor the tree simply grows
+away from. Ledger: White, 2026-09-26.
+
+**White: two named coverage levers should be closed as argued rather than left
+open — `ApplyBulk`'s four fold branches and `prompt.secret`'s terminal arm.**
+Both were worked this run and both are honestly unreachable: `PlanBulk` refuses
+the same file through the same lookup, so `ApplyBulk`'s folds are defensive
+depth behind a guard and reaching them needs a `BulkPlan` the planner would
+never build; and the password prompt's terminal branch would need its terminal
+read handed in as a value, which moves the five uncovered statements into the
+seam's own default rather than removing them. · *Cost of leaving it:* one hour
+per future coverage leg, spent rediscovering this — `COVERAGE.md` currently
+advertises the password one as "the single biggest lever left in `cmd/mtglab`".
+· **Recommendation:** "yes to both" — move both into `COVERAGE.md`'s *Left
+deliberately* with the reasons above, so the list keeps its promise of being
+the thing you read before spending an hour on a branch that cannot be entered
+honestly. Ledger: White, 2026-09-26, queued items 2 and 3.
+
+**White: the determinism replay is owed** — tarot, brew, wheel and Tier 1
+against the live instance, which this run could not do (a worktree lane with no
+browser; the pane belonged to another lane). · *Cost of leaving it:* the
+once-a-cycle check that a seed is still a promise where users live slips a
+week; the local goldens are unaffected and green. · **Recommendation:** no
+ruling wanted — it is work, and the next White or Green run with browser access
+takes it, using 09-19's recorded baselines (tarot seed 1909 → 741 bytes, sha256
+`e406f504…`; brew → 503 bytes, sha256 `54c5036e…`; Tier 1 in the two-ask
+cached form). Ledger: White, 2026-09-26.
 
 ## Open — a dollar and an account
 
@@ -151,12 +141,19 @@ list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 that keeps its port is an outage nothing detects.** Fly's HTTP check stops
 routing on failure and the restart policy fires only on exit, so a wedged
 process is a total outage with no alarm. · *Cost of leaving it:* the first
-person to notice an outage is a friend at breakfast. · **Recommendation:**
-two free minutes first — does fly-metrics.net hold any alert rule at all? —
-then UptimeRobot's free tier on `GET /api/health` (GET, never HEAD: `HEAD /`
-answers 405) wired to Pushover ($5 once) for the phone. Ledger: Red, the
-queued list carried in the 2026-09-05 entry, items 1–2; on the queue since
-09-19 only, in the ledger since 08-16.
+person to notice an outage is a friend at breakfast. · **The two free minutes
+are spent and they end at your login:** `fly` has no alert-rule subcommand at
+all, fly-metrics.net answers 401 unauthenticated, and `FLY_METRICS_TOKEN` is a
+read-only Prometheus credential rather than a Grafana one — so *whether any
+alert rule exists* is two clicks in your own Fly session and nothing a run can
+find out. (`fly synthetics` is new and is not the answer: the agent runs on
+Fly, so it cannot report that Fly is down.) · **Recommendation:** look once
+while you are in there, then UptimeRobot's free tier on `GET /api/health`
+(GET, never HEAD: `HEAD /` answers 405, and a Go guard asserts the GET now)
+wired to Pushover ($5 once) for the phone. The health body reports `app_db`,
+`disk_free_mb` and `schema_version` as of 2026-09-26, so the monitor has
+something to read besides 200. Ledger: Red, the queued list carried in the
+2026-09-05 entry, items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
 

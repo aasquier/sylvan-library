@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 // Compression the app owns. Fly's edge compresses on its own, but the app's
@@ -21,6 +22,31 @@ import (
 // headers must describe what a GET would have sent.
 
 const gzipFloor = 1024
+
+// **A level-9 compressor is the largest object in the request path, so it is
+// borrowed rather than built.** Measured on `gzip_bench_test.go` (2026-09-26,
+// this Mac): one compressed response allocated **836,848 B in 31 allocations**,
+// against 22,704 B in 10 for the same body sent uncompressed. Nearly the whole
+// difference is one `flate.Writer` — level 9's window pair and its deflate hash
+// tables — built for one response and thrown away. Every asset and every JSON
+// body over `gzipFloor` paid it. Pooled: **23,435 B in 14**, which is the
+// uncompressed path plus the framing.
+//
+// The pool's one hazard is the only thing worth being careful about here: a
+// writer returned while something still holds it would serve one response's
+// bytes inside another's. Three rules keep that impossible, and
+// `TestBorrowedCompressorsNeverBleedOneResponseIntoAnother` holds the first two:
+// `Reset` re-points the writer at this response's own sink before a byte is
+// written, the writer goes back only in [gzipWriter.finish] — after `Close` has
+// written the trailer — and the field is cleared in the same breath, so a second
+// `finish` cannot hand the same writer back twice.
+//
+// A handler that panics simply never returns its writer, which is the safe
+// direction: one fewer reusable compressor, never a shared one.
+var gzipWriters = sync.Pool{New: func() any {
+	zw, _ := gzip.NewWriterLevel(nil, gzip.BestCompression)
+	return zw
+}}
 
 func gzipped(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +104,9 @@ func (g *gzipWriter) commit() {
 		h.Set("Content-Encoding", "gzip")
 		h.Add("Vary", "Accept-Encoding")
 		g.ResponseWriter.WriteHeader(g.status)
-		g.zw, _ = gzip.NewWriterLevel(g.ResponseWriter, gzip.BestCompression)
+		zw, _ := gzipWriters.Get().(*gzip.Writer)
+		zw.Reset(g.ResponseWriter)
+		g.zw = zw
 		_, _ = g.zw.Write(g.buf)
 		g.buf = nil
 		return
@@ -98,13 +126,18 @@ func (g *gzipWriter) sink(b []byte) (int, error) {
 }
 
 // finish commits a response that never reached the floor and closes the
-// compressor, which writes the gzip trailer.
+// compressor, which writes the gzip trailer — then hands the compressor back.
+// The clear is not tidiness: it is what makes a second call to finish unable to
+// return the same writer to the pool twice.
 func (g *gzipWriter) finish() {
 	if !g.committed {
 		g.commit()
 	}
 	if g.zw != nil {
 		_ = g.zw.Close()
+		zw := g.zw
+		g.zw = nil
+		gzipWriters.Put(zw)
 	}
 }
 
