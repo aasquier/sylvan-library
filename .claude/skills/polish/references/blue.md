@@ -21,10 +21,14 @@ have fallen behind.
   merely names its contents is a finding; the standard is the determinism
   kernels' docs (`internal/mt19937`, `internal/floats`), which say what
   would break and why the code is shaped as it is.
-- The layering is checkable: `internal/door` owns HTTP concerns and auth
-  sweeps; `internal/api` never reaches around the door; DuckDB stays behind
-  `internal/pool`; the determinism kernels import nothing above them. Grep,
-  don't trust.
+- The layering is checkable, and since 2026-09-26 it is **checked**:
+  `go/cmd/mtglab/layering_test.go` holds all three claims — DuckDB stays
+  behind `internal/pool`, `internal/door` sits above `internal/api` and
+  nothing below mounts a door, the determinism kernels import nothing above
+  them. It parses rather than asking `go list`, so a `_linux.go` file's
+  imports are in scope on this darwin laptop. Three runs' worth of hand-greps
+  live in that file now; re-grep only to *extend* the claims, not to re-verify
+  them.
 - **The corpora under `testdata/` are frozen goldens** — a diff touching one
   is a finding in itself, whatever the tests say.
 - Exact-arithmetic discipline: served float sums go through `floats.Fsum`,
@@ -143,14 +147,31 @@ Work the list:
     | cut -d: -f1 | sort | uniq -c | sort -rn
   ```
 
-  Measured 2026-08-23: **33 reads outside tests in 8 files — 9 of them inside
-  `internal/config` and 24 outside it**, with `internal/sim/tier3/worker.go`
-  holding ten on its own, plus a **second local reader**, `envOr`, in
-  `cmd/mtglab/ui.go`. Not every outside read is a bug (a worker process that
-  is configured entirely by its environment is a reasonable shape), but every
-  one is a question: **does this switch have exactly one place that decides
-  its default?** Two readers mean two defaults, and the second one is
-  discovered in production.
+  **That grep is one command answering three questions, and the trend line it
+  fed was therefore not measuring one thing.** Every entry in this section from
+  2026-08-23 onward quoted its single number, and the 09-24 parallel work made
+  the number *rise* while the doctrine got strictly better — because it turned
+  reads into hand-ins. So report **two numbers, always, and say which is
+  which**:
+
+  1. **Process reads** — `os.Getenv(...)` actually called to decide something.
+     This is the number that matters and the one that should trend to zero
+     outside `internal/config`.
+  2. **Composition-root hand-ins** — `os.Getenv` passed as a *value* into a
+     `func(string) string` parameter (`config.LoadFrom`, `claude.SettingsFrom…`,
+     `tier3.LoadSettings…`, `cmd/mtglab`'s `envOr`). Each of these is the
+     doctrine *working*: the reader is a lookup the caller owns, so a test
+     describes a deployment as a map. More of these is better, not worse.
+
+  Doc-comment mentions (`[os.Getenv]` in a package comment) are the third thing
+  the grep counts and are neither; filter them out by eye. Measured
+  2026-09-26: **2 real process reads outside tests**, both argued fallbacks in
+  `internal/flymetrics`, and **6 composition-root hand-ins** — against a naive
+  grep of 15 in 7 files. Not every outside read is a bug (a worker process
+  configured entirely by its environment is a reasonable shape), but every one
+  is a question: **does this switch have exactly one place that decides its
+  default?** Two readers mean two defaults, and the second one is discovered in
+  production.
 - **Documented, or it does not exist.** CLAUDE.md says `.env.example`
   documents the names. That is an absolute claim; check it rather than
   inheriting it:
