@@ -20,6 +20,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/deck"
 	simcache "github.com/aasquier/sylvan-library/go/internal/sim/cache"
+	"github.com/aasquier/sylvan-library/go/internal/sim/compile"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3/ledger"
 )
@@ -125,7 +126,9 @@ func TestSimManaRefusesWithoutThePool(t *testing.T) {
 	d := simHome(t, false)
 	writeSimDeck(t, d, "mono-green", monoGreenText(t))
 	_, err := d.run(t, "sim", "mana", "mono-green")
-	want := "simulation needs the card pool -- run `mtglab data refresh` first"
+	// Off the refusal's own type, never typed: the sentence lives in
+	// [compile.PoolRequired] and a rewording there must move this test.
+	want := (&compile.PoolRequired{}).Error()
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -149,7 +152,9 @@ func TestSimManaRefusesADeckThePoolCannotSee(t *testing.T) {
 		"",
 	}, "\n"))
 	_, err := d.run(t, "sim", "mana", "nobody")
-	want := "simulation needs the card pool -- run `mtglab data refresh` first"
+	// Off the refusal's own type, never typed: the sentence lives in
+	// [compile.PoolRequired] and a rewording there must move this test.
+	want := (&compile.PoolRequired{}).Error()
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}

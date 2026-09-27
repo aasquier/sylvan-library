@@ -63,18 +63,39 @@ lever and a grind is visible before the work starts.
 | PR #290 | 90.1% | 89.81% |
 | #290's follow-up | 90.4% | 90.40% |
 | #478's pass | 90.8% | 90.82% |
-| the climb of 2026-09-24 (nine lanes, #488–#496) | **96.6%** | 96.56% |
-| the rainbow of 2026-09-26, leg three (the pool's faulty connector) | **96.7%** | |
+| the climb of 2026-09-24 (nine lanes, #488–#496) | 96.6% | 96.56% |
+| leg two, 2026-09-26 (the rainbow's White lane) | **96.7%** | |
+| leg three, 2026-09-26 (the pool's faulty connector) | **96.7%** measured on leg two's base | |
 | floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
 
-Leg three's arithmetic is worth reading, because it is what a *fixture* costs
-as opposed to a test: `internal/pool` went **58 → 41** missing statements
-(seventeen closed), and the tree went **734 → 721** of 21,628 → 21,689 — the
-fixture itself is sixty-one new statements, four of which nothing drives
-(`OpenFaulty`'s `tb.Fatal`, a `plain.Close()` that cannot fail). That is the
-"a test fixture in a non-test package costs coverage" trap below, paid
-knowingly and kept small; the first `authtest/faulty.go` paid forty-nine of
-them.
+**Leg two is the leg that says the climb is over**, and the number is the
+argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
+writing for their own sake. What was left after 09-24 is **734 missing
+statements over 419 functions** — 1.8 each — and `internal/api`, the worst
+package at 256, is 125 functions averaging two: the uncovered source lines
+there are `if err != nil {` sixty-seven times, a bare `return` sixty-nine, and
+a closing brace a hundred and seventy-three. There is no lever in that; there
+is a grind. **So the standing question is the better spend at this altitude**,
+and leg two's own centrepiece was not a test at all but a claim made
+machine-checked: `go/cmd/mtglab/addressreach_test.go`, which replaced the
+address-grep the checklist had been performing by hand every run with a
+register held equal in both directions *and* a call-graph rule requiring every
+route that can reach an address to check for an admin. The rule caught a
+mutation the register could not see — the public `login` route answering
+`accountBody` — which is the whole case for preferring one checked claim to
+three more tests.
+
+**Leg three, the same day, is what a *fixture* costs as opposed to a test.**
+`internal/pool` went **58 → 41** missing statements, seventeen closed;
+measured against `3e7832f` — before leg two landed, so the numbers below are
+not additive with the row above — the tree read 96.6 → 96.7, **734 → 721
+missing of 21,628 → 21,689**. The growth in the denominator is the interesting
+half: the fixture is sixty-one new statements, four of which nothing drives
+(`OpenFaulty`'s `tb.Fatal`, a `plain.Close()` that cannot fail), so seventeen
+closed branches bought thirteen. That is the "a test fixture in a non-test
+package costs coverage" trap below, paid knowingly and kept small — the first
+`authtest/faulty.go` paid forty-nine of them. **CI's arm64 print on the merged
+branch is the authority; neither lane's local number is.**
 
 The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
@@ -167,10 +188,24 @@ as meaningful to whoever finds it next.
 - **`fs.Glob` swallows its `ReadDir` error**, so `Fingerprint`'s glob-error
   branch cannot fire with a literal `"*"`; the `fs.ReadFile` branch beside
   it can and does.
-- **`users.go:prompt.secret`'s terminal branch** wants a real pty
-  (`golang.org/x/sys` is already a dependency; platform-specific test code
-  nobody has argued for yet) — the single biggest lever left in
-  `cmd/mtglab`, at five statements.
+- **`users.go:prompt.secret`'s terminal branch** — five statements, and it is
+  **closed by argument rather than open**, which 2026-09-26 worked out and is
+  queued for the ruling that makes it official. A real pty needs
+  platform-specific test code nobody has argued for. The alternative, handing
+  the terminal read in as a value (the tree's standing move — `Settings.Java`,
+  `RefreshOptions.IndexURL`), was designed and **rejected**: the seam's own
+  default still calls `term.ReadPassword`, which no test can reach, so the
+  uncovered statements move into the seam rather than out of the tree — net
+  about four — and restructuring a password-reading path to buy four statements
+  is the wrong trade at any coverage number. Do not re-derive this.
+- **`ApplyBulk`'s four fold-error branches** (`internal/deckedit/bulk.go`) are
+  defensive depth behind a guard, probed rather than assumed on 2026-09-26:
+  `PlanBulk` reads the deck through the same `locateCard`, so a file that would
+  make a fold fail is refused while it is still a plan on screen. Reaching them
+  needs a hand-built `BulkPlan` with a matching `Basis` that the planner would
+  never produce — which is calling past the guard. The *reachable* half of that
+  class is covered instead, by
+  `TestAnEditRefusesADeckWhoseCardListItCannotScan`.
 - **Fixture rows come out of the real pool by machine.** Grand Coliseum,
   Jareth, Leonine Titan and Lightning Helix went into `tiny_pool.json` on
   2026-09-24 through a throwaway script over `data/mtg.duckdb`
@@ -316,10 +351,52 @@ them is reusable:
     `writeAtomicallyOn(disk, …)` is a struct of five functions, a value
     rather than a hook so the package's tests stay parallel.
 
-These are from the rainbow of 2026-09-26. **If #504's or #512's own additions
-land first, renumber — integrator's call.**
+25. **The refusal at the mapper, not through the route.** A function that turns
+    an error into a status and a sentence is a pure function of the error, and
+    driving it through a route needs the failure to happen for real — which is
+    why `refuseTheme`'s interesting arms had never run and why the arm a player
+    meets on the worst day was the least tested. Call the mapper directly with
+    each error class, and assert the pair: the status a browser branches on,
+    *and* that the unpredicted arm answers in the room's own words while the
+    cause goes to the log. `internal/api/refusalwords_test.go` is the shape, and
+    the log half is commandment 10 made checkable — a raw error in a body is
+    machinery wearing a sentence's clothes.
+26. **The file that parses perfectly and still cannot be edited.** Every
+    malformed-input sweep reaches for files that fail at the *parse*, and those
+    are refused before anything looks at anything. The dangerous class is the
+    other one: valid YAML, a real deck, the right cards in the parsed list, and
+    only the text scanner comes up empty — `internal/deckedit` recognises a card
+    entry by the literal line `- name: …`, so a flow mapping, a bare string
+    entry, `why` before `name`, a quoted `name` key or an anchor all parse and
+    scan to nothing. One fixture family drives ADR 12's refusal across every
+    card operation *and* the bulk planner. Two things it taught: the **plan** is
+    read through the same lookup, so the refusal lands before the button rather
+    than after it; and the one write that legitimately succeeds
+    (`AddToBoard`, which owns a different list) has to leave the unreadable
+    lines byte-identical or the exemption is a hole.
+27. **A claim the checklist re-greps every run is the claim to make checkable.**
+    `go/cmd/mtglab/addressreach_test.go` came out of noticing that
+    `references/white.md` *instructs* a grep — "grep for every call site each
+    run — a third one is the finding" — which is a rule enforced by whoever
+    remembers. Two halves, and the second is where the value is: a **register**
+    held equal in both directions catches a new direct reader, and a
+    **call-graph closure** over the package catches the regression a register
+    structurally cannot — a route that reaches the address through somebody
+    else. Mutation-verified by making the public `login` route answer
+    `accountBody`: the register stayed green, the closure named the route.
+28. **Counting the census finds the dead test.** Reading the skip census
+    (59 sites, up from 40) sorted eighteen of nineteen new skips into real
+    absences and left one that was not: an `if` whose body was a `t.Skip`, sited
+    *after* the test's real assertion had passed, so its only effect was to
+    relabel a green test as one that never ran — and it was aimed at a sentence
+    the command under test does not even produce. The fix is the skill's own
+    rule: take the expectation off the source of truth
+    (`(&compile.PoolRequired{}).Error()`), never restate it.
 
-25. **The pool that goes away mid-read.** `pooltest.OpenFaulty` is lever 15 one
+These three are from the testing facet's third leg, the same day. **If #512's
+own additions land after this, they renumber — integrator's call.**
+
+29. **The pool that goes away mid-read.** `pooltest.OpenFaulty` is lever 15 one
     database across: the tiny pool on a real disk, behind a `driver.Connector`
     that spends a budget of statements or of rows and then refuses. A wrapper
     over the real driver, never a fork — DuckDB is cgo. It is what makes
@@ -327,7 +404,7 @@ land first, renumber — integrator's call.**
     `rows.Err()` reachable in six pool reads at once. Reach for it for any
     branch that asks *what happens after the first statement succeeded*; the
     schemaless pool (lever 7) is still the right fixture for the first one.
-26. **Sweep the budget, never guess it.** A budget is spent across **every**
+30. **Sweep the budget, never guess it.** A budget is spent across **every**
     query on the handle, so the number at which a given read breaks is a fact
     about today's schema: `GetCards` reads the pool's column list before it
     reads a card, which is one row per column (twenty-eight, plus the one that
@@ -336,8 +413,10 @@ land first, renumber — integrator's call.**
     answers* — plus both floors, and the test stops being about the column
     count. A third check is worth adding for a budget sweep: **monotonicity.**
     If a larger budget ever refuses after a smaller one answered, the sweep
-    below it proves nothing.
-27. **Drive the trigger with a name, not the function with an argument.**
+    below it proves nothing — and once it holds, two answers in a row is proof
+    enough, which turns the ceiling into a bound on the search rather than a
+    bill the suite pays.
+31. **Drive the trigger with a name, not the function with an argument.**
     `sweep.datedDay` is unexported and unit-testable, and testing it that way
     would have proved nothing about the sweep. Three *ten-character* misspelt
     stamps on a real shelf (`oracle_cards-2026_08-20.jsonl` and friends) reach
