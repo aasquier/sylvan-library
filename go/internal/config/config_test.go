@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -95,37 +96,50 @@ func TestTheNightSwitchesArriveRawAndEmpty(t *testing.T) {
 	}
 }
 
-// TestLoadReadsTheEnvironmentOnce is the one test in this package that touches
-// the process, because [Load] is the one function that reads it. It cannot be
-// parallel, and that is the whole point of it being alone: everything else
-// here describes a Config instead of setting one up.
-func TestLoadReadsTheEnvironmentOnce(t *testing.T) {
-	t.Setenv("MTGLAB_DATA_DIR", "/data")
-	t.Setenv("MTGLAB_DECKS_DIR", "/data/decks")
-	t.Setenv("MTGLAB_REQUIRE_AUTH", "1")
-	t.Setenv("MTGLAB_SECURE_COOKIES", "")
-	t.Setenv("MTGLAB_BASE_URL", "https://example.test/")
-	t.Setenv("MTGLAB_EMAIL_FROM", "")
-	t.Setenv("RESEND_API_KEY", "re_not_a_real_key")
-	// The five night switches, each set to a value no other could pass as, so
-	// two wirings swapped in Load land somewhere an assertion notices — the
-	// configrecord gate only proves each *name* is documented, never which
-	// field it reaches.
-	t.Setenv("MTGLAB_NIGHT_WINDOW", "23:30-01:30")
-	t.Setenv("MTGLAB_NIGHT_ZONE", "America/Los_Angeles")
-	t.Setenv("MTGLAB_NIGHT_BOUTS", "4")
-	t.Setenv("MTGLAB_NIGHT_BOUTS_PER_ACCOUNT", "1")
-	t.Setenv("MTGLAB_NIGHT_GAMES", "7")
+// environment is a deployment described as a value: the map [LoadFrom] reads
+// instead of the process, which is what lets the one test about the whole
+// resolution run beside every other.
+func environment(vars map[string]string) func(string) string {
+	return func(name string) string { return vars[name] }
+}
 
-	c := Load()
+// TestLoadReadsAnEnvironmentOnce is about [LoadFrom], which is [Load] with
+// the lookup handed in. It describes a fully-configured deployment as a map
+// and asserts where every one of those values lands — the configrecord gate
+// only proves each *name* is documented, never which field it reaches.
+func TestLoadReadsAnEnvironmentOnce(t *testing.T) {
+	t.Parallel()
+	c := LoadFrom(environment(map[string]string{
+		"MTGLAB_DATA_DIR":       "/data",
+		"MTGLAB_DECKS_DIR":      "/data/decks",
+		"MTGLAB_REQUIRE_AUTH":   "1",
+		"MTGLAB_SECURE_COOKIES": "",
+		"MTGLAB_BASE_URL":       "  https://example.test/  ",
+		"MTGLAB_EMAIL_FROM":     "",
+		"RESEND_API_KEY":        "re_not_a_real_key",
+		// The five night switches, each set to a value no other could pass
+		// as, so two wirings swapped in Load land somewhere an assertion
+		// notices.
+		"MTGLAB_NIGHT_WINDOW":            "23:30-01:30",
+		"MTGLAB_NIGHT_ZONE":              "America/Los_Angeles",
+		"MTGLAB_NIGHT_BOUTS":             "4",
+		"MTGLAB_NIGHT_BOUTS_PER_ACCOUNT": "1",
+		"MTGLAB_NIGHT_GAMES":             "7",
+		"MTGLAB_ADMIN_EMAIL":             "keeper@example.test",
+		"MTGLAB_ADMIN_USERNAME":          "keeper",
+		"MTGLAB_CLIENT_IP_HEADER":        "Fly-Client-IP",
+	}))
 	if c.DataDir != "/data" || c.DecksDir != "/data/decks" {
 		t.Errorf("dirs: %+v", c)
 	}
 	if !c.RequireAuth || !c.SecureCookies {
 		t.Error("auth on should have carried secure cookies with it")
 	}
+	// Both halves of the one line that is not a plain copy: the surrounding
+	// whitespace an exported-from-a-shell value carries, then the trailing
+	// slash a base URL must not keep.
 	if c.BaseURL != "https://example.test" {
-		t.Errorf("the trailing slash survived: %q", c.BaseURL)
+		t.Errorf("the trailing slash or the padding survived: %q", c.BaseURL)
 	}
 	if !c.EmailFromIsDefault() {
 		t.Errorf("an unset From address should be the default: %q", c.EmailFrom)
@@ -133,8 +147,27 @@ func TestLoadReadsTheEnvironmentOnce(t *testing.T) {
 	if c.ResendAPIKey != "re_not_a_real_key" {
 		t.Errorf("key: %q", c.ResendAPIKey)
 	}
+	if c.AdminEmail != "keeper@example.test" || c.AdminUsername != "keeper" ||
+		c.ClientIPHeader != "Fly-Client-IP" {
+		t.Errorf("the maintainer and proxy settings landed wrong: %+v", c)
+	}
 	if c.NightWindow != "23:30-01:30" || c.NightZone != "America/Los_Angeles" ||
 		c.NightBouts != "4" || c.NightBoutsPerAccount != "1" || c.NightGames != "7" {
 		t.Errorf("the night switches landed on the wrong fields: %+v", c)
+	}
+}
+
+// An environment that says nothing resolves to exactly [Defaults] — the
+// laptop's footing, and the assertion that no field quietly reads a variable
+// under a name nobody wrote down.
+func TestAnEmptyEnvironmentResolvesToTheLaptopsDefaults(t *testing.T) {
+	t.Parallel()
+	if got := LoadFrom(environment(nil)); got != Defaults() {
+		t.Fatalf("a silent environment did not resolve to the defaults: %+v", got)
+	}
+	// And the door that reads the real process is the same function, so a
+	// Load on a machine is a LoadFrom over os.Getenv and nothing else.
+	if Load() != LoadFrom(os.Getenv) {
+		t.Fatal("Load and LoadFrom(os.Getenv) disagreed about this machine")
 	}
 }

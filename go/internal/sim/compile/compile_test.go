@@ -21,7 +21,7 @@ import (
 // Two corpora in one file, and they are separate on purpose. The **texts** are
 // the three readers on their own -- the functions that read prose, where every
 // real bug this module has had lived. The **decks** are the whole chain: the
-// same YAML, parsed by `internal/deck`, resolved against the same 21-card pool
+// same YAML, parsed by `internal/deck`, resolved against the same fixture pool
 // through `pooltest`, compiled, and compared card for card in order.
 //
 // The deck cases are what make the text cases trustworthy rather than the
@@ -168,7 +168,7 @@ func TestTheTextReadersMatchTheCorpus(t *testing.T) {
 // TestCardShapesThePoolDoesNotHold runs the compiler over records built by
 // hand, and it is where four mutations died.
 //
-// The 21-card pool is a real pool, which is its whole value and also its
+// The fixture pool is a real pool, which is its whole value and also its
 // limit: it holds no card whose front is an artifact and whose back is a
 // creature, no land that is also a creature, no fetchland, and nothing whose
 // `produced_mana` carries a string Scryfall would never send. Each of those

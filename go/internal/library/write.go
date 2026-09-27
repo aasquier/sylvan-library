@@ -171,9 +171,56 @@ func (f *FileSource) WriteText(ctx context.Context, slug, text string) error {
 	return writeAtomically(path, text)
 }
 
+// tempFile is the part of `*os.File` the atomic write uses, named as an
+// interface for one reason: the five failures below.
+//
+// A write, a sync, a close, a chmod and a rename each get their own wrapped
+// error carrying the path, because the operator reading the log has to know
+// **which deck would not save** -- and on a working disk not one of those five
+// branches can be made to fire. `unwritable_test.go` gets as far as it can
+// from outside, by taking away the directory's write bit, and that reaches
+// only the first call; the rest were never run by anything until this seam
+// existed. The alternative to a seam is five error paths in the write that
+// guards the source of truth (ADR 1), none of which anybody has ever seen
+// work.
+type tempFile interface {
+	Name() string
+	WriteString(string) (int, error)
+	Sync() error
+	Close() error
+}
+
+// disk is the filesystem the atomic write works through. `realDisk` is the
+// one the app uses; a test builds one that refuses at a chosen step.
+//
+// Deliberately a value rather than a package-level hook: a test that installs
+// a fake filesystem on the process is a test that cannot run beside its
+// neighbours, and this package's tests are all parallel.
+type disk struct {
+	createTemp func(dir, pattern string) (tempFile, error)
+	stat       func(name string) (os.FileInfo, error)
+	chmod      func(name string, mode os.FileMode) error
+	rename     func(oldpath, newpath string) error
+	remove     func(name string) error
+}
+
+func realDisk() disk {
+	return disk{
+		createTemp: func(dir, pattern string) (tempFile, error) { return os.CreateTemp(dir, pattern) },
+		stat:       os.Stat,
+		chmod:      os.Chmod,
+		rename:     os.Rename,
+		remove:     os.Remove,
+	}
+}
+
 func writeAtomically(path, text string) error {
+	return writeAtomicallyOn(realDisk(), path, text)
+}
+
+func writeAtomicallyOn(fs disk, path, text string) error {
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".deck-*.yaml")
+	tmp, err := fs.createTemp(dir, ".deck-*.yaml")
 	if err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
@@ -182,7 +229,7 @@ func writeAtomically(path, text string) error {
 	// when it has not: a temporary file left in the deck's directory would be
 	// picked up by nothing -- the glob wants `deck.yaml` -- but would sit
 	// there forever.
-	defer func() { _ = os.Remove(name) }()
+	defer func() { _ = fs.remove(name) }()
 
 	if _, err := tmp.WriteString(text); err != nil {
 		_ = tmp.Close()
@@ -200,12 +247,12 @@ func writeAtomically(path, text string) error {
 	// The temporary file is created 0600; the deck files are the app's own and
 	// are read by nothing else, but a mode that changes on the first edit is
 	// the kind of surprise a volume backup notices.
-	if info, err := os.Stat(path); err == nil {
-		if err := os.Chmod(name, info.Mode().Perm()); err != nil {
+	if info, err := fs.stat(path); err == nil {
+		if err := fs.chmod(name, info.Mode().Perm()); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)
 		}
 	}
-	if err := os.Rename(name, path); err != nil {
+	if err := fs.rename(name, path); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil

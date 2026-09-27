@@ -62,6 +62,18 @@ func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening app.db for the Claude ledger: %w", err)
 	}
+	// Proved at the open, not at the first write. `sql.Open` only records
+	// the DSN, so without this a missing `app.db` -- a volume that did not
+	// mount -- was discovered by the first conversation's `Record`, which
+	// warns rather than fails: conversations happened, cost money and were
+	// not recorded, and nothing said so but a log line. A conversation that
+	// cannot be recorded should not start, so the recorder refuses to be
+	// built. The reading side keeps the other rule, that a read never
+	// acquires a database.
+	if err := auth.PingWritable(context.Background(), db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("opening app.db for the Claude ledger: %w", err)
+	}
 	if logger == nil {
 		logger = slog.Default()
 	}

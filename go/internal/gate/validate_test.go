@@ -15,7 +15,7 @@ import (
 )
 
 // The differential cases: each fixture deck's text beside its recorded
-// report -- with the 21-card pool and without -- and this test must produce
+// report -- with the fixture pool and without -- and this test must produce
 // the same issues, in the same order, with the same sentences. That is the
 // Phase 3 gate for the gate: validate matches the golden case for case.
 

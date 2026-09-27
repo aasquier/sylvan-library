@@ -193,7 +193,7 @@ func TestACardIsAddedToTheSectionItWasAskedFor(t *testing.T) {
 
 	// Onto a board that exists.
 	const richDeck = "/api/decks/alice/rich"
-	// `rich`'s commander is not in the 21-card fixture pool, so the identity
+	// `rich`'s commander is not in the fixture pool, so the identity
 	// resolves to colourless and only a colourless card may be added.
 	status, _, raw = rig.do(t, alice, "POST", richDeck+"/cards",
 		`{"name":"Bag End Banquet","category":"payoff","why":"a finisher","to":"swap_board"}`)
@@ -262,7 +262,7 @@ func TestASwapMovesTheCardOutRatherThanLosingIt(t *testing.T) {
 		t.Skip("the fixture does not hold the card this swaps out")
 	}
 
-	// Both cards are in the 21-card fixture pool, and the incoming one is
+	// Both cards are in the fixture pool, and the incoming one is
 	// legal in Commander -- a banned card is a different refusal, tested
 	// with the gate rather than here.
 	status, _, raw := rig.do(t, alice, "POST", cleanDeck+"/swap",

@@ -170,7 +170,7 @@ func TestNoCommanderIsNoColoursRatherThanNoField(t *testing.T) {
 
 // ---------------------------------------------------------------- the deal
 
-// tinyDeck is a real deck over the 21-card pool: a green commander, four
+// tinyDeck is a real deck over the fixture pool: a green commander, four
 // spells, and enough Forests to make a library worth shuffling.
 func tinyDeck() *deck.Deck {
 	return &deck.Deck{

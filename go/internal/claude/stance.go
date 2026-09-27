@@ -22,7 +22,6 @@ package claude
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -256,18 +255,26 @@ func DefaultFor(deck DeckStatused) Stance {
 // CeilingEnv names the deployment's cap.
 const CeilingEnv = "MTGLAB_CLAUDE_STANCE_CEILING"
 
-// Ceiling is the most permissive stance this deployment allows anyone to
-// select.
+// CeilingFrom reads a deployment's cap out of one string.
+//
+// The most permissive stance this deployment allows anyone to select, and the
+// whole of the rule in eight lines: empty means uncapped, a preset name means
+// that preset, and anything else means OFF.
 //
 // Defaults to Collaborator — the top of what presets offer — because a local
 // run on the maintainer's own key should not need configuring to work. A
 // hosted instance sets MTGLAB_CLAUDE_STANCE_CEILING and every request is
 // clamped to it, including ones from a client that asks for more.
 //
-// Read at call time, not at package init: an operator changing the cap should
-// not have to restart the process to lower it.
-func Ceiling() Stance {
-	raw := os.Getenv(CeilingEnv)
+// **A parse, not a lookup**, which is the ADR 39/40 shape arriving last in
+// this package. The string comes from [SettingsFromLookup] and from nowhere
+// else, so the rule is describable by handing it a value: `CeilingFrom("")`
+// is an uncapped deployment and `CeilingFrom("not-a-preset")` is a typo in
+// one, neither of which needs a process to be written to. It used to read
+// `os.Getenv` here, at call time, on the argument that an operator could
+// lower the cap without a restart — an argument a container's immutable
+// environment cannot honour, and one that held twelve tests serial to buy it.
+func CeilingFrom(raw string) Stance {
 	if raw == "" {
 		return Collaborator
 	}
@@ -278,6 +285,28 @@ func Ceiling() Stance {
 		return Off
 	}
 	return s
+}
+
+// ceilingOr is the cap a caller handed down, or the built-in default.
+//
+// The one reading of the `limit *Stance` convention, so that every surface
+// that takes one — [Resolve] and the four deckless `…StanceFor` functions —
+// falls back the same way and to the same stance [Settings.ceiling] does.
+// Nil means "nobody configured a cap", which is Collaborator; it cannot mean
+// "refuse everything", because the zero Stance is Off and a silent total
+// outage is the wrong shape for a missing default.
+//
+// Nothing here consults the process. A deployment's cap reaches this by being
+// threaded — `api.Config` carries one field, the door passes it through, and
+// every serving call site passes `a.claude.Ceiling` — and
+// `TestASettingsBuiltFromTheEnvironmentAlwaysCarriesACeiling` holds the
+// composition root to filling it, which is the guard that used to be bought
+// by reading the environment again down here.
+func ceilingOr(limit *Stance) Stance {
+	if limit != nil {
+		return *limit
+	}
+	return Collaborator
 }
 
 // Clamp returns requested with every axis lowered to limit where it exceeds

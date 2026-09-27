@@ -130,6 +130,104 @@ func TestTheSkillsNameOnlyPathsThatResolve(t *testing.T) {
 	}
 }
 
+// testFuncDecl is a test function's own declaration line. `gofmt` guarantees
+// the `func` is at column zero in a file this repository will accept, so an
+// anchored match cannot pick up a call, a comment, or a closure.
+var testFuncDecl = regexp.MustCompile(`(?m)^func (Test[A-Za-z0-9_]+)\(`)
+
+// skillCitedTest is a Go test name written in skill prose. Anchored on the
+// word boundary rather than on backticks, because these are cited both ways
+// ("`TestEveryGoFileCompilesOnBothCILegs`" and bare, mid-sentence).
+var skillCitedTest = regexp.MustCompile(`\bTest[A-Z][A-Za-z0-9_]*`)
+
+// notATest is the two `Test`-shaped tokens skill prose writes that are not
+// citations of anything. `TestMain` is the language's own entry point -- a
+// package may have none, one, or several across the tree, and the skills
+// mention it to say it is *not* a test. `TestX` is the stand-in in the
+// diagnosis recipe `go test -race -run '^TestX$'`, where the whole point is
+// that the reader substitutes their own name. Restating a list is normally
+// the wrong move in this file, and it is the right one here for the same
+// reason as `repoExtensions`: a wrong entry means one missed stale citation,
+// never a false alarm, and a new stand-in fails loudly until it is argued
+// onto this list.
+var notATest = map[string]bool{"TestMain": true, "TestX": true}
+
+// A skill that points at a test by name is making the strongest claim the
+// pass knows how to make: *this rule is enforced, and here is the thing that
+// enforces it*. The claim is also the one most likely to go quietly wrong,
+// because a test can be renamed or deleted by work that never opens a skill
+// file -- and when it does, the skill goes on promising enforcement that is
+// gone, which is the "silent permission" failure this pass warns a proposed
+// guard about, one level up.
+//
+// This file's own doc comment records that exact rot as one of the three that
+// motivated it ("a test cited as the model of good practice that had been
+// deleted"), and then held only paths and commands. This is the third leg.
+func TestTheSkillsNameOnlyTestsThatExist(t *testing.T) {
+	t.Parallel()
+	root, files := skillDocs(t)
+
+	have := map[string]bool{}
+	err := filepath.WalkDir(filepath.Join(root, "go"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if skipDir(d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		body, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for _, m := range testFuncDecl.FindAllStringSubmatch(string(body), -1) {
+			have[m[1]] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An empty lookup is the way this guard goes inert: every citation would
+	// be reported, or -- worse, if the loop below were ever written the other
+	// way round -- none would.
+	if len(have) < 100 {
+		t.Fatalf("only %d test functions found under go/; the declaration "+
+			"scan has probably stopped matching, and a lookup that small "+
+			"cannot answer anything", len(have))
+	}
+
+	cited := 0
+	for _, rel := range files {
+		body, readErr := os.ReadFile(filepath.Join(root, rel))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		for _, name := range skillCitedTest.FindAllString(string(body), -1) {
+			if notATest[name] {
+				continue
+			}
+			cited++
+			if !have[name] {
+				t.Errorf("%s cites %s as the thing that enforces a rule, and "+
+					"no test by that name exists under go/ -- so the skill is "+
+					"promising enforcement that is gone. Point it at the test "+
+					"that holds the rule now, or stop claiming the rule is held.",
+					rel, name)
+			}
+		}
+	}
+	if cited == 0 {
+		t.Error("no test name cited in any skill document; the extractor has " +
+			"probably stopped matching")
+	}
+}
+
 func TestTheSkillsNameNoCommandTheBinaryLacks(t *testing.T) {
 	t.Parallel()
 	have := map[string]bool{}

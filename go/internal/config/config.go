@@ -153,20 +153,35 @@ const (
 	DefaultEmailFrom = "mtglab <no-reply@localhost>"
 )
 
-// Load reads the environment and resolves it into a [Config].
+// Load reads the process's environment and resolves it into a [Config]. It is
+// [LoadFrom] over [os.Getenv], and `cmd/mtglab` calls it once per command, at
+// the top.
 //
-// **This is the only reader of the settings on [Config]**, and `cmd/mtglab`
-// calls it once per command, at the top. That single reader is what keeps a
-// test from having to mutate the process in order to describe a deployment.
+// **This is the only reader of the settings on [Config]**, and that single
+// reader is what keeps a test from having to mutate the process in order to
+// describe a deployment.
 //
-// Three things in the tree still read the environment on their own, and each
-// is deliberate rather than missed. `cmd/mtglab`'s `envOr` supplies *flag
+// A handful of places in the tree still read the environment on their own, and
+// each is deliberate rather than missed. `cmd/mtglab`'s `envOr` supplies *flag
 // defaults* for `--web-dist` and `--tarot`, which Cobra needs while it is
 // building the command tree -- before a `Load` could have run. The Forge shim
 // (`cmd/mtglab/shim.go`) and `internal/sim/tier3` read the Forge variables,
-// and `internal/claude` reads the Anthropic ones; both are the second
-// injection ADR 39 names and does not attempt.
-func Load() Config {
+// `internal/claude` reads the Anthropic ones, and `internal/flymetrics` reads
+// the Fly ones; those are the second injection ADR 39 names and does not
+// attempt, and each of them now takes the value as well, so the process read
+// is the fallback rather than the only door.
+func Load() Config { return LoadFrom(os.Getenv) }
+
+// LoadFrom resolves a [Config] out of any environment: getenv answers for a
+// variable name the way [os.Getenv] does, and a test hands in a map rather
+// than installing one on the binary it is running inside.
+//
+// The split exists for one reason and it is worth naming: [testing.T.Setenv]
+// is what a test needed before it, and Go panics on that inside a parallel
+// test, so the one function that resolves this app's whole deployment could
+// only ever be described by a test that ran alone.
+func LoadFrom(getenv func(string) string) Config {
+	env := func(name string) string { return strings.TrimSpace(getenv(name)) }
 	c := Defaults()
 	if v := env("MTGLAB_DATA_DIR"); v != "" {
 		c.DataDir = v
@@ -195,9 +210,6 @@ func Load() Config {
 	c.NightGames = env("MTGLAB_NIGHT_GAMES")
 	return c
 }
-
-// env is the one read, trimmed the one way.
-func env(name string) string { return strings.TrimSpace(os.Getenv(name)) }
 
 // ParseFlag reads an on/off setting the way `config._flag` does: blank is the
 // default; otherwise one of 1/true/yes/on, case-insensitively, is on and

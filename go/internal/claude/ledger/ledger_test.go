@@ -465,3 +465,48 @@ func TestTheRollUpAgreesWithTheCorpus(t *testing.T) {
 		}
 	}
 }
+
+// A recorder over a database that is not there is refused at the open.
+//
+// It used to open: `sql.Open` only records the DSN, so the absence was
+// discovered by the first read -- while `Record` itself warned rather than
+// failing, because the ledger never fails the feature. On an instance whose
+// volume did not mount, conversations happened, cost money and were not
+// recorded, and nothing said so except a line in the log. Aaron ruled on
+// 2026-09-24 that a conversation which cannot be recorded should not start:
+// `NewRecorder` pings the file the way `internal/auth` does, and refuses.
+func TestARecorderOverAMissingDatabaseIsRefusedAtTheOpen(t *testing.T) {
+	t.Parallel()
+	r, err := NewRecorder(filepath.Join(t.TempDir(), "never", "app.db"), nil)
+	if err == nil {
+		_ = r.Close()
+		t.Fatal("a recorder was built over a database that is not there; the " +
+			"first conversation would have cost money and gone unrecorded")
+	}
+	if r != nil {
+		t.Errorf("a refused open still handed back a recorder: %+v", r)
+	}
+}
+
+// Closing what was never opened is the no-ledger case rather than a fault: a
+// caller writes `defer r.Close()` before knowing whether there is a ledger at
+// all, and nil is how "no ledger" arrives everywhere else in this package.
+func TestClosingARecorderThatIsNotThereIsNotAFault(t *testing.T) {
+	t.Parallel()
+	var absent *Recorder
+	if err := absent.Close(); err != nil {
+		t.Errorf("closing a nil recorder: %v", err)
+	}
+	if err := (&Recorder{}).Close(); err != nil {
+		t.Errorf("closing a recorder with no handle: %v", err)
+	}
+	// The floor, so the two branches above are a special case rather than the
+	// whole function: a real recorder's Close actually closes.
+	r := scratch(t)
+	if err := r.Close(); err != nil {
+		t.Fatalf("closing a real recorder: %v", err)
+	}
+	if _, err := r.Summarise(context.Background(), "mode", "", ""); err == nil {
+		t.Error("a closed recorder still answered a roll-up")
+	}
+}

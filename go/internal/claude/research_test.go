@@ -168,24 +168,20 @@ func TestTheQuestionKeyLowercasesWhereFullFoldingDiffers(t *testing.T) {
 
 // ------------------------------------------------------------ the stance
 
+// The corpus's ceiling column is a deployment's setting, and it reaches the
+// function as the `limit` a serving process threads through — the same path
+// `/api/research` takes from `a.claude.Ceiling`, rather than a variable
+// installed on a process this test shares with every other one.
 func TestResearchStanceForAgreesWithTheCorpus(t *testing.T) {
-	// **Serial**: it calls `t.Setenv(CeilingEnv)` once per corpus row, to drive the ceiling
-	// this mapping is read under, which Go
-	// panics on inside a parallel test -- the environment is one slot for the
-	// whole process, so two tests setting it at once are one test reading the
-	// other's deployment.
-	//
-	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
-	// than reading the process, which is what ADR 39/40 did for every other
-	// piece of configuration in this package.
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	for _, row := range corpus.StanceFor {
 		ceiling := ""
 		if row.Ceiling != nil {
 			ceiling = *row.Ceiling
 		}
-		t.Setenv(CeilingEnv, ceiling)
-		got, err := ResearchStanceFor(row.Requested, nil)
+		limit := CeilingFrom(ceiling)
+		got, err := ResearchStanceFor(row.Requested, &limit)
 		if err != nil {
 			t.Errorf("ceiling %q requested %v: %v", ceiling, row.Requested, err)
 			continue
@@ -198,17 +194,11 @@ func TestResearchStanceForAgreesWithTheCorpus(t *testing.T) {
 // The default is not `off`: a surface whose only control is a question box
 // has been asked for a call. `Resolve(nil, nil)` would answer off, and that
 // is the bug `/api/claude` once had.
+// An uncapped deployment is a nil limit — the value a caller with no ceiling
+// hands down, which is what the blank variable used to buy by writing the
+// process.
 func TestTheDefaultResearchStanceIsNotOff(t *testing.T) {
-	// **Serial**: it calls `t.Setenv(CeilingEnv)` to blank the ceiling, because what it asserts
-	// is the default and a ceiling on the machine would be a different question, which Go
-	// panics on inside a parallel test -- the environment is one slot for the
-	// whole process, so two tests setting it at once are one test reading the
-	// other's deployment.
-	//
-	// The fix is `claude.Ceiling` taking its ceiling as an argument rather
-	// than reading the process, which is what ADR 39/40 did for every other
-	// piece of configuration in this package.
-	t.Setenv(CeilingEnv, "")
+	t.Parallel()
 	s, err := ResearchStanceFor(nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -220,12 +210,12 @@ func TestTheDefaultResearchStanceIsNotOff(t *testing.T) {
 		t.Errorf("the default is %+v, want second-opinion", s)
 	}
 	// And a deployment ceiling still clamps it.
-	t.Setenv(CeilingEnv, "consultant")
-	s, _ = ResearchStanceFor(nil, nil)
+	capped := CeilingFrom("consultant")
+	s, _ = ResearchStanceFor(nil, &capped)
 	if s != Consultant {
 		t.Errorf("under a consultant ceiling the default is %+v", s)
 	}
-	// Off is still reachable.
+	// Off is still reachable, capped or not.
 	s, _ = ResearchStanceFor("off", nil)
 	if s.AllowsCalls() {
 		t.Error("off was not reachable")
@@ -244,27 +234,17 @@ func TestTheResearchOpeningIsTheRecordedShape(t *testing.T) {
 
 // ------------------------------------------------------------- the runs
 
+// The corpus's frozen `generated_at` reaches both halves through the plan:
+// `checkResearch` stamps a refusal, `readResearch` stamps an answer, and the
+// clock is the value this test hands in rather than a swap of the package's.
 func TestEveryResearchOutcomeMatchesTheGolden(t *testing.T) {
-	// **Serial, and measured rather than read**: `noEnvOverrides` calls
-	// `t.Setenv`, so Go panics on a `t.Parallel()` here. Nothing in this body
-	// says so -- the call is one helper away, and that helper is in
-	// `dossier_test.go`, a file away -- which is why the audit adds the line
-	// and runs the test rather than reading for a reason.
-	//
-	// The blocker is `claude.Ceiling`, the last reader of
-	// `MTGLAB_CLAUDE_STANCE_CEILING` left in this package: describing a
-	// deployment still means installing one on the process here. When the
-	// ceiling becomes a value the way the model override already did (ADR
-	// 39/40), this test and its eight neighbours parallelise with nothing to
-	// change but the deletion of this comment.
-	noEnvOverrides(t)
-	freezeClock(t)
+	t.Parallel()
 	corpus := loadResearchCorpus(t)
 	sawAnswer := false
 	withPool(t, func(c *pool.Conn) {
 		ctx := context.Background()
 		for _, row := range corpus.Reports {
-			plan, err := CheckResearch(row.Question, row.Requested, "", nil, Endpoint{})
+			plan, err := checkResearch(frozenClock, row.Question, row.Requested, "", nil, Endpoint{})
 			if err != nil {
 				t.Fatalf("%s: check: %v", row.Note, err)
 			}

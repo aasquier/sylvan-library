@@ -102,18 +102,31 @@ var (
 )
 
 func init() {
+	FullDeck, Spread, ByKey = loadDeck(deckJSON)
+}
+
+// loadDeck reads the embedded deck and indexes it.
+//
+// It takes the bytes rather than reading the embed directly so the refusal
+// can be driven: a deck file that does not parse is a build that must not
+// ship, and a panic nobody has ever seen fire is a promise rather than a
+// guard. The table is the fortune-teller's whole room -- there is no
+// fallback deck and no half a reading -- so the failure belongs at start,
+// where nobody is sitting at the table waiting for it.
+func loadDeck(raw []byte) (full []Card, spread []Position, byKey map[string]Card) {
 	var doc struct {
 		Spread []Position `json:"spread"`
 		Cards  []Card     `json:"cards"`
 	}
-	if err := json.Unmarshal(deckJSON, &doc); err != nil {
+	if err := json.Unmarshal(raw, &doc); err != nil {
 		panic(fmt.Sprintf("tarot: the embedded deck is unreadable: %v", err))
 	}
-	FullDeck, Spread = doc.Cards, doc.Spread
-	ByKey = make(map[string]Card, len(FullDeck))
-	for _, c := range FullDeck {
-		ByKey[c.Key] = c
+	full, spread = doc.Cards, doc.Spread
+	byKey = make(map[string]Card, len(full))
+	for _, c := range full {
+		byKey[c.Key] = c
 	}
+	return full, spread, byKey
 }
 
 // Drawn is a card, where it landed, and which way up.

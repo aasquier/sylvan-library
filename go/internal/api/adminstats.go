@@ -72,29 +72,55 @@ func (a *API) statsSystem(w http.ResponseWriter, r *http.Request) {
 
 // schemaApplied reads `user_version` off `app.db` through a bare read-only
 // connection — never through the ladder, because a stats panel that could
-// change the schema by being looked at is not a stats panel. `mode=ro`
-// refuses to create the file and the exists() check keeps a bare laptop
-// from logging a warning per refresh; the redundancy is deliberate, exactly
-// as `adminstats._schema` argues it.
+// change the schema by being looked at is not a stats panel.
 func (a *API) schemaApplied() any {
+	_, version := a.appDBReading()
+	return version
+}
+
+// appDBReading opens `app.db` read-only and answers the two facts anything
+// watching this instance wants from it: whether it opens and answers at all,
+// and which rung of the ladder it sits on. One reader for both because they
+// are one read — the pragma that reports the rung is also the cheapest proof
+// the file is a database.
+//
+// `mode=ro` refuses to create the file and the exists() check keeps a bare
+// laptop from logging a warning per refresh; the redundancy is deliberate,
+// exactly as `adminstats._schema` argued it.
+//
+// Three shapes, and the difference between the middle two is the whole point
+// of the first return value:
+//
+//   - **nil, nil** — this instance has no `app.db` (no path, or nothing at
+//     the path). Nothing is wrong; there is nothing to open.
+//   - **false, nil** — there is a file and it would not answer. Half a
+//     restore, a download that landed on the wrong name, a corrupt header.
+//     Every login on this instance is failing.
+//   - **true, <rung>** — it opened and answered.
+//
+// It is a header read and not an integrity check: `PRAGMA integrity_check`
+// walks the whole database and is not something a probe runs every thirty
+// seconds. What this catches is the fault that presents as a green instance
+// where nobody can sign in.
+func (a *API) appDBReading() (opens any, version any) {
 	if a.dbPath == "" {
-		return nil
+		return nil, nil
 	}
 	if _, err := os.Stat(a.dbPath); err != nil {
-		return nil
+		return nil, nil
 	}
 	db, err := sql.Open("sqlite", "file:"+url.PathEscape(a.dbPath)+"?mode=ro")
 	if err != nil {
 		a.log.Warn("could not read app.db schema version", "error", err)
-		return nil
+		return false, nil
 	}
 	defer func() { _ = db.Close() }()
-	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+	var applied int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&applied); err != nil {
 		a.log.Warn("could not read app.db schema version", "error", err)
-		return nil
+		return false, nil
 	}
-	return version
+	return true, applied
 }
 
 // statsStorage is `GET /api/admin/stats/storage`: what is on the volume,

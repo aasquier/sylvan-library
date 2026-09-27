@@ -1039,18 +1039,15 @@ func (l *lockedLog) String() string {
 	return l.b.String()
 }
 
-// Serial: it lowers the package-level `slowRequest` floor to zero, which
-// every request in this package crosses Handler under — a parallel
-// neighbour would see the lowered floor and log warnings nobody asked for.
+// The warning fires on a door built with no patience at all: one nanosecond
+// is a floor every answer crosses, and it is this door's own floor rather
+// than the package's, so the doors standing beside it stay quiet.
 func TestASlowRequestLeavesARouteShapedWarning(t *testing.T) {
-	saved := slowRequest
-	slowRequest = 0
-	t.Cleanup(func() { slowRequest = saved })
-
+	t.Parallel()
 	logged := &lockedLog{}
 	web, tarot := site(t)
 	d, err := New(Config{RequireAuth: false, SecureCookies: false,
-		WebDist: web, TarotDir: tarot,
+		WebDist: web, TarotDir: tarot, SlowRequest: time.Nanosecond,
 		Logger: slog.New(slog.NewTextHandler(logged, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -1069,5 +1066,27 @@ func TestASlowRequestLeavesARouteShapedWarning(t *testing.T) {
 	// carry a person — the ledger's own rule, held for the log too.
 	if strings.Contains(line, "mono-green") {
 		t.Fatalf("the warning leaked a concrete path: %q", line)
+	}
+
+	// And the other half of the bargain, which is the half a deployment
+	// lives under: a door told nothing gets the half-second default, and an
+	// answer that took microseconds earns no line at all. Without this, a
+	// resolution that quietly landed on zero would log every request on the
+	// instance and read as green here.
+	quiet := &lockedLog{}
+	patient, err := New(Config{WebDist: web, TarotDir: tarot,
+		Logger: slog.New(slog.NewTextHandler(quiet, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if patient.slowRequest != DefaultSlowRequest {
+		t.Fatalf("an unset floor resolved to %v, want %v",
+			patient.slowRequest, DefaultSlowRequest)
+	}
+	psrv := httptest.NewServer(patient.Handler())
+	t.Cleanup(psrv.Close)
+	_ = get(t, psrv, "GET", "/api/decks/local/mono-green", "").Body.Close()
+	if strings.Contains(quiet.String(), "slow request") {
+		t.Fatalf("a fast answer under the default floor still warned: %q", quiet.String())
 	}
 }
