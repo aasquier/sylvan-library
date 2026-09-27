@@ -116,17 +116,19 @@ Tier 1 cache discarded. · **Recommendation:** read §3 and §4 of #506 and
 answer **"union"** (merge it) or **"MDFC only"** (and no golden moves at all).
 Ledger: Green, 2026-09-26.
 
-**Green: nothing reports how old the card pool is, and this is the fourth run
-to say so.** `pool_stale` asks whether the pool predates the *columns* the app
-reads, so it answers `false` for a pool of any age; the only age signal in the
-product is a date inside a bulk filename that a person has to go and read.
-Today: 13 days old, `pool_stale: false`. · *Cost of leaving it:* legality and
-prices answer out of date silently, and the one number that would have said so
-is the one nothing reports. · **Recommendation:** "yes" — add `pool_age_days`
-to the health body beside the `disk_free_mb` that #502 adds, as a small
-follow-on once #502 lands. Deliberately not built today: two lanes editing
-`health.go` on one afternoon is a merge conflict for nothing. Ledger: Green,
-2026-09-26.
+**Green: nothing reported how old the card pool is, and this is the fourth run
+to say so — BUILT, and open as PR #515.** Taken at the recommendation once #502
+landed: `pool_age_days` sits beside `disk_free_mb` in the `/api/health` body,
+off Scryfall's own stamp on the bulk files rather than off the pool file's
+mtime, because a rebuild moves the mtime and does not make month-old rows
+younger. Two readings had to be chosen and both are argued in the code: for a
+shelf holding both kinds it is the **older** of the two (a run that loaded only
+the oracle half leaves prices exactly as behind as they were), and an
+unanswerable question — no shelf, an undated file, a clock that has not
+synchronised — is `null` rather than a small reassuring number, which is
+`disk_free_mb`'s own rule one key across. · **Nothing left to rule**; the line
+stays here only until #515 merges. Ledger: Green, 2026-09-26 (the entry at the
+end of the section).
 
 **Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
 existed nowhere else, and it is deleted now.** It survives in git history
@@ -218,6 +220,24 @@ to five questions" against a cap of six, and the theme's replace-versus-union
 rule — put to you rather than guessed. Queued rather than landed because it is
 all model-facing text and the dossier's instructions are hash-frozen in a
 corpus. Ledger: Black, 2026-09-26.
+
+**White: a faulty *pool* still needs a one-field seam in the app, and four
+packages are waiting on it.** `pooltest.OpenFaulty` now hands back a DuckDB
+handle that refuses past a budget, which is what closed `internal/pool`'s
+own half-answer branches — but `internal/cards`, `internal/deckread`,
+`internal/api` and `internal/library` all reach the pool through a
+`*pool.Pool`, and a Pool opens its own file inside `acquire` (`pool.Open` on
+`p.path`). So they are still stuck with the schemaless fixture, which fails at
+the *first* statement. The seam is one field and one exported constructor —
+`open func(context.Context, string) (*sql.DB, error)`, defaulting to `Open`,
+which is the tree's own documented idiom (`tier3.Settings.Java`,
+`api.Config.BulkIndex`). · *Cost of leaving it:* COVERAGE.md's own entry for
+`deckread/commander.go`'s seven statements says it wants "a pool that breaks
+mid-flight, which no fixture yet is" — the fixture now exists and cannot be
+plugged in. · **Recommendation:** "go" — a test-only field on a production
+struct is what this tree already does everywhere else, and the alternative is
+four copies of a test-only `Conn` door. Ledger: White, 2026-09-26 (rainbow,
+leg three).
 
 **Colorless: this file's own rule says "one line per item" and not one item has
 obeyed it for a month — is the rule wrong, or is the file?** Every item here is

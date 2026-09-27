@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -22,16 +23,19 @@ import (
 // `door.PublicPaths`, so the platform's anonymous probe and a signed-in
 // browser read the same number.
 //
-// **Three of the facts here are about sickness rather than liveness, and the
-// status stays 200 for all of them.** `app_db`, `disk_free_mb` and
-// `schema_version` answer the two faults that used to leave this route green
-// while the site was unusable: a corrupt auth database (every login fails, the
-// card pool is fine) and a full volume (every write fails, likewise). They are
-// reported in the body and never in the status, because the platform stops
-// routing to a machine whose check fails and there is one machine — so a
-// failing status turns "logins are broken" into "the site is down". Whoever is
-// watching from outside decides what is worth waking somebody for; this route's
-// job is to make the decision possible.
+// **Four of the facts here are about sickness rather than liveness, and the
+// status stays 200 for all of them.** `app_db`, `disk_free_mb`,
+// `pool_age_days` and `schema_version` answer the faults that used to leave
+// this route green while the site was wrong: a corrupt auth database (every
+// login fails, the card pool is fine), a full volume (every write fails,
+// likewise), and a library weeks behind (every card answers, with last month's
+// legality and last month's prices — `pool_stale` cannot see it, because it
+// asks about columns rather than about age). They are reported in the body and
+// never in the status, because the platform stops routing to a machine whose
+// check fails and there is one machine — so a failing status turns "logins are
+// broken" into "the site is down". Whoever is watching from outside decides
+// what is worth waking somebody for; this route's job is to make the decision
+// possible.
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	var oracle, printings int64
 	var stale bool
@@ -44,6 +48,7 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	sickness := wire.OrderedMap{
 		{Key: "app_db", Value: opens},
 		{Key: "disk_free_mb", Value: diskFreeMB(a.dataDir)},
+		{Key: "pool_age_days", Value: poolAgeDays(a.scryfallDir, time.Now())},
 		{Key: "schema_version", Value: applied},
 	}
 
@@ -136,4 +141,34 @@ func diskFreeMB(dataDir string) any {
 		return nil
 	}
 	return free / (1 << 20)
+}
+
+// poolAgeDays is how many whole days ago the rows this library was built from
+// were published, or nil when nothing on the shelf can say.
+//
+// **`diskFreeMB`'s rule, applied to the other number that would be read as
+// reassurance.** A small age means "the library is current", so the one thing
+// this may never do is answer a small number for a question nobody could
+// answer — an absent shelf, an undated file, a stamp that is ten characters of
+// digits and still not a day. Each of those is nil.
+//
+// A stamp in the *future* is nil for the same reason and it is not a
+// hypothetical: a container whose clock has not synchronised yet would compute
+// a negative age, and clamping that to zero would print the most reassuring
+// possible number at exactly the moment the machine cannot be trusted about
+// time at all.
+//
+// Whole days, floored, off `time.Time.Sub` — a pool published yesterday
+// afternoon and read this morning is nought days old rather than one, which is
+// the reading a person would give it.
+func poolAgeDays(scryfallDir string, now time.Time) any {
+	day, ok := pool.BulkDataDay(scryfallDir)
+	if !ok {
+		return nil
+	}
+	age := now.UTC().Sub(day)
+	if age < 0 {
+		return nil
+	}
+	return int64(age.Hours() / 24)
 }
