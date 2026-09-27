@@ -19,10 +19,11 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-26 (rainbow, and its second leg — the grind).
-  Previous: 2026-09-24 (the coverage climb, outside the rainbow), 2026-09-19
-  (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
-  2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-26 (rainbow — three legs of the testing facet, run in
+  parallel: the machine-checked claim, the grind, and the pool's faulty
+  connector). Previous: 2026-09-24 (the coverage climb, outside the rainbow),
+  2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
+  2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -30,6 +31,75 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-26 (rainbow, leg three — the pool's faulty connector)
+
+The testing facet's third leg, run beside legs one and two. Leg two (#504)
+landed while this one was in flight and its block sits directly below; leg
+one's (#512) was still open and will sort in beside them. Nothing in
+`internal/pool` was touched by either, so the only overlap was these three
+documents.
+
+Leg two's queued recommendation was the whole brief: *"the next grind is a
+fixture, not a sweep — `internal/pool`'s missing statements want a faulty
+DuckDB connector, the last named fixture gap in the tree."* That is what this
+leg built, and then swept with.
+
+- **`pooltest.OpenFaulty` exists** (`go/internal/pool/pooltest/faulty.go`).
+  `authtest.OpenFaulty` one database across: the tiny pool on a real disk,
+  reached through the real driver, behind a [driver.Connector] that spends a
+  budget of statements (`Fault.After`) or of rows (`Fault.RowsAfter`) and then
+  refuses every one. A wrapper, never a fork — DuckDB is cgo and its driver is
+  a prebuilt library. The fixture the suite already had is a **schemaless**
+  pool, which fails every read at its *first* statement; everything past the
+  first statement had no fixture at all.
+- **`internal/pool`: 58 → 41 missing statements; the tree 734 → 721 of
+  21,628 → 21,689, and 96.6% → 96.7% by `go tool cover -func`.** Seventeen
+  closed. The tree's 61 new statements are the fixture itself, four of them
+  undriveable and named in COVERAGE.md. Fourteen of the seventeen came through the
+  new fixture: `Columns`, `ArtFor`, `GetCards`, `tokenParts`,
+  `tokenIdentities` and `tokenArtByOracle` all have a `rows.Err()` branch that
+  only a result set dying mid-iteration can reach; `probeStaleness` refuses at
+  each of its **six** statements; `TokensMade`'s probe; `loadInto`'s BEGIN; and
+  both of `SnapshotPrices`' post-count faults.
+- **What the assertions are about, in every case: whether a *partial* answer is
+  handed on as a whole one.** A card lookup short by half is a page telling a
+  newcomer their decklist is wrong (commandment 2). A token sheet that comes
+  back `Read: true` and empty says *this deck makes nothing* about a deck full
+  of Food — and the mutation run proved that sentence live: deleting
+  `tokenParts`' `rows.Err()` check produced exactly `read=true` with no tokens
+  on a pool holding both. `SnapshotPrices` folds its *first* count's failure
+  into `ErrNoPool` on purpose, so the test holds that word **reserved**: a
+  volume that detached mid-write must not be reported as a library with no
+  prices, because that is the one command a cron runs unattended.
+- **Two classes proved unreachable, and they are the reason this leg is
+  seventeen statements rather than twenty-five.** A **scan into `*any` cannot
+  fail** — `database/sql`'s `convertAssign` ends `case *any: *d = src; return
+  nil` — which kills six `rows.Scan` error branches in this package outright
+  (`scanRecord` and its two callers, `ArtFor`, `tokenParts`,
+  `tokenIdentities`, `tokenArtByOracle`). And `Columns` scans into `*string`,
+  which **DuckDB's strict typing cannot poison**: leg two reached the same
+  shape in SQLite through affinity (a text left sitting in a REAL column) and
+  there is no DuckDB equivalent.
+- **Two cheap levers taken while in the package, both by driving the real
+  trigger rather than the function.** `datedDay`'s two remaining arms are now
+  reached by putting three *ten-character* misspelt stamps on the download
+  shelf (`oracle_cards-2026_08-20`, `…-08x20`, `…-08-2O`) and asserting the
+  sweep leaves all three — the existing test covered only a *short* stamp.
+  `ownerOf`'s no-Unix-stat arm is reached with an `fstest.MapFS` FileInfo, in
+  both shapes: a `Sys()` of another type, and a **typed nil**, which without
+  the `stat == nil` half of the guard is a nil dereference in the middle of a
+  refresh (mutation-verified: it panics).
+- **No production Go file touched.** Four new test files, two existing test
+  files extended, one test-only seam: `export_test.go` gains `ConnOver(db)`,
+  which is `&Conn{db: db, pool: New("", nil)}` — lever 19's shape, made
+  visible to the external test package. It is a test file rather than a
+  production field **on purpose**: a `Pool` opens its own file through
+  `pool.Open`, so a faulty *Pool* needs a seam in the app, which is queued
+  rather than taken.
+- **The floor did not move**, for the reason legs one and two both recorded:
+  `ci.yml` carries the 1.6-point gap as Aaron's own 2026-09-24 ruling, and the
+  lane brief said not to ratchet it.
 
 ### 2026-09-26 (rainbow)
 
@@ -7958,6 +8028,38 @@ is quoted only where it was taken at a load this entry names.
   re-record trap above, which would have silently rewritten all nine), and
   **`fly status --app mtglab` does not exist** — the Fly app is
   `sylvan-library` (Red met the same thing today, so it is two lanes now).
+
+**Follow-on the same evening, by the testing facet's third leg: queued item 1
+above is BUILT (PR #515), once #502 had landed and the conflict it was deferred
+for was gone.** `pool_age_days` is in the `/api/health` body beside
+`disk_free_mb`, and both the readings it needed were decisions rather than
+arithmetic:
+
+- **Off Scryfall's stamp, not off the pool file.** `pool.BulkDataDay` reads the
+  date out of the parked bulk filenames, through the sweep's *own* parser rather
+  than a second copy of it — `parkedBulk` and the new reader are one function now
+  (`parkedBulkDay`), so the suffix list and the date rule stay in one place. The
+  pool file's mtime was the obvious alternative and it is wrong: a rebuild
+  rewrites `mtg.duckdb` and does not make month-old rows younger, so a pool
+  rebuilt this morning out of a six-week-old download would have read as fresh.
+- **The OLDEST kind on the shelf, never the newest.** `--oracle-only` is a
+  supported refresh and a run that fell over between its two loads leaves the
+  same shape, so a shelf can hold a day-old oracle file beside a month-old
+  printings file. The pool built from those is a month behind on prices and
+  printings whatever the oracle half says. Per kind it is still the *newest*
+  copy, because the older ones are rollbacks `SweepBulk` has not taken yet.
+  Mutation-verified: flipping the comparison answers 0 where the truth is 42.
+- **`null`, never a small number, for anything unanswerable** — no shelf, an
+  undated name, ten characters that are not a day (`2026-13-45`), and a stamp in
+  the *future*, which is a container whose clock has not synchronised. Clamping
+  that last one to zero would print "the library is current" at exactly the
+  moment the machine cannot be trusted about time; it is `diskFreeMB`'s
+  never-`0`-for-an-unanswered-read rule, one key across, and it is
+  mutation-verified too.
+- Nine table cases plus three shelf-shape tests (a directory wearing a bulk
+  file's exact name dates nothing; an unreadable shelf says so rather than
+  answering the zero time). `HOSTING.md`'s health-key list gains the fourth
+  bullet and its "three" becomes "four", in the same diff.
 
 ### 2026-09-19 (rainbow) — no PR of its own; ledger carried by the next leg
 
