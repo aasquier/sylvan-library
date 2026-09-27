@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -16,12 +17,13 @@ import (
 // The no-pool shape, as bytes: the degraded answer is the platform's normal
 // state between deploy and seeding, and its key order is part of the wire.
 //
-// The three sickness keys are here as well as in the healthy shape, and that
+// The four sickness keys are here as well as in the healthy shape, and that
 // is the point of them: an instance between deploy and seeding still has an
-// auth database and a volume, and whatever is watching from outside should
-// never have to branch on the card pool to find out whether they are well.
-// Nulls throughout because this instance was described with no data directory
-// and no `app.db` — nothing is wrong; there is nothing to open.
+// auth database, a volume and possibly a shelf of downloads, and whatever is
+// watching from outside should never have to branch on the card pool to find
+// out whether they are well. Nulls throughout because this instance was
+// described with no data directory, no `app.db` and no download shelf —
+// nothing is wrong; there is nothing to open.
 func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
 	t.Parallel()
 	a := New(Config{DecksDir: t.TempDir()})
@@ -30,10 +32,111 @@ func TestHealthWithNoPoolIsTheDegradedShapeExactly(t *testing.T) {
 		t.Fatalf("%d: %s", status, raw)
 	}
 	want := `{"pool":false,"oracle_cards":0,"printings":0,` +
-		`"app_db":null,"disk_free_mb":null,"schema_version":null,` +
+		`"app_db":null,"disk_free_mb":null,"pool_age_days":null,` +
+		`"schema_version":null,` +
 		`"message":` + string(mustJSON(t, noPoolMessage)) + `}`
 	if string(raw) != want {
 		t.Fatalf("got %s\nwant %s", raw, want)
+	}
+}
+
+// **How old the library's rows are, which nothing reported until now.**
+// `pool_stale` asks whether the pool predates the *columns* this binary reads,
+// so it answers `false` for a library of any age — and a library six weeks
+// behind answers every card with last month's legality and last month's prices,
+// confidently. The number comes off Scryfall's own stamp on the bulk files a
+// refresh parked, so it is the age of the **data** rather than of the file: a
+// rebuild moves `mtg.duckdb`'s mtime and does not make month-old rows younger.
+//
+// Driven through the route rather than the function, because the key and its
+// place in the body are the deliverable. The arithmetic is held by
+// [TestThePoolsAgeIsAbsentRatherThanReassuring], which owns a clock.
+func TestHealthReportsHowOldTheLibrarysRowsAre(t *testing.T) {
+	t.Parallel()
+	scryfall := t.TempDir()
+	// Thirteen days, which is what the fourth run to raise this measured on the
+	// instance. Written relative to now so the assertion is about the age rather
+	// than about a date that rots.
+	stamp := time.Now().UTC().AddDate(0, 0, -13).Format(time.DateOnly)
+	for _, kind := range []string{"oracle_cards", "default_cards"} {
+		name := kind + "-" + stamp + ".jsonl.gz"
+		if err := os.WriteFile(filepath.Join(scryfall, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := New(Config{Pool: pooltest.Open(t), DecksDir: decksDir(t),
+		ScryfallDir: scryfall})
+	_, body, raw := call(t, a, http.MethodGet, "/api/health", "")
+	got, ok := body["pool_age_days"].(float64)
+	if !ok {
+		t.Fatalf("pool_age_days is %v, want a number: %s", body["pool_age_days"], raw)
+	}
+	if got != 13 {
+		t.Errorf("a shelf stamped %s reads as %v days old, want 13: %s", stamp, got, raw)
+	}
+	// And the flag that cannot see age still says nothing is wrong, which is the
+	// whole reason this key exists.
+	if body["pool_stale"] != false {
+		t.Errorf("the fixture pool should not be stale: %s", raw)
+	}
+}
+
+// **An age is read as reassurance, so a question nobody could answer must not
+// produce a small number.** This is `disk_free_mb`'s rule one key across, and
+// the last case is the one worth having: a container whose clock has not
+// synchronised computes a negative age, and clamping that to zero would print
+// "the library is current" at exactly the moment the machine cannot be trusted
+// about time.
+func TestThePoolsAgeIsAbsentRatherThanReassuring(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+
+	if got := poolAgeDays("", now); got != nil {
+		t.Errorf("an instance with no download shelf reports an age of %v", got)
+	}
+	if got := poolAgeDays(filepath.Join(t.TempDir(), "no-such-shelf"), now); got != nil {
+		t.Errorf("a shelf that is not there reports an age of %v", got)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		files []string
+		want  any
+	}{
+		{"an empty shelf", nil, nil},
+		{"nothing this code downloads", []string{"rulings-2026-09-13.json"}, nil},
+		{"a file with no date at all", []string{"oracle_cards.jsonl.gz"}, nil},
+		{"ten characters that are not a day",
+			[]string{"oracle_cards-2026-13-45.jsonl.gz"}, nil},
+		{"a stamp from the future -- an unsynchronised clock",
+			[]string{"oracle_cards-2026-10-01.jsonl.gz"}, nil},
+		{"one kind, thirteen days back",
+			[]string{"oracle_cards-2026-09-13.jsonl.gz"}, int64(13)},
+		{"the newest copy of a kind, not the rollback beside it",
+			[]string{"oracle_cards-2026-08-01.jsonl.gz",
+				"oracle_cards-2026-09-13.jsonl.gz"}, int64(13)},
+		// The reading that matters most: a refresh loaded the oracle half this
+		// morning and the printings are six weeks behind, so prices and
+		// printings are six weeks behind whatever the oracle file says.
+		{"the OLDEST kind, never the newest",
+			[]string{"oracle_cards-2026-09-26.jsonl.gz",
+				"default_cards-2026-08-15.jsonl.gz"}, int64(42)},
+		{"a day is whole days, floored",
+			[]string{"oracle_cards-2026-09-26.jsonl.gz"}, int64(0)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			shelf := t.TempDir()
+			for _, name := range tc.files {
+				if err := os.WriteFile(filepath.Join(shelf, name),
+					[]byte("x"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := poolAgeDays(shelf, now); got != tc.want {
+				t.Errorf("%v days, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
