@@ -313,3 +313,64 @@ func decompress(t *testing.T, rec *httptest.ResponseRecorder) string {
 	}
 	return string(raw)
 }
+
+// **The pooled compressor's one hazard, driven.** A level-9 `flate.Writer` is
+// the largest object in the request path, so `gzipWriters` lends them out
+// instead of building one per response — and a writer handed out while it still
+// points at a finished response would write one caller's bytes into another's
+// stream. Three responses in a row through the same pool, each a distinct body,
+// each read back on its own: the second and third are the ones that matter,
+// because they are the ones that get a used writer.
+//
+// Removing `zw.Reset(g.ResponseWriter)` from `commit` is what this catches, and
+// how it presents is worth knowing: a `nil` dereference on the *first*
+// compressed response, because a writer straight out of the pool's `New` points
+// at nothing yet. Only on the ones after that would it present as a body
+// written into somebody else's response — which is the reason the loop runs
+// three times rather than once.
+func TestBorrowedCompressorsNeverBleedOneResponseIntoAnother(t *testing.T) {
+	t.Parallel()
+	for i, want := range []string{
+		strings.Repeat("Syr Gwyn, Hero of Ashvale. ", 60),
+		strings.Repeat("Arahbo, Roar of the World. ", 60),
+		strings.Repeat("Gyome, Master Chef. ", 80),
+	} {
+		body := want
+		rec := httptest.NewRecorder()
+		handler := gzipped(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+		req := httptest.NewRequest(http.MethodGet, "/x", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		handler.ServeHTTP(rec, req)
+		if rec.Header().Get("Content-Encoding") != "gzip" {
+			t.Fatalf("response %d was not compressed, so this proves nothing", i)
+		}
+		if got := decompress(t, rec); got != want {
+			t.Errorf("response %d read back %d bytes of the wrong body (wanted %d "+
+				"bytes starting %q)", i, len(got), len(want), want[:20])
+		}
+	}
+}
+
+// And the trailer is written before the writer goes back, so a body read by a
+// strict reader is complete rather than merely decompressible: `io.ReadAll` over
+// `gzip.Reader` reports `unexpected EOF` on a stream whose CRC never arrived,
+// which `decompress` turns into a fatal. Dropping the `Close` above the `Put`
+// fails this by name; it fails the bleed test too, and that is fine — this one
+// is here so the reason is written down where the next reader of `finish` will
+// look, rather than being deduced from a truncation in a test about bleeding.
+func TestAPooledCompressorWritesItsTrailerBeforeItGoesBack(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	want := strings.Repeat("Trostani, Selesnya's Voice. ", 60)
+	handler := gzipped(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(want))
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	handler.ServeHTTP(rec, req)
+	if got := decompress(t, rec); got != want {
+		t.Errorf("the compressed body is %d bytes, wanted %d", len(got), len(want))
+	}
+}
