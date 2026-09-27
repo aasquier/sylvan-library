@@ -201,8 +201,20 @@ holds and can clear it, and the caches count their own use in-process (the
 door's ETag memo through `etagCounts` in `go/internal/door/static.go`, the
 Tier 1 store through `cache.Store.Counts` in `go/internal/sim/cache/store.go`
 — that pair is the pattern to copy for the next one), but nothing yet reads
-those counts out of a running instance. **Building the bench suite is an open
-ledger item.**
+those counts out of a running instance.
+
+**Benchmarks are no longer only a kernel thing, and the open item is narrower
+than "there is no bench suite".** They live beside the code as
+`*_bench_test.go` — the four determinism kernels first (`mt19937`, `floats`,
+`textutil`, `sim/compile`), and as of 2026-09-26 two outside them, one on the
+deck shelf's read-and-parse and one on the door's compressor, each landed by
+the colour that needed the number. CI proves they build and run and gates on
+nothing, which is right: a benchmark is a local instrument, not a check. So
+what is **still missing** is the two things a suite would be and a scattering
+of `Benchmark…` functions is not: **one command that runs them all**, and **a
+recorded ledger of results** that makes a delta comparable to last month's
+rather than to this laptop's mood. Write a benchmark where a colour needs one;
+the open ledger item is the runner and the ledger, not the first benchmark.
 Mutation sampling is the exception — `gremlins` is the tool, installed on
 demand, and White's testing facet carries the protocol. Otherwise the stock
 Go toolchain is the instrument set — richer than a purpose-built shelf would
@@ -415,11 +427,12 @@ a solo run would do.
 
 The order is not arbitrary and neither is the serialism:
 
-- **Serial, because parallel churns.** Concurrent branches all expand adjacent
-  sections of `docs/polish/LEDGER.md` and conflict by construction, and
-  several open PRs queue several `image` builds for no gain. Merging each
-  before starting the next means the conflicts never exist rather than getting
-  resolved.
+- **Serial by default, because parallel churns.** Concurrent branches all
+  expand adjacent sections of `docs/polish/LEDGER.md` and conflict by
+  construction, and several open PRs queue several `image` builds for no gain.
+  Merging each before starting the next means the conflicts never exist rather
+  than getting resolved. **Parallel is a real option when Aaron is present to
+  integrate** — he runs it that way — and it has its own rules below.
 - **WUBRG, because Magic says so and the dependencies agree**: White's
   licensing law binds Black's static-assets facet, Black's spend numbers feed
   Green's quota proposal, Red's external probe is Green's baseline. Every
@@ -433,10 +446,12 @@ The order is not arbitrary and neither is the serialism:
 
 Orchestration:
 
-- **Main working tree, not a worktree.** One color is live at a time so there
-  is nothing to isolate from, and main already has `web/node_modules`, a warm
-  Go build cache and the card pool — a fresh worktree rebuilds all three
-  before it can run the gauntlet.
+- **Main working tree for a serial rainbow, a worktree per lane for a parallel
+  one.** Serially there is nothing to isolate from and main already has
+  `web/node_modules`, a warm Go build cache and the card pool — a fresh
+  worktree rebuilds all three before it can run the gauntlet, so paying for
+  isolation buys nothing. In parallel that cost is the price of admission; the
+  subsection below is what it buys and what it costs.
 - Give each agent exactly one color, its reference file, the ledger, and the
   protocol and non-negotiables below.
 - **A leg closes its own loop inside its one turn.** No wake ever reaches a
@@ -461,6 +476,62 @@ Orchestration:
 - A rainbow may outlive a session. The merged PRs and the ledger are the
   resume point: read which colors already carry this rainbow's tag and pick up
   at the next.
+
+### The parallel rainbow — Aaron's own shape, and the rules it needs
+
+**"Serial, because parallel churns" is the default and it is no longer the
+only shape.** Aaron has now run the pass as **simultaneous lanes in separate
+worktrees** three times — the ten-lane coverage climb of 2026-09-24 and two
+waves on 2026-09-26 — each time with a written lane file per colour and a merge
+train at the end. It works, it is much faster, and the skill said "never" while
+he did it, which is the checklist losing to practice and being fixed here
+rather than argued with. Serial stays right for an unattended night with one
+agent; parallel is right when Aaron is present enough to integrate. What the
+parallel shape needs, all of it learned the expensive way:
+
+- **A lane file per colour, written before any lane starts**, naming its
+  facet, its reference file, the files it owns and the files it must not
+  touch. Ownership is the whole mechanism: two lanes editing `web/src` (and
+  therefore the committed bundle) serialise the whole train, so exactly one
+  lane holds `web_dist/` and exactly one holds the Browser pane — **the pane
+  is a single shared resource and a second driver simply loses**.
+- **Every lane appends at the END of its own ledger section**, and touches no
+  other colour's. `LEDGER.md` and `DAYBREAK.md` will still conflict; the
+  integrator keeps both sides, which is cheap when nothing was reflowed and
+  expensive when something was.
+- **The ratchets are shared state and will collide.** Two lanes both raising
+  `webDatedCommentCeiling`, or one raising `goDatedCommentCeiling` while
+  another lowers it after a sweep, is a guaranteed conflict in one const
+  block. It is a *good* conflict — that is the ratchet making a silent drift
+  visible — but a lane that touches one says so in its report with the
+  arithmetic, so the integrator resolves it in seconds instead of re-deriving
+  the count.
+- **The load on this Mac goes past 400.** Before chasing a failure, decide
+  whether it is an assertion or a resource symptom: re-run the suspect alone
+  with `-run '^TestX$' -count=1`. **Never loosen a timeout that was fine this
+  morning and never drop a `t.Parallel()`.** A genuine `-race` report is
+  always real. Two families fail on load rather than on truth: the
+  `cmd/mtglab` forge-bout tests, at a flat 30s with `Java None`, and a
+  handful of Vitest `waitFor` timeouts. And `golangci-lint` refuses to run
+  beside another lane's ("parallel golangci-lint is running") — retry in a
+  loop rather than reporting a failure.
+- **A fresh worktree is cold in three ways.** No card pool, no
+  `web/node_modules` (one `npm --prefix web ci`, about a minute, only if
+  `web/src` must move), and no warm Go build cache. Also macOS scans a
+  *committed* executable per file, so exec
+  `go/cmd/mtglab/testdata/fakejava -version` once before the first gauntlet or
+  the forge-bout tests read `Java None` on a checkout that is provably correct.
+- **The harness's git guard is stricter inside a worktree**, and the shapes it
+  refuses are worth knowing rather than rediscovering: an `export` whose value
+  derives from `$HOME`, a compound `cd X && <git or heredoc>`, `sleep N; cmd`,
+  and anything with a pipeline or a nested quote around a git word. The
+  standing fix is a two-line wrapper script in the scratchpad with the three Go
+  exports spelled with a literal `/Users/aaronsquier` prefix and `exec "$@"`,
+  then `bash wrapper.sh go test …`; and `until <check>; do sleep 30; done` in
+  place of a sleep.
+- **A lane still closes its own loop inside its one turn** — the serial rule,
+  unchanged and more important, because the integrator is now waiting on
+  several at once.
 
 ## The ledger
 
@@ -513,7 +584,18 @@ It is what makes the pass cumulative rather than repetitive.
      `DAYBREAK.md`** — the question, what it costs to leave, the
      recommendation, and a pointer to the ledger entry. The ledger is the
      record; daybreak is the queue. Nothing waits in the ledger alone, because
-     nobody reads three thousand lines to find out what is waiting. Queue-class
+     nobody reads three thousand lines to find out what is waiting.
+     **And "it rides the report" is not a third place — it is the ledger-only
+     failure wearing a better suit.** A report is read once, over coffee, and
+     then it is gone; a question that lives only there is answered by nobody
+     and cannot even be found again. Twice on 2026-09-19 — by the Colorless run
+     that had *just* discovered five items waiting in the ledger alone since
+     August, and again by the Cleanup run behind it — two questions about how
+     the pass writes were deliberately sent to the report instead of the queue,
+     and a week later `git log -S` proves neither had ever appeared in the file
+     Aaron opens. If it needs him, it gets a line with a recommendation. If it
+     does not need him, it is not queue-class. There is no third answer.
+     Queue-class
      findings: design decisions, anything costing money, new dependencies or
      services, schema migrations, and anything an ADR already decided (that
      gets a *superseding ADR proposal*, never an edit — ADRs are immutable).

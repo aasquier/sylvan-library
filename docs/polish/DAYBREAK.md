@@ -17,17 +17,23 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > migration window — and the last group needs nothing today. The 09-13
 > Answered list that used to sit at the foot of this file is gone: all eleven
 > records are in the ledger now (White, Green, Red-carried-by-Cleanup and
-> Colorless; the Cleanup section's 2026-09-19 entry says where each went).
-> **Fourteen items are open as this file is written**, twelve inherited and
-> two surfaced by the untap — Red's #481 walk line, which had lived only on
-> its parked branch, and a merge-queue item whose ledger trigger fired today
-> with four PRs open at once. Count them with the colour, never the bold:
->
-> ```
-> grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):' docs/polish/DAYBREAK.md
-> ```
->
-> A count is a claim to re-check, and so is the recipe for checking it.
+> Colorless; the Cleanup section's 2026-09-19 entry says where each went). The
+> regrouping left **fourteen** items open — twelve inherited and two surfaced by
+> the untap: Red's #481 walk line, which had lived only on its parked branch,
+> and a merge-queue item whose ledger trigger fired that day with four PRs open
+> at once.
+
+**How many are open right now is a question for the file, not for this
+paragraph.** Count them with the colour, never with the bold:
+
+```
+grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):' docs/polish/DAYBREAK.md
+```
+
+A count written into prose is a claim that rots the next time anyone adds a
+line — this one said "fourteen" through a week in which five colour lanes and
+two design passes added and closed items — and so is the recipe for checking
+it. Run the recipe; re-read the recipe.
 
 ---
 
@@ -168,6 +174,66 @@ to five questions" against a cap of six, and the theme's replace-versus-union
 rule — put to you rather than guessed. Queued rather than landed because it is
 all model-facing text and the dossier's instructions are hash-frozen in a
 corpus. Ledger: Black, 2026-09-26.
+
+**Colorless: this file's own rule says "one line per item" and not one item has
+obeyed it for a month — is the rule wrong, or is the file?** Every item here is
+a paragraph, and you have answered the file happily in that shape (25 in one
+morning on 09-05). A line-count gate would fail the file you blessed, and
+rewording a rule to match drift is the move the pass forbids, so nobody has
+touched either side. This question was raised on 2026-09-19 and sent to "the
+report" instead of here, which is why you are seeing it a week late. · *Cost of
+leaving it:* nothing today; the risk is the file growing into the
+three-thousand-line thing the queue exists to replace, with no rule anyone can
+point at. · **Recommendation:** "headline" — the rule means *one item per
+question, headline first, context after*, which is what the good items already
+do; say the word and the sentence gets rewritten once and then held by the
+shape of every new item. Ledger: Colorless, 2026-09-19, and 2026-09-26 for why
+it is arriving now.
+
+**Colorless: the guard on this file reads one direction only, and the missing
+direction is how five items hid for 26 days.**
+`daybreakrecord_test.go` proves every line here names a ledger record; nothing
+proves every *waiting* ledger record has a line, because "queued" in ledger
+prose carries no marker a test can read — and an answered item correctly
+*leaves* this file, so a naive reverse check would demand a line for every
+historical block ever written. The missing piece is one convention: a marker on
+a queued ledger block that says *still open*. A convention binds every future
+session, which makes it yours rather than a run's. · *Cost of leaving it:* the
+breach recurs in the only direction nothing watches — it has happened twice
+that we know of, most recently to this very question. · **Recommendation:**
+"marker" — queued blocks that are still open get a literal `(open)` after the
+heading, struck when you answer, and the next Colorless run extends the guard
+to read both ways; say "no" and the reverse walk stays a `git log -S` recipe in
+`references/colorless.md`, which is honest but only runs when somebody
+remembers. Ledger: Colorless, 2026-09-19, re-filed 2026-09-26.
+
+**White (leg two): the ratchet trigger you named has arrived — does the floor
+click?** The grind took the tree 96.6 → **96.9**, and the day's first leg (PR
+#504) is another tenth, so merged `main` should print **97.0** on the arm64
+leg. 97.0 is the exact number leg one's own recommendation set as the
+condition: *hold 95.0 until the tree reaches 97.0, then click to 95.5 and keep
+the gap.* · *Cost of leaving it:* nothing this week; the gap grows to two full
+points, and at two points a diff can lose a whole point of honest coverage
+without a check going red — which is the one thing the floor exists to
+notice. · **Recommendation:** **"ratchet"** — 95.5, and only once a merged
+`main` actually prints 97.0 or better in the `Coverage floor` step (read it off
+the run, not off this file). The floor did not move on this branch on purpose:
+`ci.yml` records the gap as your own 2026-09-24 ruling, and a lane does not
+overwrite a ruling with its own arithmetic. Ledger: White, 2026-09-26
+(rainbow, leg two).
+
+**White (leg two): the next grind is a fixture, not a sweep.** What is left
+after this is `internal/pool` (58 statements), `internal/sim/tier3` (67) and
+`cmd/mtglab` (46), and the pool's share wants **a faulty DuckDB connector** —
+`authtest.OpenFaulty` is SQLite-only, and `rebuild.go`'s `startRebuild` and
+`finish` are the same "a statement failed in the middle of a long write" shape
+this leg closed everywhere else. · *Cost of leaving it:* the refresh's own
+failure arms stay undriven, and the refresh is the one job that can leave the
+card pool half-written on the deployed volume. · **Recommendation:** **"go"** —
+a `pooltest.OpenFaulty` built the same way (borrow the registered driver off a
+throwaway handle, wrap the three context forms, count statements) is a day's
+work and reusable, and it is the last named fixture gap in the tree. Ledger:
+White, 2026-09-26 (rainbow, leg two).
 
 ## Open — a dollar and an account
 

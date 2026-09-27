@@ -122,8 +122,8 @@ const (
 	// **[EventDies]'s twin, and it exists for the same hole.** A great deal of
 	// what removal does in Commander exiles rather than destroys — Path to
 	// Exile, Swords to Plowshares, Anguished Unmaking — and every one of those
-	// was a card that vanished off the sand with nothing said about it (Aaron,
-	// 2026-08-27: *"we don't show exiled cards there like we do for destroyed
+	// was a card that vanished off the sand with nothing said about it (Aaron:
+	// *"we don't show exiled cards there like we do for destroyed
 	// creatures going to the graveyard"*). The board moved the card, correctly
 	// and silently, and the moment a player would have reacted to went past
 	// unmarked.
@@ -154,7 +154,7 @@ const (
 	// into a graveyard from the battlefield; a Treasure cracked for mana and a
 	// fetchland cracked for a land do neither, so `dies` was right to stay
 	// silent about them and the account simply had nothing to say instead
-	// (Aaron, 2026-08-26, on the Treasure that taps and then goes "into the
+	// (Aaron, on the Treasure that taps and then goes "into the
 	// ether"). A creature *sacrificed* raises both, which is correct: it was
 	// sacrificed and it did die.
 	//
@@ -189,7 +189,7 @@ const (
 	// **Abilities reached nothing at all before this**, because the scribe
 	// returned on anything that was not a spell, so eminence — a triggered
 	// ability whose source sits in the command zone and never moves — was
-	// invisible from end to end (Aaron, 2026-08-26: *"It should just visually
+	// invisible from end to end (Aaron: *"It should just visually
 	// indicate that an ability is being used"*).
 	//
 	// **This does not reopen the stack**, which is the fear it looks like it
@@ -204,8 +204,8 @@ const (
 	// EventCompanion is a companion bought in from outside the game: it leaves
 	// the command zone for its controller's hand, which is the {3} being paid.
 	//
-	// **It exists because the board looked like it was cheating** (Aaron,
-	// 2026-08-27: *"I watched a match play and I swear Kaheera was dealt in a
+	// **It exists because the board looked like it was cheating** (Aaron:
+	// *"I watched a match play and I swear Kaheera was dealt in a
 	// hand? That should not be possible, you don't shuffle your companion in
 	// with normal cards to be dealt, they come from outside the game like the
 	// commander does"*). He is right about the rules and the engine was right

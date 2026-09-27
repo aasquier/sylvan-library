@@ -65,6 +65,7 @@ lever and a grind is visible before the work starts.
 | #478's pass | 90.8% | 90.82% |
 | the climb of 2026-09-24 (nine lanes, #488–#496) | 96.6% | 96.56% |
 | leg two, 2026-09-26 (the rainbow's White lane) | **96.7%** | |
+| the grind of 2026-09-26 (one lane, the faulty handle) | **96.9%** | 96.86% |
 | floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
 
 **Leg two is the leg that says the climb is over**, and the number is the
@@ -83,6 +84,11 @@ route that can reach an address to check for an admin. The rule caught a
 mutation the register could not see — the public `login` route answering
 `accountBody` — which is the whole case for preferring one checked claim to
 three more tests.
+
+The grind's numbers, measured with the recipe at the top of this file on the
+same commit either side: **734 missing of 21,628 → 679**, fifty-five statements,
+`-func` 96.6 → 96.9. It closed no lever; it closed one *shape* in six packages
+at once, and the shape is lever 29 below.
 
 The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
@@ -201,6 +207,37 @@ as meaningful to whoever finds it next.
 - **`deckread/commander.go`**'s seven statements that need `GetCards` to
   succeed and a later `oracle_cards` query to fail: a pool that breaks
   mid-flight, which no fixture yet is.
+
+The 2026-09-26 grind added four more, and they are **classes** rather than
+branches — each one names a shape to recognise rather than a line to skip:
+
+- **`res.RowsAffected()` after a successful `Exec` cannot fail on this
+  driver**, so every `if err != nil` beside one is unreachable. That is the
+  whole of what is left in `internal/night`'s store (`StartRun`, `PlanBouts`,
+  `Playing`, `settle`, `CloseRun`, `FinishRun` — six statements) plus
+  `library/crypt.Empty` and `sim/tier3/ledger.record`'s `LastInsertId`. A
+  full-lifecycle budget sweep over the night store was written, run green, and
+  **deleted**: it closed zero statements and cost three seconds of suite. If a
+  future driver ever makes `RowsAffected` fallible, that sweep is the test to
+  write, and this is the note saying so.
+- **`sql.Open` never fails for a registered driver**, because it only records
+  the DSN. So `auth.Open`, `auth.OpenReadWrite`, `cache.Open`,
+  `authtest.NewScratchDB` and `api.schemaApplied` all carry an `if err != nil`
+  beside theirs that no path reaches — including the two warn-and-degrade arms
+  in `api.accountsDB` and `api.appDB` that look like the obvious lever for "the
+  volume did not mount" and are not. The reachable fault is at the first
+  *statement*, not at the open.
+- **A scan of an aggregate cannot be given the wrong type.** `count(*)`,
+  `sum(...)` and `substr(created_at, 1, 10)` are computed, so lever 26's
+  poison has nothing to land on: `cache.Stats`' `rows.Scan`,
+  `api.statsActivity`'s, and `auth.UsableAdminIDs`' (an INTEGER PRIMARY KEY,
+  which SQLite refuses to hold text in) stay out of reach. Their `rows.Err()`
+  arms beside them do not — lever 27.
+- **`json.Marshal` of a `[]string`** (`sim/tier3/ledger.record`, twice) and
+  **`wire.MarshalOrdered` of a payload the route just built** (`api`'s
+  `getDeck`, `deckArtifacts`) cannot fail: there is no unmarshalable value in
+  either. These are the `api` `refuse` arms that look like a pair and are the
+  second of the pair.
 
 ## Levers that worked
 
@@ -365,6 +402,59 @@ them is reusable:
     rule: take the expectation off the source of truth
     (`(&compile.PoolRequired{}).Error()`), never restate it.
 
+The grind's, the same day — and the first of them is the one worth reaching
+for before anything bespoke:
+
+29. **The budget, swept rather than counted.** `authtest.OpenFaulty` had four
+    callers (`auth`, `night`, `traffic`, and its own test) and every one of
+    them hand-counted `Fault.After(n)` to land on the statement it was about.
+    A counted budget is a restatement of today's statement order: add a query
+    to the middle of a write and the number that used to land on the commit
+    lands somewhere else, and the test keeps passing while testing something
+    else. **Sweeping every budget from zero** asks the question the code
+    actually has to answer — *at no point in this call may a failure become a
+    false answer* — and it reaches every arm in between without naming one.
+    It took `internal/api`'s admin and account routes, `internal/library`'s
+    writes and `Visible`, `internal/sim/cache`'s `Put`, and four of
+    `internal/auth`'s account writes, in one shape. Three rules make it work:
+    every sweep carries **both** floors (at least one budget refused *and* at
+    least one succeeded, or it is measuring one state N times); the assertion
+    is per operation and always the pair *an error means nothing changed, no
+    error means the change is there*; and a read-only route may share one
+    fixture across the sweep while a write gets a fresh one, which is the
+    difference between 11 seconds and 39 in `internal/api`.
+30. **A column that holds what a scan cannot take.** SQLite applies column
+    affinity rather than enforcing it, so `UPDATE forge_matches SET
+    wall_seconds = 'not a number'` leaves **text** in a REAL column and every
+    `rows.Scan` arm in the reader becomes reachable. One hand-run UPDATE
+    during an incident, one half-finished restore, one row written by a
+    version that spelled a column differently, and the ledger holds a row it
+    cannot read back. It took `internal/sim/tier3/ledger` from 18 missing to 6
+    (`Recent`, `tally`, `seats`, `boardSeats` and all three feat boards). Two
+    cautions: check `typeof(col)` in the fixture rather than assuming the
+    affinity did not coerce, and poison **one row** (`WHERE rowid = (SELECT
+    MIN(rowid) …)`) — a whole-table UPDATE is refused by any UNIQUE the
+    column is part of, which is how `forge_seats.seat` failed first.
+    A column an aggregate computes (`count(*)`, `sum(...)`) cannot be poisoned
+    at all, which is why `cache.Stats`' and `api.statsActivity`'s own `Scan`
+    arms are in *Left deliberately* below.
+31. **`Fault.RowsAfter` reaches `rows.Err()` and never `rows.Scan`.** A `Next`
+    that fails surfaces through `Rows.Err()`, not through the `Scan` inside
+    the loop — `database/sql` stores the error and answers `false`. So the
+    row budget is the lever for every "a partial answer presented as a whole
+    one" branch and for none of the scans. And the budget is spent across
+    **every** query on the handle: `api.statsActivity` makes five single-row
+    queries before the result set this is about, so a sweep that stopped at
+    four rows never reached the loop. Sweep it as wide as the handler is deep.
+32. **A fixture's own guards are worth a test.** `authtest`'s `faultyConn`
+    refuses `Prepare` and `Begin` rather than delegating, and `Connect`
+    refuses a driver that does not speak all three context forms — because
+    `database/sql` would otherwise route statements down a path where nothing
+    spends the budget, and **every test standing on the fixture would go green
+    for the wrong reason**. Those three refusals had never been tripped.
+    `refusals_test.go` trips them, with a five-line half-a-driver that speaks
+    `driver.Conn` and nothing else, and checks the message names the type.
+
 ## Corrections to this file
 
 **A corrupt pool is not a failing pool.** #290 predicted that pointing
@@ -452,6 +542,19 @@ and `ci.yml` gated on the other.
 - **A sweep that sweeps nothing passes.** Every table-driven sweep here carries
   a floor (`if swept < 15`), because a pattern filler that stops matching the
   route table is silent otherwise — and silent is indistinguishable from green.
+- **A budget sweep needs a floor at BOTH ends.** "At least one budget refused"
+  is the obvious one and it is the useless half: a fixture that refuses
+  everything passes it. The one that catches a broken fixture is **"at least
+  one budget succeeded"** — and it is what caught a night lifecycle whose
+  `CloseRun` came after `FinishRun`, an order the store refuses on a perfectly
+  healthy database. Without it the sweep read as 27 budgets all correctly
+  refusing.
+- **Widening a sweep is not free and is not always a gain.** Extending
+  `internal/api`'s budget sweep from `/api/admin` + `/api/account` to
+  `/api/auth` closed **zero** statements — `login`, `logout`, `claim` and
+  `throttle`'s arms want a stale session cookie and a failing `auth.Login`,
+  not a budget — and roughly tripled the wall time (Argon2id per request).
+  Reverted. Measure the gain per route family before paying for it.
 
 - **Minting an executable per test races a 30-second probe.** The first
   execution of a freshly written executable costs seconds on this Mac (6.2s
