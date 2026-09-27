@@ -811,6 +811,28 @@ jobs:
           API="https://api.machines.dev/v1/apps/sylvan-library"
           AUTH="Authorization: Bearer $FLY_API_TOKEN"
 
+          # **Every call below is one transient away from a red deploy, so
+          # every call retries.** Twice in the week of 2026-09-19 a single
+          # unretried request to this API failed the whole job after the app
+          # had already deployed: a 409 on the update (#477) and a
+          # `curl: (35) Recv failure: Connection reset by peer` on
+          # 2026-09-24, whose run reads `failure` over release v413 serving
+          # happily. Both healed on the next deploy, which is the tell that
+          # neither was about this repository.
+          #
+          # `--retry-all-errors` rather than `--retry` alone, and the
+          # difference is the whole point: curl's own list of "transient"
+          # errors is timeouts plus a handful of status codes, and a
+          # connection reset is not on it — so plain `--retry` would not have
+          # retried either of the two failures above. Bounded at five tries
+          # two seconds apart with a thirty-second ceiling per attempt, so a
+          # genuinely broken call still fails the job inside a minute rather
+          # than hanging it.
+          #
+          # `TestEveryMachinesAPICallInTheDeployRetries` holds this: a curl
+          # added to this step without the flags fails by line.
+          RETRY=(--retry 5 --retry-delay 2 --retry-all-errors --max-time 30)
+
           # Dedicated CPU is ADR 35's core sizing argument: on throttled
           # shared cores the measured tail stretches into the clock and
           # clock-outs are corrupted measurements, not slow ones.
@@ -865,13 +887,13 @@ jobs:
           wake() {
             state=""
             for _ in $(seq 1 60); do
-              state=$(curl -fsS -H "$AUTH" "$API/machines/$id" \
+              state=$(curl -fsS "${RETRY[@]}" -H "$AUTH" "$API/machines/$id" \
                 | jq -r '.state')
               case "$state" in
                 started) return 0 ;;
                 stopped)
-                  curl -fsS -X POST -H "$AUTH" "$API/machines/$id/start" \
-                    > /dev/null || true ;;
+                  curl -fsS "${RETRY[@]}" -X POST -H "$AUTH" \
+                    "$API/machines/$id/start" > /dev/null || true ;;
               esac
               sleep 5
             done
@@ -879,17 +901,19 @@ jobs:
             return 1
           }
 
-          id=$(curl -fsS -H "$AUTH" "$API/machines" \
+          id=$(curl -fsS "${RETRY[@]}" -H "$AUTH" "$API/machines" \
             | jq -r '.[] | select(.name=="forge-worker") | .id' | head -1)
           if [ -z "$id" ]; then
             # Create launches the machine itself; wake() just watches it up.
-            id=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+            id=$(curl -fsS "${RETRY[@]}" -X POST -H "$AUTH" \
+              -H 'Content-Type: application/json' \
               -d "$(jq -n --argjson c "$config" \
                     '{name: "forge-worker", region: "iad", config: $c}')" \
               "$API/machines" | jq -r '.id')
             echo "created forge-worker machine $id"
           else
-            curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+            curl -fsS "${RETRY[@]}" -X POST -H "$AUTH" \
+              -H 'Content-Type: application/json' \
               -d "$(jq -n --argjson c "$config" '{config: $c}')" \
               "$API/machines/$id" > /dev/null
             echo "updated forge-worker machine $id"
@@ -899,9 +923,10 @@ jobs:
           # stopped-when-idle is the steady state and per-second billing is
           # the point.
           wake
-          curl -fsS -X POST -H "$AUTH" "$API/machines/$id/stop" > /dev/null
+          curl -fsS "${RETRY[@]}" -X POST -H "$AUTH" \
+            "$API/machines/$id/stop" > /dev/null
           for _ in $(seq 1 24); do
-            state=$(curl -fsS -H "$AUTH" "$API/machines/$id" \
+            state=$(curl -fsS "${RETRY[@]}" -H "$AUTH" "$API/machines/$id" \
               | jq -r '.state')
             [ "$state" = "stopped" ] && break
             sleep 5

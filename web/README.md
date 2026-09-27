@@ -144,10 +144,14 @@ following the same geometry — there is no build step to run and nothing in
   fetches at runtime (`lib/glossary.ts`, and a missing entry costs a tooltip
   and nothing else — deliberately). The consequence is that a typo'd key fails
   **silently**: TypeScript cannot check a string against a JSON table, and a
-  component test cannot either, because the glossary is mocked away there. The
-  check that failed when a simulator control had no entry is gone; rebuilding
-  it over the Go table is a queued item, so until then a new `Term` gets its
-  key confirmed against that file by hand.
+  component test cannot either, because the glossary is mocked away there. So
+  the check lives on the Go side, where the served table is:
+  `go/cmd/mtglab/glossarykeys_test.go` sweeps `web/src` for both shapes a key
+  is written in — `name="…"` on the element, and the one-line `help('…')`
+  helper the two busiest routes define — and holds every one against
+  `reference.Words()`. A key passed as `name={…}` is one it cannot follow, so
+  those sites are listed there by name and a third one fails rather than
+  quietly shrinking the sweep.
 - **Page nameplates are `PageMasthead`** (`components/ui.tsx`): the painting
   whole at its own ratio beside the title, never a cropped band behind it —
   `art_crop` is 1.37:1 and a full-bleed band keeps less than half of it, a

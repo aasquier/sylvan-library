@@ -19,9 +19,9 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-24 (the coverage climb, outside the rainbow).
-  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05
-  (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-24 (the coverage
+  climb, outside the rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow),
+  2026-09-05 (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -29,6 +29,267 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-09-26 (rainbow)
+
+Leg two of the coverage climb, run as one of four parallel lanes. The honest
+headline is that **the climb is over and the standing question was worth more
+than the grind**: two days after nine lanes took the tree from 91.2 to 96.6,
+what remains is 734 missing statements spread over 419 functions — a mean of
+1.8 each — and the biggest single lever in the tree is 13 statements inside a
+branch `COVERAGE.md` already argues is unreachable. So this leg spent its
+budget the other way round: one machine-checked claim, three real refusals, one
+ADR-shaped guard, and a dead test found while counting.
+
+- **Fixed this run:**
+  1. **CLAUDE.md rule 5's address rule was enforced by a grep, and the grep
+     was written into the checklist as a chore.** `references/white.md` has
+     instructed every White run to "grep for every call site each run — a
+     third one is the finding" and four consecutive runs duly reported one
+     non-test caller; `internal/api/admin.go`'s own doc comment goes further
+     and says *"no other module may acquire the habit"* and even calls the
+     rule "still checkable". Nothing checked it.
+     `go/cmd/mtglab/addressreach_test.go` is both halves of it now, and the
+     two halves needed different proofs:
+     - **The register** (`TestOnlyTheArguedFunctionsReadAnAddress`) walks
+       every non-test `.go` file under `go/` for a selector named `Email` or
+       an `AsDict(true)`, attributes each to its enclosing declaration, and
+       holds the result equal to `addressReaders` **in both directions** — an
+       unargued reader fails, and an argued entry that stopped reading fails
+       too, because a register naming functions that no longer matter reads
+       wider than the tree is. **Seven, and every one carries its reason**:
+       `auth.User.AsDict` (the withholding itself), `auth.scanUser` (the
+       column becoming the field), `auth.SendInvite` and `auth.SendReset`
+       (addressing a letter), `cmd/mtglab.usersListCommand` (an operator's
+       own terminal, never a response), `api.accountBody` and
+       `api.API.sendAccountReset` (ADR 17, ADR 16). Anti-vacuity floor at
+       four, since the withholding and both mailers are always there.
+     - **The reachability rule**
+       (`TestEveryRouteThatCanReachAnAddressChecksForAnAdmin`) is the half a
+       register structurally cannot state, and it is the reason this is a
+       finding rather than a formality. Inside `internal/api` no handler
+       reads an address: `accountBody` does, three routes deep, and what
+       makes those routes safe is `requireAdmin` at the top of each. So the
+       test builds the package's own call graph from the AST, closes it
+       upward from the direct readers, and requires that every **entry
+       point** — a closure member nothing else in the package calls, so only
+       the router can — calls `requireAdmin`. Five functions can reach an
+       address today; every way in checks. The graph is keyed by function
+       name, which merges same-named methods and therefore *widens* the
+       closure — the safe direction for a guard, and why a name is enough
+       and `packages.Load` (28s a test in `internal/claude`) is not needed.
+     **Mutation-verified three ways, and the third is the one that earns the
+     test its place.** (a) An address read planted in `api.API.refuse`: the
+     register names it by file and line, and the reachability sweep reports
+     the whole package, correctly. (b) `requireAdmin` deleted from
+     `sendAccountReset`: the reachability sweep names it alone. (c) **The
+     public `login` route made to answer `accountBody`** — a real leak, the
+     admin body with an address in it returned from an unauthenticated
+     endpoint — and the **register stays green** while the reachability rule
+     names `internal/api.login`. A roster could never have seen that, because
+     `login` reads no address itself. All three restored.
+  2. **Three refusals a person reads, taken at the mapper**
+     (`go/internal/api/refusalwords_test.go`, new). `refuseTheme` had six of
+     its seventeen statements unrun — including the arm that fires when the
+     cause is something nobody predicted, which is the arm a player meets on
+     the worst day. The assertion is not the coverage: it is that the 500
+     answers in the room's own words while the cause goes to the log
+     (commandment 10 — a raw error is machinery wearing a sentence's
+     clothes). Beside it `refuseAdminWrite`'s non-ADR-17 arm, and
+     `unknownSentence`'s **plural** shape, which is what somebody pasting a
+     decklist's commander line meets and which had never run; the table also
+     holds that the sentence does not scold (commandment 2, made checkable
+     against the five words a scolding interface reaches for).
+     **Mutation-verified three ways**: the theme 500 made to interpolate
+     `err.Error()` — fails naming the leak; the unknown-tier status moved
+     422 → 409 — fails; the plural sentence reworded to "are invalid" — fails
+     on the scold. All restored.
+  3. **ADR 12's class had no fixture: a deck file that parses perfectly and
+     still cannot be edited.** `internal/deckedit/malformed_test.go` swept
+     nine broken shapes and every one of them fails at the *parse*, so an
+     operation refuses before it has looked at anything. The dangerous class
+     is the opposite — valid YAML, a real deck, the right cards in the parsed
+     list, and only the **text** scanner comes up empty, because it
+     recognises a card entry by the literal line `- name: …`. `locateCard`
+     notices the two counts disagree and refuses, which is exactly right: with
+     N parsed entries and no spans, an edit that guessed would rewrite the
+     wrong lines of a hand-written file, and since ADR 30 there is no revision
+     to restore it from. Five shapes now drive it — a flow mapping, a bare
+     string entry, `why` before `name`, a quoted `name` key, an anchor and its
+     alias — against seven card operations including `PlanBulk`, whose
+     presence in the list is the useful discovery: **the plan is read through
+     the same lookup, so a file like this is refused while it is still a
+     screen of proposed changes rather than after the button.** The test also
+     pins the one write that legitimately succeeds: `AddToBoard` writes to
+     `swap_board`, a list of its own, and the unreadable lines must come
+     through byte-identical or the exemption is a hole rather than a
+     distinction. **Mutation-verified with the exact degradation the code's
+     comment warns about** — the refusal replaced by `continue` — and what it
+     produces is a *player-facing lie*: `"no card entry named 'Sol Ring'"`
+     about a deck that plainly holds Sol Ring. Restored.
+  4. **A test that skipped itself, found by counting.** The skip census read
+     59 call sites against 09-19's 40, and reading the 19 new ones sorted
+     them cleanly — 16 are `os.Geteuid() == 0` (root really does make
+     chmod-based fault injection impossible), two are the frozen fixture's
+     priced-printing condition, one is the absent bundle, two are
+     child-process halves — except one:
+     `cmd/mtglab/halfarefresh_test.go`'s
+     `t.Skip("the degraded sentinel has been reworded; this guard needs
+     rewriting")`. It sat **after** the test's real assertion had already
+     passed, inside an `if` with no assertion in it, so its only possible
+     effect was to relabel a green test as one that never ran. And it was
+     aimed at the wrong sentence: the test matched the fragment
+     `"mtglab data refresh"` by hand, and `sim mana` **never surfaces
+     `pool.ErrNoPool` at all** — measured, not assumed: asserting against the
+     sentinel fails with *simulation needs the card pool -- run `mtglab data
+     refresh` first*, which is `compile.PoolRequired`'s own
+     words. So the comment claiming "the pool's own sentinel is what the
+     command is reading" was simply false, and the dead conditional was what
+     kept anyone from noticing. All four sites in `cmd/mtglab` that restated
+     that sentence by hand now take it off `(&compile.PoolRequired{}).Error()`
+     — the skill's own rule, that an expectation is derived from the source of
+     truth and never a restatement. **Mutation-verified on the production
+     side** (the refusal wrapped as `fmt.Errorf("sim: %w", err)` in
+     `cmd/mtglab/sim.go`): all three fail together; restored. Nothing in the
+     fingerprinted `internal/sim/compile` was edited — the type is only read.
+- **The floor did NOT move, and that is a ruling being respected rather than
+  a click skipped.** This lane's brief said to ratchet to about half a point
+  below the measurement, which at 96.7 would be ~96.2. `ci.yml`'s own comment
+  records why that is wrong: *"Aaron asked for the tree at 96 and the gate at
+  95, so a diff can cost a few tenths of honest refactoring without going
+  red"* — the 1.6-point gap is a deliberate margin, not slack, set two days
+  ago at this very measurement. The ratchet's own instruction is to raise
+  MINIMUM **when the tree passes a higher number**, and 96.7 against 96.6 is
+  a tenth from eleven statements, not a new number to stand on. Queued for
+  Aaron as a question about the *shape* of the pair rather than acted on.
+- **Verified this run — licensing (triple-check):** 34 commits since 09-19's
+  audit anchor (`e9b2d5f`). Tracked media **207 → 209**, and the delta holds
+  exactly one new source-side asset plus its bundle copy:
+  **`web/src/assets/coliseum/pratum.webp`**, read in full against the primary
+  sources. CC0, *"Poppies (Unsplash).jpg"*, confirmed through the Wikimedia
+  Commons API at fetch time (2026-09-20), recipe `hortus.recipe.yaml` records
+  the crop (`frac_box [0, 0.40, 1, 1]`) and the resize (640) and the WEBP
+  encode, and the committed-vs-hotlinked argument is made twice. The subtlety
+  that matters is caught in the record itself and is the reason this one is
+  sound: it is a Commons mirror **from before 2017, while Unsplash's own
+  licence was still CC0** — Unsplash relicensed to a custom non-CC0 licence
+  that year, so a later mirror would not be usable, and the recipe says so.
+  CC0 waives attribution, so the missing in-room credit is not an obligation
+  here (unlike card art, commandment 19). **Dependencies: zero new package
+  names on either side** — Go is four version bumps (anthropic-sdk-go
+  1.71→1.72, x/crypto .56→.57, x/term .45→.46, x/tools .49→.50) plus three
+  indirect, npm is seven bumps of packages already counted; so 09-19's census
+  composition stands and no new licence entered the graph. The per-version
+  re-read of npm licence fields is **owed to a lane with `node_modules`
+  installed** — this was a worktree lane and the brief forbids `npm ci`.
+- **Verified this run — security & isolation:**
+  - **Zero new routes** since 09-19 (`git diff e9b2d5f..HEAD` on
+    `go/internal/api/` adds no `Pattern:`), so the 403/404 law has nothing
+    new to be read against and the door's derived sweeps are unchanged.
+  - **Zero new `os.Getenv` outside the composition root.** Every added hit is
+    the 09-24 climb's own shape — `envOr(os.Getenv, …)` at the root,
+    `EndpointFromEnv`/`SettingsFromEnv` as the one-line production wrappers,
+    and `childEnv` in the run-the-test-binary-as-a-child fixture.
+  - **`t.Setenv`: zero call sites.** A bare grep reads **8** and every one is
+    prose explaining why it is gone — the same comments-counted-as-code trap
+    `COVERAGE.md` records for `t.Parallel()`, hit in the other direction.
+    Recording the number and the trap together so the next census does not
+    report a regression that is not there. (09-19 recorded 53 call sites;
+    the climb took them to 0.)
+  - **String-built SQL in the delta: three hits, all clean.**
+    `pool/loaders.go`'s `"DELETE FROM "+qualified` and `rebuild.go`'s two
+    `"DETACH "+rebuildCatalog` — `rebuildCatalog` is a package constant
+    (`= "rebuild"`), and `qualified` is built from `catalog` plus `table`
+    whose every non-test call site passes a string literal (`"oracle_cards"`,
+    `"printings"`) with `catalog` either `""` or that same constant. Nothing
+    caller-tainted reaches a statement.
+  - **Argon2id unchanged at OWASP's minimum**: `m=19_456` KiB, `t=2`, `p=1`,
+    salt 16, digest 32 (`passwords.go:19-23`). `.env` ignored (`.env`,
+    `.env.*`, `!.env.example`), zero tracked; `fly.toml` still opens with its
+    no-secrets rule; no query-string token under `web/src` (the one `token=`
+    is the card-token React prop, as recorded four runs running).
+  - **CodeQL: 0 open, 11 dismissed, 4 fixed** (dismissals flat vs 09-19).
+    **Dependabot: 9 open, all `pip/torch`, all development scope** — the
+    standing daybreak item, not re-litigated.
+  - **No live walk this run.** A worktree lane with no browser (the pane is
+    one pane and belongs to the Queen's lane today), and the diff is tests
+    only. The determinism replay is **owed** and goes to daybreak.
+- **Measurements (2026-09-26, rainbow):** raw output, not a summary.
+
+  ```
+  go test -count=1 -coverpkg=./... ./... ; go tool cover -func
+    before  →  total: 96.6%      419 functions uncovered, 734 missing statements
+    after   →  total: 96.7%      416 functions uncovered, 723 missing statements
+  ```
+
+  Floor unchanged at **95.0**. Missing statements by package, before:
+  `api` 256 over 125 functions, `sim/tier3` 67/41, `pool` 58/27,
+  `cmd/mtglab` 46/27, `deckedit` 44/22, `claude` 42/32, `auth` 28/23,
+  `library` 22/12, `deckread` 19/7, `deckyaml` 19/3. **Read the api row
+  twice**: 256 over 125 functions is two statements each, and the uncovered
+  source lines are `if err != nil {` ×67, a bare `return` ×69 and a closing
+  brace ×173 — there is no lever left in that package, only a grind, and the
+  five biggest single functions in the whole tree (`orderedValue` 13,
+  `CommanderDossier` 10, `inviteAccount` 7, `refuseTheme` 6 — taken this
+  run — `rebuild.finish` 6) are four *Left deliberately* entries and one fix.
+  **Census**: 59 `t.Skip` call sites (09-19: 40; the 19 new ones sorted in
+  fix 4), 0 `t.Setenv` call sites, ~2,497 top-level tests by the grep proxy.
+  The by-function tool was rewritten from scratch as the map instructs
+  (parse the profile, OR the counts per block key, attribute each block to
+  its enclosing declaration); it took about fifteen minutes and is the right
+  first move for any future leg.
+  **No mutation spin**: the machine carried load averages of 285–485 with
+  four lanes on it, and the 09-05 lesson is that a loaded `gremlins` run
+  fabricates a score. The hand protocol did the work instead — ten
+  mutations across the four fixes, every one watched to fail and restored.
+- **Queued for Aaron (2026-09-26): three, all in DAYBREAK.**
+  1. **The floor's gap: should the 1.6 points track the tree, or stay
+     anchored at 95?** Both readings of the ruling are defensible and they
+     diverge as the tree climbs. *Recommendation:* leave 95.0 alone until the
+     tree reaches 97.0, then click to 95.5 and keep the gap — the margin was
+     asked for as a margin, not as a fixed number.
+  2. **`ApplyBulk`'s four fold-error branches are unreachable and should
+     join *Left deliberately*.** Probed rather than assumed: `PlanBulk`
+     refuses the same file through the same lookup, so the folds are
+     defensive depth behind a guard, and reaching them needs a hand-built
+     `BulkPlan` the planner would never produce — which the map's own rule
+     forbids ("a branch whose comment says it is unreachable is not coverage
+     to take"). *Recommendation:* add them to the list and stop counting them.
+  3. **`prompt.secret`'s terminal branch: close it as argued rather than
+     leave it open.** `COVERAGE.md` names it the biggest lever left in
+     `cmd/mtglab` at five statements and wants a pty. The seam version was
+     designed and **rejected**: handing the terminal read in as a value would
+     move the uncovered statements into the seam's own default rather than
+     remove them (net ~4), and restructuring a password-reading path to buy
+     four statements is the wrong trade at any coverage number.
+     *Recommendation:* move the entry from "open lever" to
+     *Left deliberately* with that reason.
+- **Deferred:**
+  - **`internal/pool/rebuild.go`'s twelve statements want a faulty DuckDB
+     connector.** `startRebuild` (6) and `finish` (6) are all "an operation
+     that succeeded on the way in fails on the way out" — a failing `DETACH`,
+     a failing `Close`. `authtest.OpenFaulty` is the shape and it is
+     SQLite-only; a DuckDB equivalent is a real fixture, not a surgical fix.
+     *Trigger:* the next time `internal/pool` is opened for its own reasons,
+     or the day a rebuild fails in production and nobody can reproduce it.
+  - **`internal/auth`'s remaining 28 statements are one budget number each.**
+    `authtest.Fault.After` reaches them, but each wants its own count — the
+    grind the map predicted. *Trigger:* a lane with `internal/auth` as its
+    only job.
+  - **The claude boundary trio at ~28s each**, **`repr.go`'s corpus ruling**
+    and **`--version`/build stamp**: standing, triggers unchanged.
+- **One checklist correction owed, recorded here for Colorless.**
+  `.claude/skills/polish/references/white.md`'s testing facet still opens on
+  *"The 95% floor is a claim no gate enforces"* and still quotes **80.3%**,
+  **831 test functions across 115 files and not one `t.Parallel()` call**, and
+  a `1m13s` suite where `internal/api` is 86% of the wall. Every one of those
+  is a 2026-08-23 fact and all four are now false — the floor is a gate
+  (`ci.yml`, 95.0), the tree measures 96.7, every one of ~2,497 tests is
+  parallel and a register requires it, and `api` is no longer the whole wall.
+  A checklist that recites stale numbers sends the next run to re-derive
+  things the ledger already knows. The address-grep chore fix 1 replaced is
+  in the same file and the same paragraph family. **Not fixed here** because
+  the skill is Colorless's territory by the pass's own rules.
 
 ### 2026-09-24 (the coverage climb)
 
@@ -1838,9 +2099,11 @@ kill rate is bad enough to want every mutant rather than a sample.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
-  2026-08-18.
+- **Last run:** 2026-09-26 (rainbow) — **its entry is at the END of this
+  section, not the top**: four lanes ran in parallel that day and each
+  appended at its own section's foot so the colours could not conflict.
+  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
+  night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -3414,6 +3677,247 @@ applies to each. Ordered by cost:
    remaining generic ones are the simulator's "Wasted"/"No land" table columns,
    which are Magic concepts (mana burn's descendant, the missed land drop)
    wearing spreadsheet labels.
+
+### 2026-09-26 (rainbow)
+
+**This entry is out of chronological place on purpose.** Four lanes ran in
+parallel today rather than serially, so every leg appended at the *end* of its
+own colour section: the top of a section abuts the previous colour's and
+conflicts with whichever lane owns it. The 2026-09-19 block above is the run
+before this one.
+
+The whole of this leg's build went to the standing question, and the honest
+answer was that **three of Blue's own absolutes were enforced by nothing** —
+two of them documented as such, in writing, by the tree itself.
+
+- **Fixed: the layering claims are a test now, not a habit.**
+  `go/cmd/mtglab/layering_test.go` holds the three claims blue.md states and
+  then tells the reader to "grep, don't trust": DuckDB stays behind
+  `internal/pool`; `internal/door` sits above `internal/api` and nothing below
+  mounts a door; the determinism kernels import nothing above them. The tell
+  that this was owed is in this section's own history — 09-12, 09-19 and today
+  each re-ran the same greps by hand and wrote the answers here, which is a
+  claim with a date on it rather than a claim that is held.
+  - **It parses rather than asking the toolchain, and that is worth more than
+    convenience.** `go list` and `packages.Load` answer for the platform they
+    run on, so a `_linux.go` file's imports are invisible to every build and
+    every grep on this darwin laptop. Proven rather than asserted: with a
+    throwaway package whose only import sat in `mutant_linux.go`,
+    `go list -f '{{join .Imports " "}}'` printed **`IMPORTS:` and nothing
+    else**, while the `parser.ImportsOnly` walk failed the guard by name. That
+    is blue.md's platform-tag warning turned into coverage instead of a
+    caveat, and it costs no subprocess, no module cache and no network.
+  - **One claim was found to be already enforced — by the compiler — and the
+    test says so instead of taking credit.** While `internal/door` imports
+    `internal/api`, *any* path back from api to door closes an import cycle
+    and the build stops; nothing a test adds improves on that. So the pair of
+    assertions is aimed at the failure Go is happy with — an **inversion**,
+    the route table moved above the middleware — and the live edge is the
+    third assertion: nothing but the composition root imports the door, which
+    no cycle prevents.
+  - **Mutation-verified three ways, all in the real tree, all restored:** a
+    throwaway package importing the DuckDB driver (claim 1 fails, naming it);
+    the same package importing `internal/door` (claim 2's third assertion
+    fails); `internal/textutil` given a blank import of `internal/config`
+    (claim 3 fails, naming the kernel and the dependency). `git status` clean
+    afterwards.
+  - Measured facts the test rests on, all raw: the DuckDB driver has exactly
+    one direct importer (`internal/pool`) and 18 transitive ones;
+    `internal/api`'s in-module closure contains no `internal/door`;
+    `internal/door` has exactly one non-test importer (`cmd/mtglab/ui.go`);
+    `mt19937`, `floats` and `textutil` have **zero** in-module dependencies,
+    and `yamlemit`'s only one is `internal/deckyaml` — which the guard holds
+    to zero of its own, so the kernels' floor is genuinely a floor.
+- **Fixed: the glossary keys are pinned to the served table — the queued item
+  `web/README.md` had been carrying in prose.** That file said it outright:
+  *"a typo'd key fails silently… The check that failed when a simulator
+  control had no entry is gone; rebuilding it over the Go table is a queued
+  item."* `go/cmd/mtglab/glossarykeys_test.go` is the rebuild, and the reason
+  it is a Go test about TypeScript is that the authority is the **served**
+  table: it reads `reference.Words()` rather than re-parsing
+  `glossary.json`, so it asserts against the answer and not a copy of it
+  (`datedcomments_test.go` already sweeps `web/src` from that package).
+  - The silence is the whole fault. A missing key renders as plain text with
+    no affordance — deliberately, so a word can be marked up before its entry
+    is written (`components/term.tsx` argues it) — which makes a typo
+    indistinguishable from a choice. Commandment 2 is why it matters: the
+    glossary is how this site gets to use Magic's own word instead of a
+    flatter one without shutting a newcomer out (blue.md's own squaring of
+    commandments 2 and 3).
+  - **Both shapes a key is written in are read, and the sweep's completeness
+    is itself asserted.** `name="…"` on the element, and the one-line
+    `help('…')` helper `routes/Simulator.tsx` and `routes/Coliseum.tsx` each
+    define. The only two sites that pass a key the extractor cannot follow are
+    those two helpers, listed by file with the exact line that earns the
+    exemption; a third `name={…}` anywhere fails rather than quietly shrinking
+    the guard's reach, and a stale exemption fails too.
+  - **Mutation-verified three ways, restored:** `help('sim.seed')` →
+    `help('sim.seeds')` in `Simulator.tsx` (failed at `Simulator.tsx:454`);
+    `<HelpTip name="stat.card_lag" />` → `stat.card_lagg` in
+    `components/closedform.tsx` (failed twice, at `:104` and `:242`);
+    `<Term name="combo">` → `<Term name={"combo"} />` in
+    `components/combos.tsx` (the completeness assertion failed naming the
+    file). The guard logs what it walked rather than leaving it to prose, the
+    way the parallel register does: **48 marks naming 37 distinct terms over a
+    served table of 55**, every one resolving.
+- **Fixed: CLAUDE.md's test count had rotted, and it is de-numbered rather
+  than corrected.** The Testing section said "every one of the 2,488
+  top-level tests"; `origin/main` held **2,491** (2,483 distinct names — eight
+  repeat across packages), and this branch's six new guards take the register's
+  own log line to **2,497**. Two days between the number being written and
+  being wrong, which is the shortest rot this ledger has recorded — and the
+  reason the replacement carries no figure at all. The sentence now points at the
+  register's own log line (`go test -v -run
+  TestEveryTestRunsBesideItsNeighbours ./cmd/mtglab/`), the same move ROADMAP's
+  "seven modes" got on 09-12: drop the figure, name the thing that counts.
+- **Docs updated on this branch, no doc-only PR:** `web/README.md`'s glossary
+  bullet names the new guard instead of promising one; blue.md's layering
+  bullet says the greps are a test and tells the next run to re-grep only to
+  *extend* the claims.
+- **Four other absolutes checked and found held, so a later run need not
+  re-derive them:** CLAUDE.md's coverage floor (`ci.yml` gates **95.0**, read
+  back from the workflow); "the repo's only other `.py`" (`find` returns
+  exactly `.claude/hooks/guard-git.py`) and "`scribe/` is the one piece of
+  Java" (zero `.java` outside it); `.env.example` held equal to the code both
+  ways by `configrecord_test.go`; and `web/README.md`'s "**Routes are lazy**
+  … three are deliberately eager — `Library`, `Login`, `Claim`" — exactly
+  thirteen `lazy(() => import(…))` lines and exactly those three eager
+  imports in `App.tsx`. That last one looked like a fifth unenforced claim
+  and is not: a route that stops being lazy lands in the entry chunk, which
+  `bundlebudget_test.go` already gates. Recorded so it is not built twice.
+- **The register itself re-read, not inherited.** `serialregister_test.go`
+  still fails by name on any test whose own body omits `t.Parallel()`, still
+  refuses a zero total, and still logs what it walked. The claim in CLAUDE.md
+  is held; only its number was not.
+- **Boot and config, re-measured — and the ledger's own metric was wrong all
+  along.** Every previous entry counted `grep -c 'os.Getenv\|os.LookupEnv'`
+  and reported "12 reads in 7 files". That grep counts three different things:
+  actual calls, `os.Getenv` **handed in as a value** at a composition root,
+  and doc-comment mentions like `[os.Getenv]`. Counted apart, today:
+  - **2 real process reads outside tests, both in `internal/flymetrics`** —
+    `token()`'s fallback when `Panel.Token` is nil, and `valueOr`'s middle
+    tier. Both are argued fallbacks behind a field or an argument, which is
+    the doctrine holding, not drifting.
+  - **6 composition-root hand-ins** (`config.Load`, `claude.EndpointFromEnv`,
+    `claude.SettingsFromEnv`, `tier3.LoadSettings`, and `ui.go`'s two
+    `envOr(os.Getenv, …)` flag defaults) — which is the 09-24 parallel work's
+    shape, and the reason the old number stopped meaning anything.
+  - The naive grep now reads 15 in 7 files. **It is not a regression and a
+    future run should not read it as one**; use the two counts above.
+  - Local env readers still three: `ui.go`'s `envOr`, `tier3`'s `envInt`, and
+    `flymetrics`' — renamed `valueOr` since 09-19. Deferred trigger (a
+    fourth, or a whitespace bug) has not arrived.
+  - `.env.example` vs code: **both `comm` directions empty** for shipping
+    names (35 documented, 42 in code). The seven outside the file —
+    `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`, `MTGLAB_OLD_SHIM_URL`,
+    `MTGLAB_TEST_HOLD_POOL`, `MTGLAB_TEST_POOL`, `MTGLAB_TEST_SERVE_CHILD`,
+    `MTGLAB_X` — each have **0 non-test readers**, verified one at a time.
+    `MTGLAB_TEST_SERVE_CHILD` is new (#496's child-process SIGTERM proof) and
+    `configrecord_test.go` already holds it on the right side of the boundary;
+    the two `MTGLAB_TEST_ENVOR*` names from 09-19 are gone with `envOr`'s
+    lookup parameter.
+- **Blue's daybreak line re-verified and left standing.** `fly` answered on a
+  plain call and `fly secrets list` shows seven secrets, **none of them
+  `MTGLAB_NIGHT_*`** — so "the torches are not lit yet" is still a fact and
+  `routes/Settings.tsx` is still telling the truth. Premise unmoved; the line
+  stays as the reminder it was written to be.
+- **Green's Goreclaw line: premise confirmed, and it needs one word from
+  Aaron, not a session's guess.** `fly ssh console -C "mtglab decks list"`
+  answered **25 decks**, every one 99 cards, and no mono-green Goreclaw among
+  them — so the `mtg-lab` skill's trigger list does name a deck the library
+  does not have. Not touched, because the daybreak recommendation forks on
+  Aaron's answer: re-import and the trigger becomes right again; "obituary"
+  and it comes out. Deleting it on the wrong branch of that fork is a trigger
+  that has to be put back.
+- **The spirit of Magic — shelf fact-check, four claims, all held, zero wrong
+  facts.** Lighter than 09-19's nine on purpose; the budget went to the two
+  guards. Sample seeded over `lore.json`/`colors.json`, every card through
+  `cards show` against the borrowed pool (rule 1, nothing recalled):
+  Shahrazad "makes both players set their decks aside and play a whole
+  separate sub-game" ✓ (*"Players play a Magic subgame, using their libraries
+  as their decks"*); "'Ramp' … is named after one specific two-mana sorcery:
+  Rampant Growth" ✓ (`{1}{G}`, Sorcery, and it does search a basic land);
+  Black Lotus in the Alpha-price entry ✓ (`{0}`, three mana of one colour);
+  and the combat-damage-on-the-stack entry, a rules-history claim the pool
+  cannot answer and which is correct as written. **The sweep half found
+  nothing new to flavour**: the only rendered string `web/src` gained since
+  09-19 is board.tsx's `Fallen`, which is the game's own word.
+- **Memory audit: whole and quiet.** 183 files (177 on 09-19); every file the
+  index names exists and every file on disk is indexed — both directions
+  scripted, both empty. One relative-date hit (`many-lanes-saturate-this-mac`'s
+  "a timeout that was fine this morning") is a rule's phrasing, not a dated
+  claim. Nothing changed.
+- **Toolchain audit: go.dev read today — still go1.27.1 / go1.26.8, nothing
+  shipped since 2026-09-01.** Local sdk stays go1.26.7; `go.mod` stays
+  `go 1.26.0` behind the macOS 12 ceiling. Reopening trigger unchanged:
+  Go 1.28, ~Feb 2027.
+- **Modern-Go inventory (non-test), and the sweep's honest answer is "nothing
+  new":** `interface{}` 0 · `ioutil` 0 · `rand.Seed` 0 · `strings.Title` 0 ·
+  `sort.Slice` 2 (both `internal/jobs`, ruled 2026-08-24, ruling carried) ·
+  `sort.SliceStable` 20 · `sort.Strings` 63 · `sort.Ints` 4 · `sync.RWMutex`
+  0 · `sync.Mutex` 22 · `errgroup` 0 · `wg.Add(` **0 non-test** (6 in
+  `internal/jobs/fuzz_test.go` and `shimdoor_test.go`) · `sync.Once` 2
+  (`shim.go`'s watchdog, `sim/cache`'s fingerprint — the latter inside a
+  fingerprinted package, so `OnceValue` there costs every stored Tier 1
+  result and is not worth a spelling). Non-test goroutine sites: 3
+  (`ui.go`'s listener, `shim.go`'s watchdog, `tier3/run.go`), none added
+  since 09-19. C-style counting loops convertible to range-over-int: **20**,
+  a new row — and ruled the same way `sort.Strings` was: eight are inside the
+  five fingerprinted packages where a prose-or-spelling edit discards the
+  cache (ADR 18, Aaron's 2026-09-05 ruling), several are byte scans over a
+  string where the index is load-bearing, and the rest are a spelling change
+  in files nobody is touching. **Convert as the file is touched for a real
+  reason; do not open a sweep.**
+- **TS craft (audit only this leg, by lane assignment):** zero regex
+  lookbehind, zero `forwardRef`/`React.memo`/`defaultProps` across 116
+  non-test `.ts`/`.tsx` files; `web/src` moved only in `board.tsx`,
+  `board.test.tsx`, `index.css` and one asset since 09-19, so no bundle
+  rebuild is owed by this branch and `web_dist/` is untouched.
+- **Queued for Aaron: nothing new.** No design decision, no spend, no
+  dependency, no security question; `DAYBREAK.md` is untouched by this leg and
+  the two lines it already carries for Blue's and Green's premises were
+  re-verified above rather than re-asked.
+- **Deferred (re-checked, triggers unchanged):** the "Shuffling up…" flavour
+  pair on `App.tsx`'s two spinner labels — still waiting on a bundle-carrying
+  PR outside a rainbow, and today's four-lane shape makes that sharper, not
+  softer, since the Queen's leg owns `web_dist/`; the three local env readers;
+  the dropped-name counter; pprof's live half (b); `claude plugin eval` /
+  `/skill-doctor` (Colorless's question). **Left standing by ruling:**
+  `internal/jobs`' two `sort.Slice`, the 63 `sort.Strings`, and now the 20
+  counting loops.
+- **Measured (2026-09-26, this Mac, 13:46–13:55, four lanes at once — read
+  every wall-clock number here as a fact about a saturated machine and compare
+  none of it to a quiet night):** load **2.3/7.9/15.8** at the gauntlet's
+  start, **112** when the suite finished, **517/262/143** by the time the
+  linter did.
+  - Go gauntlet: `gofmt -l .` prints nothing; `go vet ./...` clean;
+    `go test -race ./...` **50 ok, 2 load failures in `cmd/mtglab`**
+    (diagnosed below, both green alone), **346.3s wall / 1005.2s user**;
+    `golangci-lint run ./...` **0 issues**.
+  - `go test -race -count=1 ./cmd/mtglab/` after the warm-up: **ok, 55.7s**,
+    both new guards included.
+  - The three layering guards cost **0.09–0.10s each**; the three glossary
+    guards **0.08–0.14s**. Six new top-level tests, all parallel.
+  - `web/src` untouched by this branch, so **no bundle rebuild owed** and
+    `web_dist/` is not in the diff. No `data/` exists in this worktree, so
+    there is no `app.db` for a running app to have dirtied.
+- **One trap met, worth the next lane's minute.** The first `go test -race
+  ./...` in this worktree failed twice in `cmd/mtglab` —
+  `TestAMatchIsReportedEvenWhenItCannotBeRecorded` and
+  `TestTheLedgerKeepsTheLabelsTheDecksWore`, both at a flat **~30.0s**, both
+  reporting `Java None` against the committed `testdata/fakejava`. Both passed
+  alone immediately after. It is the 09-24 minted-executable trap in a new
+  guise: **Gatekeeper's scan is per file, and a fresh worktree checkout is a
+  fresh file**, so "the fake JVM is committed once" buys nothing until
+  something has exec'd *this* copy. Load was 112 at the time and 517 by the
+  end of the gauntlet. One line before the first gauntlet in a new worktree
+  pays it outside any probe's clock: `go/cmd/mtglab/testdata/fakejava
+  -version`. Nothing was loosened and no timeout was touched; the memory file
+  now carries the worktree half.
+- **Handed forward:** to **Colorless**, the ledger-metric correction above —
+  every Blue entry from 08-23 onward quotes an `os.Getenv` count that conflates
+  calls with hand-ins, so the *trend line* in this section is not measuring one
+  thing; the two-number form is the replacement.
 
 ## Black — Ruthless Efficiency
 
@@ -5389,10 +5893,262 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-09-19 (rainbow). Previous: 2026-09-12 (rainbow),
+- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+  2026-09-12 (rainbow),
   2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
   2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
   first Red run and the baseline the numbers below are a trend against.
+
+### 2026-09-26 (rainbow)
+
+*Two PRs, both backend-only: **#502** carries everything below except the
+deploy retry, which is **#505** — a `deploy`-job change, and a `deploy` job runs
+on a push to `main` alone, so it could only ever be watched rather than proven.*
+
+- **Landed: `/api/health` reports sickness as well as liveness — queued item
+  3, ruled yes on the daybreak queue and closed here.** `app_db`,
+  `disk_free_mb` and `schema_version` are in the body, in both shapes, and
+  the status stays 200 for every one of them (Fly stops routing to a machine
+  whose check fails, and with one machine that turns "logins are broken" into
+  "the site is down"). Three readings, each with a shape that does not lie:
+  - `app_db` is **three-valued on purpose** — `null` for an instance with no
+    auth database, `false` for a file that is there and will not answer,
+    `true` for one that opened. Only the middle one is an alarm, and the
+    distinction is the whole reason it is not a bare boolean.
+  - `disk_free_mb` is `null` rather than `0` when the read fails.
+    `diskUsage` reports a failed statfs as three zeros, and a monitor reading
+    `disk_free_mb: 0` would page somebody for a full volume that is really a
+    question nobody asked (the `?? false` trap in its Go form). `total <= 0`
+    is how the failure is told from a reading.
+  - `schema_version` and `app_db` are **one read**: `appDBReading` in
+    `adminstats.go` opens `app.db` read-only once and answers both, and
+    `schemaApplied` — the admin panel's existing caller — is now two lines
+    over it. It is a header read and not `PRAGMA integrity_check`, which
+    walks the whole database and is not what a thirty-second probe runs.
+  - **The queued entry's premise was already half solved and nobody had
+    looked.** It called the free-space read platform-shaped and said only
+    CI's arm64 leg could prove it; `api.diskUsage` has existed in
+    `system_darwin.go` / `system_linux.go` since the admin storage view, so
+    there was no new platform code to write and no build tag involved. Worth
+    recording because the queue line is what a future session would have
+    budgeted from.
+  - Four tests in `health_test.go` (the degraded shape's byte-exact record
+    updated; a real `app.db` reporting the rung read back from
+    `auth.SchemaVersion` rather than typed; a garbage file reading `false`
+    with the status still 200; `diskFreeMB` absent rather than zero).
+    **Mutation-verified three ways**: dropping `total <= 0` fails the free-space
+    test naming "a path that names nothing reports 0 free"; returning `nil`
+    instead of `false` on the pragma error fails the unreadable-database test
+    by name; dropping `append(body, sickness...)` fails two tests at once.
+- **Landed: the platform's own health check is machine-checked now — the
+  standing question's answer for this run.** `fly.toml`'s
+  `[[http_service.checks]]` and the `Dockerfile`'s `HEALTHCHECK` both name
+  `/api/health` as a string and both assert *in prose* that it is on
+  `PublicPaths`. Nothing held either claim to the code, and the drift is the
+  most expensive in the repository while being silent in both directions: a
+  renamed or re-methoded route leaves Fly polling a 404, the proxy stops
+  routing, and with one machine that is the whole site dark with every test
+  green — the container's own check fails the same way and restarts the
+  process in a loop. `TestThePlatformsHealthCheckNamesAServedPublicRoute`
+  (`go/cmd/mtglab/healthchecktarget_test.go`) reads the method and path out
+  of `fly.toml`'s check block, the second copy out of the `Dockerfile`'s
+  probe *URL*, and holds them equal to each other, to
+  `api.API.Routes()` and to `door.PublicPaths` — nothing typed. The GET
+  assertion carries queued item 2's caveat where a reader will meet it.
+  **Mutation-verified four ways in one run**: `path = "/api/healthz"` and
+  `method = "HEAD"` in `fly.toml` fire all four messages
+  (Dockerfile mismatch, no such served route, not public, wrong method), and
+  deleting `"/api/health"` from `door.PublicPaths` alone fires exactly the
+  public one.
+- **Hot-spot patrol: `internal/door`, which Red had never profiled, and it
+  found the largest object in the request path being built and thrown away
+  per response.** The door is on the path of *every* request (auth
+  middleware, router, session touch, gzip, static tiers, the visitor
+  ledger) and the five packages previous patrols profiled — `api`,
+  `sim/tier1`, `deckread`, `gate`, `library` — are all inside or behind it.
+  Raw tops (test-shaped load, load 2.17 before):
+
+  ```
+  internal/door  (2.24s)  CPU: Duration 403.30ms, samples 830ms (205.80%)
+     450ms 54.22%  syscall.rawsyscalln        <- sqlite WAL, app.db
+     240ms 28.92%  runtime.cgocall            <- the documented blind spot
+      20ms  2.41%  regexp.(*Regexp).doOnePass
+      10ms  1.20%  compress/flate.(*compressor).deflate
+  internal/door  ALLOC: 48,060.92kB total
+    19456.00kB 40.48%  argon2.initBlocks            <- the legitimate remainder
+     6318.10kB 13.15%  compress/flate.NewWriter (7960.45kB cum, 16.56%)
+     3039.81kB  6.32%  libc/netdb.init.0
+     2564.25kB  5.34%  runtime.mallocgc
+     1642.35kB  3.42%  compress/flate.(*compressor).initDeflate
+     1542.01kB  3.21%  bufio.NewReaderSize
+      517.33kB  1.08%  door.newRouteTable
+      513.69kB  1.07%  door.servedPaths
+  ```
+
+  CPU is 83% syscall and cgo — both standing blind spots, and nothing to read
+  there. **The allocation profile is where the finding was**, exactly as the
+  shelf says it would be: `flate.NewWriter` is second only to password
+  hashing, and `gzip.go` built one `gzip.Writer` at
+  `BestCompression` per compressed response and dropped it.
+- **And the fix, with the discipline attached (`gzip.go`, a `sync.Pool`).**
+  Per compressed response, `gzip_bench_test.go` (new, this branch — the
+  instrument the claim rests on):
+
+  ```
+  before  BenchmarkOneGzippedResponse-8   5013   234524 ns/op   836848 B/op   31 allocs/op
+  after   BenchmarkOneGzippedResponse-8  16735    65666 ns/op    23435 B/op   14 allocs/op
+  control BenchmarkOnePlainResponse-8   161048     7286 ns/op    22704 B/op   10 allocs/op  (load 2.2)
+  control BenchmarkOnePlainResponse-8   161049     8195 ns/op    22704 B/op   10 allocs/op  (load 147)
+  ```
+
+  **−813 kB and −17 allocations per compressed response**, landing the
+  compressed path within a kilobyte of the uncompressed one — every asset and
+  every JSON body over `gzipFloor` was paying it. `-count=6`, spread under
+  190 B/op either side.
+  **The wall clock in that table is not the finding and the control says why**:
+  the plain path never touches the compressor and its `B/op` is 22,704 to the
+  byte in both runs, while its `ns/op` moved 6.1µs → 14µs on ambient load
+  alone (2.17 → 147.28 between the two). That is the cross-night rule holding
+  inside one session; the allocation figures are the load-independent half.
+  **The one hazard is a writer lent out twice**, which would write one
+  response's bytes into another's, so: `Reset` before a byte is written, `Put`
+  only in `finish` and only after `Close` has written the trailer, and the
+  field cleared in the same breath so a second `finish` cannot return the same
+  writer. `TestBorrowedCompressorsNeverBleedOneResponseIntoAnother` (three
+  responses through one pool, each read back on its own) and
+  `TestAPooledCompressorWritesItsTrailerBeforeItGoesBack`.
+  **Mutation-verified two ways**: no `Reset` panics on the *first* compressed
+  response (a writer out of `New` points at nothing), and `Put` without
+  `Close` fails both with `unexpected EOF` — a stream whose CRC never arrived.
+- **CI, measured (n=37 successful `ci.yml` runs, the window ending
+  2026-09-24T22:17Z — main has not run since; per-job medians from
+  `started_at`/`completed_at`, raw rows in this run's scratch `jobs.txt`,
+  296 lines):** `go (amd64)` **316s** (204–356, was 298.5) · `go (arm64)`
+  **270s** (200–325, **was 223**) · `image` **184s** (63–328, was 143) ·
+  `deploy` **171.5s** (153–211, n=14, was 165) · `frontend` **87s** (61–94,
+  was 88) · `go-lint` **40s** (21–125, was 37.5) · `tools` **33s** (27–41,
+  unchanged) · `no-secrets-or-card-data` **6s** (4–9, was 7).
+  **Two movers with one named cause between them.** arm64 **+21%** and amd64
+  **+6%**: the coverage climb of 09-24 (#488–#497) grew the suite and raised
+  the floor to 95.0, and the arm64 leg is the one that computes coverage
+  (#466 gated the step to that leg alone). So the leg carrying the extra work
+  grew three times as fast as the one that does not — which is the shape the
+  cause predicts, and it is also **the critical path narrowing to 46s** from
+  ~75s. If arm64 ever passes amd64, the floor step is where the time is and
+  the 09-12 reasoning for putting it on one leg gets re-read, not undone.
+  `image` +41s is inside its own 63–328 spread (cache replays versus cold).
+  **Last five `tests` runs on `main`, wall clock:** 470s (0e3ef833) · 542s
+  (11f154dc) · 549s (48f569d4) · 711s (1048e635) · **945s FAILED**
+  (36b0aee3) · 808s (a4277721). The trend is down, and the failure is its own
+  entry below.
+- **A red `main` run whose deploy had fully landed — for the third recorded
+  time, and this one has a cause worth fixing.** Run 36055012220 (09-24,
+  sha 36b0aee3, `deploy` failed at 15m45s) died in **Point the forge-worker
+  machine at it** with `curl: (35) Recv failure: Connection reset by peer`,
+  exit 35, under `set -euo pipefail`. **Release v413 completed at 20:42 and
+  the curl died at 20:43:22** — the app deploy had fully landed and was
+  serving; the step runs *after* the smoke test by
+  design, so a red worker sync is feedback about the worker rather than a
+  rollback of the app — but the run reads `failure`, which is the
+  read-the-image-tag lesson arriving a third way. **Every Fly Machines API
+  call in that step is a bare `curl -fsS` with no retry** — the machine list,
+  the update, the state polls in `wake`, the start, the stop — so any single
+  transport hiccup against `api.machines.dev` fails the deploy job. That is
+  **two unretried transients in one week**: a 409 on #477 (09-19, memory
+  `the-rainbow-of-2026-09-19`) and this reset. Both self-healed on the next
+  deploy, and the worker holds `forge-worker-0e3ef833` today, so the standing
+  cost is a red check that is not about the code. **Fixed in #505**, its own
+  small PR because that is the only way a deploy-job change can be watched:
+  all seven calls take `--retry 5 --retry-delay 2 --retry-all-errors
+  --max-time 30`, and `--retry-all-errors` rather than `--retry` alone is the
+  whole point — curl's own "transient" list is timeouts plus a handful of
+  status codes, so plain `--retry` would have retried *neither* of the two real
+  failures. `TestEveryMachinesAPICallInTheDeployRetries` holds it by indent
+  inside that one step (three other jobs run curls under different rules) and
+  refuses a block with fewer than six calls in it, so a parser that found the
+  wrong step cannot pass. **Mutation-verified both ways**; `bash -n` clean over
+  the extracted 127-line step; the flag set retried and gave up in **10.0s**
+  against a closed port.
+- **Required contexts, read back: EIGHT, unchanged** — `frontend`, `image`,
+  `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`,
+  `go (arm64)`, `go-lint`, `tools`.
+- **The "two free minutes" on queued item 1, answered as far as it can be
+  from here — and it cannot be finished without Aaron's browser.** `fly` has
+  **no alert-rule subcommand at all** (`fly help` under "Monitoring &
+  managing things" lists exactly one entry, and it is not alerting);
+  fly-metrics.net's Grafana provisioning API answers **401** to an
+  unauthenticated request and its root **302**s to a login; and
+  `FLY_METRICS_TOKEN` is a **read-only Prometheus credential** —
+  `flymetrics.go` queries `https://api.fly.io/prometheus/<org>/api/v1/query`
+  with it — not a Grafana one, so it cannot list rules even if it were to
+  hand. The repository holds no alert configuration of any kind: `fly.toml`'s
+  only watcher is the HTTP check. **So the answer is two clicks in Aaron's
+  own Fly session, and nothing a run can do.** The daybreak line is sharpened
+  to say so rather than to ask again.
+- **Free-tier / platform feature audit: one new thing, and it does not close
+  queued item 1.** `fly synthetics` exists in the CLI now (`fly synthetics
+  agent`, "Runs the Synthetics agent") — Fly's own synthetic monitoring,
+  which runs an **agent on Fly**. That is the fate-sharing objection the
+  ledger already made about managed Grafana and about self-hosting ntfy, in a
+  first-party wrapper: a checker that cannot report when the platform it runs
+  on is down is not the liveness half. Recorded so a future run does not
+  mistake it for the answer; the off-platform probe is still off-platform.
+- **The expiry calendar, re-verified from the sources:** **TLS 2026-11-11**
+  (live cert, `notAfter=Nov 11 14:11:46 2026 GMT`, `notBefore=Aug 13`, issuer
+  Let's Encrypt `YE2` — **the same certificate as 09-19, unturned; 46 days
+  out**. Fly renews ~30 days ahead, so the turnover is due around
+  **2026-10-12** and the next Red run after that date reads a new
+  `notBefore`. Automatic, nothing for Aaron) · **domain 2027-08-13** (whois:
+  Porkbun, `Registry Expiry Date: 2027-08-13T02:28:05Z`) ·
+  **`github-actions-deploy` token 2027-08-14**, `Mtglab API` 2126-07-27
+  (`fly tokens list`, neither revoked) · **`fly auth login` ~2026-10-14** (a
+  laptop ceiling, not a site outage; `fly` answered every call this run) ·
+  **Anthropic key through year-end** (not re-read this run: reading the
+  digest needs `fly secrets list`, and the delta rule only wants it when
+  something suggests a rotation).
+- **Live probe (2026-09-26 ~20:47Z, release v417, from this Mac):** `GET /`
+  200 **183ms**, 5,756b · `/api/health` 200 **267ms**, body `pool true,
+  35,517 oracle / 108,583 printings, bulk 2026-09-13 ×2, 25 decks,
+  pool_stale false` — **identical to 09-19's counts**, so no refresh since,
+  which matches Green's 10-05 plan · `/api/decks` **401** · `HEAD /` still
+  **405** (queued item 2's monitor caveat, and now asserted in Go).
+- **Alerting posture — unchanged in every line:** `fly.toml` HTTP check GET
+  `/api/health` 30s/5s/10s grace (stops routing on failure, restarts
+  nothing) · machine restart policy on process exit only · deploy-job failure
+  email · **external uptime monitoring: none · phone alerting: none** (queued
+  item 1, still the biggest gap, and now the only one on the queue that costs
+  money). Held-awake block still on.
+- **Instance:** app machine `84e19ef25041e8` **started**, 1/1 checks passing,
+  release **v417**, image `deployment-01M3AQSAE17XB60HFC8A3SXHBE`, last
+  updated 2026-09-24T22:16:41Z · `forge-worker` **stopped**,
+  `performance-4x:8192MB`, holding
+  `forge-worker-0e3ef8332784cd58d08c775c509b8b9bfb5670a5` — the newest sha,
+  which is the 09-24 failure having self-healed · volume `mtglab_data` 3GB
+  encrypted, **5 snapshots, newest 6h, 5-day retention, 1.1 GiB stored** (the
+  4-day-old one 905 MiB, the dailies 56–87 MiB). Restore drill still dated
+  2026-09-13.
+- **Controls: not touched, by arrangement.** Red's controls facet was held by
+  the Queen lane this run (she owns `web/src/index.css` and every `.tsx`), so
+  no census was taken here and nothing in `web/src` moved on this branch. The
+  09-19 numbers stand as the last reading.
+- **Queue movement tonight — three items leave the queue and one arrives.**
+  - **Queued item 3 (the health endpoint) CLOSED** — ruled yes, landed above.
+  - **The #481 walk line CLOSED**: PR #481 **merged 2026-09-20**. The
+    daybreak line is deleted; nothing else is owed.
+  - **Queued item 5 (a merge queue) CLOSED at its own recommendation.** The
+    trigger was a threshold rather than a pain, and the evidence has grown
+    since: the coverage climb of 09-24 ran ten lanes through this repository
+    in one evening and landed them with the merge-train pattern instead, so
+    the case for changing the contributor workflow is weaker now than when
+    the trigger fired.
+  - **New and already answered: the deploy job's unretried Machines API
+    calls** — found and fixed in the same run (#505), so it never became a
+    question. The daybreak queue gains **nothing** from Red tonight.
+  - Unchanged and still Aaron's: items **1** (off-platform uptime + phone,
+    the dollar), **2** (GET not HEAD, now half-asserted in Go and kept as the
+    monitor's configuration note), **6** (a snapshot before a deploy), **11**
+    (the drill-versus-retention wording, whose own daybreak line recommends
+    "close").
 
 ### 2026-09-19 (rainbow)
 
