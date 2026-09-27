@@ -64,13 +64,31 @@ lever and a grind is visible before the work starts.
 | #290's follow-up | 90.4% | 90.40% |
 | #478's pass | 90.8% | 90.82% |
 | the climb of 2026-09-24 (nine lanes, #488–#496) | 96.6% | 96.56% |
+| leg two, 2026-09-26 (the rainbow's White lane) | **96.7%** | |
 | the grind of 2026-09-26 (one lane, the faulty handle) | **96.9%** | 96.86% |
 | floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
+
+**Leg two is the leg that says the climb is over**, and the number is the
+argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
+writing for their own sake. What was left after 09-24 is **734 missing
+statements over 419 functions** — 1.8 each — and `internal/api`, the worst
+package at 256, is 125 functions averaging two: the uncovered source lines
+there are `if err != nil {` sixty-seven times, a bare `return` sixty-nine, and
+a closing brace a hundred and seventy-three. There is no lever in that; there
+is a grind. **So the standing question is the better spend at this altitude**,
+and leg two's own centrepiece was not a test at all but a claim made
+machine-checked: `go/cmd/mtglab/addressreach_test.go`, which replaced the
+address-grep the checklist had been performing by hand every run with a
+register held equal in both directions *and* a call-graph rule requiring every
+route that can reach an address to check for an admin. The rule caught a
+mutation the register could not see — the public `login` route answering
+`accountBody` — which is the whole case for preferring one checked claim to
+three more tests.
 
 The grind's numbers, measured with the recipe at the top of this file on the
 same commit either side: **734 missing of 21,628 → 679**, fifty-five statements,
 `-func` 96.6 → 96.9. It closed no lever; it closed one *shape* in six packages
-at once, and the shape is lever 25 below.
+at once, and the shape is lever 29 below.
 
 The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
@@ -153,10 +171,24 @@ as meaningful to whoever finds it next.
 - **`fs.Glob` swallows its `ReadDir` error**, so `Fingerprint`'s glob-error
   branch cannot fire with a literal `"*"`; the `fs.ReadFile` branch beside
   it can and does.
-- **`users.go:prompt.secret`'s terminal branch** wants a real pty
-  (`golang.org/x/sys` is already a dependency; platform-specific test code
-  nobody has argued for yet) — the single biggest lever left in
-  `cmd/mtglab`, at five statements.
+- **`users.go:prompt.secret`'s terminal branch** — five statements, and it is
+  **closed by argument rather than open**, which 2026-09-26 worked out and is
+  queued for the ruling that makes it official. A real pty needs
+  platform-specific test code nobody has argued for. The alternative, handing
+  the terminal read in as a value (the tree's standing move — `Settings.Java`,
+  `RefreshOptions.IndexURL`), was designed and **rejected**: the seam's own
+  default still calls `term.ReadPassword`, which no test can reach, so the
+  uncovered statements move into the seam rather than out of the tree — net
+  about four — and restructuring a password-reading path to buy four statements
+  is the wrong trade at any coverage number. Do not re-derive this.
+- **`ApplyBulk`'s four fold-error branches** (`internal/deckedit/bulk.go`) are
+  defensive depth behind a guard, probed rather than assumed on 2026-09-26:
+  `PlanBulk` reads the deck through the same `locateCard`, so a file that would
+  make a fold fail is refused while it is still a plan on screen. Reaching them
+  needs a hand-built `BulkPlan` with a matching `Basis` that the planner would
+  never produce — which is calling past the guard. The *reachable* half of that
+  class is covered instead, by
+  `TestAnEditRefusesADeckWhoseCardListItCannotScan`.
 - **Fixture rows come out of the real pool by machine.** Grand Coliseum,
   Jareth, Leonine Titan and Lightning Helix went into `tiny_pool.json` on
   2026-09-24 through a throwaway script over `data/mtg.duckdb`
@@ -328,10 +360,52 @@ them is reusable:
     `writeAtomicallyOn(disk, …)` is a struct of five functions, a value
     rather than a hook so the package's tests stay parallel.
 
-These are 2026-09-26's, and the first of them is the one worth reaching for
-before anything bespoke:
+25. **The refusal at the mapper, not through the route.** A function that turns
+    an error into a status and a sentence is a pure function of the error, and
+    driving it through a route needs the failure to happen for real — which is
+    why `refuseTheme`'s interesting arms had never run and why the arm a player
+    meets on the worst day was the least tested. Call the mapper directly with
+    each error class, and assert the pair: the status a browser branches on,
+    *and* that the unpredicted arm answers in the room's own words while the
+    cause goes to the log. `internal/api/refusalwords_test.go` is the shape, and
+    the log half is commandment 10 made checkable — a raw error in a body is
+    machinery wearing a sentence's clothes.
+26. **The file that parses perfectly and still cannot be edited.** Every
+    malformed-input sweep reaches for files that fail at the *parse*, and those
+    are refused before anything looks at anything. The dangerous class is the
+    other one: valid YAML, a real deck, the right cards in the parsed list, and
+    only the text scanner comes up empty — `internal/deckedit` recognises a card
+    entry by the literal line `- name: …`, so a flow mapping, a bare string
+    entry, `why` before `name`, a quoted `name` key or an anchor all parse and
+    scan to nothing. One fixture family drives ADR 12's refusal across every
+    card operation *and* the bulk planner. Two things it taught: the **plan** is
+    read through the same lookup, so the refusal lands before the button rather
+    than after it; and the one write that legitimately succeeds
+    (`AddToBoard`, which owns a different list) has to leave the unreadable
+    lines byte-identical or the exemption is a hole.
+27. **A claim the checklist re-greps every run is the claim to make checkable.**
+    `go/cmd/mtglab/addressreach_test.go` came out of noticing that
+    `references/white.md` *instructs* a grep — "grep for every call site each
+    run — a third one is the finding" — which is a rule enforced by whoever
+    remembers. Two halves, and the second is where the value is: a **register**
+    held equal in both directions catches a new direct reader, and a
+    **call-graph closure** over the package catches the regression a register
+    structurally cannot — a route that reaches the address through somebody
+    else. Mutation-verified by making the public `login` route answer
+    `accountBody`: the register stayed green, the closure named the route.
+28. **Counting the census finds the dead test.** Reading the skip census
+    (59 sites, up from 40) sorted eighteen of nineteen new skips into real
+    absences and left one that was not: an `if` whose body was a `t.Skip`, sited
+    *after* the test's real assertion had passed, so its only effect was to
+    relabel a green test as one that never ran — and it was aimed at a sentence
+    the command under test does not even produce. The fix is the skill's own
+    rule: take the expectation off the source of truth
+    (`(&compile.PoolRequired{}).Error()`), never restate it.
 
-25. **The budget, swept rather than counted.** `authtest.OpenFaulty` had four
+The grind's, the same day — and the first of them is the one worth reaching
+for before anything bespoke:
+
+29. **The budget, swept rather than counted.** `authtest.OpenFaulty` had four
     callers (`auth`, `night`, `traffic`, and its own test) and every one of
     them hand-counted `Fault.After(n)` to land on the statement it was about.
     A counted budget is a restatement of today's statement order: add a query
@@ -349,7 +423,7 @@ before anything bespoke:
     error means the change is there*; and a read-only route may share one
     fixture across the sweep while a write gets a fresh one, which is the
     difference between 11 seconds and 39 in `internal/api`.
-26. **A column that holds what a scan cannot take.** SQLite applies column
+30. **A column that holds what a scan cannot take.** SQLite applies column
     affinity rather than enforcing it, so `UPDATE forge_matches SET
     wall_seconds = 'not a number'` leaves **text** in a REAL column and every
     `rows.Scan` arm in the reader becomes reachable. One hand-run UPDATE
@@ -364,7 +438,7 @@ before anything bespoke:
     A column an aggregate computes (`count(*)`, `sum(...)`) cannot be poisoned
     at all, which is why `cache.Stats`' and `api.statsActivity`'s own `Scan`
     arms are in *Left deliberately* below.
-27. **`Fault.RowsAfter` reaches `rows.Err()` and never `rows.Scan`.** A `Next`
+31. **`Fault.RowsAfter` reaches `rows.Err()` and never `rows.Scan`.** A `Next`
     that fails surfaces through `Rows.Err()`, not through the `Scan` inside
     the loop — `database/sql` stores the error and answers `false`. So the
     row budget is the lever for every "a partial answer presented as a whole
@@ -372,7 +446,7 @@ before anything bespoke:
     **every** query on the handle: `api.statsActivity` makes five single-row
     queries before the result set this is about, so a sweep that stopped at
     four rows never reached the loop. Sweep it as wide as the handler is deep.
-28. **A fixture's own guards are worth a test.** `authtest`'s `faultyConn`
+32. **A fixture's own guards are worth a test.** `authtest`'s `faultyConn`
     refuses `Prepare` and `Begin` rather than delegating, and `Connect`
     refuses a driver that does not speak all three context forms — because
     `database/sql` would otherwise route statements down a path where nothing

@@ -766,7 +766,7 @@ func (p *ScribeParser) fold(l scribeLine) {
 		// **The board learns the fight too, not only the account.** An
 		// attacking creature and a sleeping one used to be the same picture,
 		// so a wall of tokens said nothing about which of them was swinging
-		// (Aaron, 2026-08-26, on wanting attacking and blocking token piles
+		// (Aaron, on wanting attacking and blocking token piles
 		// apart). `against_seat` is who is being attacked; `seat` is the
 		// attacker's own controller and is not it.
 		p.board.inCombat(l.ID, CombatAttacking, l.AgainstSeat, 0)
@@ -1190,7 +1190,7 @@ func (p *ScribeParser) refused(l scribeLine) bool {
 // # The fourth fact, and why the first three were not enough
 //
 // The rule above is an **and** of two conditions, and a real board got past it
-// (Aaron, 2026-08-26: *"hovering on the command zone pops up some things I
+// (Aaron: *"hovering on the command zone pops up some things I
 // don't understand, like 'Olinda the Oblivious (99)'s Effect'"*). Either half
 // can fail — an effect reported outside a command zone, or one that arrived
 // carrying a type line — and both leave a blank card in somebody's picture.
