@@ -145,6 +145,24 @@ a merge queue changes the contributor workflow to save a monthly twenty
 minutes; the trigger was a threshold, not a pain. Ledger: Red, the queued
 list carried in the 2026-09-05 entry, item 5; trigger fired 2026-09-19.
 
+**White: a faulty *pool* still needs a one-field seam in the app, and four
+packages are waiting on it.** `pooltest.OpenFaulty` now hands back a DuckDB
+handle that refuses past a budget, which is what closed `internal/pool`'s
+own half-answer branches — but `internal/cards`, `internal/deckread`,
+`internal/api` and `internal/library` all reach the pool through a
+`*pool.Pool`, and a Pool opens its own file inside `acquire` (`pool.Open` on
+`p.path`). So they are still stuck with the schemaless fixture, which fails at
+the *first* statement. The seam is one field and one exported constructor —
+`open func(context.Context, string) (*sql.DB, error)`, defaulting to `Open`,
+which is the tree's own documented idiom (`tier3.Settings.Java`,
+`api.Config.BulkIndex`). · *Cost of leaving it:* COVERAGE.md's own entry for
+`deckread/commander.go`'s seven statements says it wants "a pool that breaks
+mid-flight, which no fixture yet is" — the fixture now exists and cannot be
+plugged in. · **Recommendation:** "go" — a test-only field on a production
+struct is what this tree already does everywhere else, and the alternative is
+four copies of a test-only `Conn` door. Ledger: White, 2026-09-26 (rainbow,
+leg three).
+
 ## Open — a dollar and an account
 
 **Red: nothing off-platform tells you the site is down, and a hung process

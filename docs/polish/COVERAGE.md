@@ -64,7 +64,17 @@ lever and a grind is visible before the work starts.
 | #290's follow-up | 90.4% | 90.40% |
 | #478's pass | 90.8% | 90.82% |
 | the climb of 2026-09-24 (nine lanes, #488–#496) | **96.6%** | 96.56% |
+| the rainbow of 2026-09-26, leg three (the pool's faulty connector) | **96.7%** | |
 | floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
+
+Leg three's arithmetic is worth reading, because it is what a *fixture* costs
+as opposed to a test: `internal/pool` went **58 → 41** missing statements
+(seventeen closed), and the tree went **734 → 721** of 21,628 → 21,689 — the
+fixture itself is sixty-one new statements, four of which nothing drives
+(`OpenFaulty`'s `tb.Fatal`, a `plain.Close()` that cannot fail). That is the
+"a test fixture in a non-test package costs coverage" trap below, paid
+knowingly and kept small; the first `authtest/faulty.go` paid forty-nine of
+them.
 
 The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
@@ -125,11 +135,21 @@ as meaningful to whoever finds it next.
   in `internal/api/edits.go` after `writeTarget`'s `Get`; the duplicate
   `library.WriterFor` calls in `lifecycle.go`; `commanderRecords` after the
   same closure's `GetCards`. Only a race reaches them.
-- **Scans and `rows.Err()` on a still-open handle**, across `library`,
-  `deckread`, `decklog`, `pool` — with one exception: `authtest.Fault.RowsAfter`
-  makes `rows.Err()` reachable, and `internal/auth`, `night` and `traffic`
-  use it. Other packages could, at the price of a faulty connector of their
-  own.
+- **`rows.Err()` on a still-open handle** across `library`, `deckread` and
+  `decklog` — reachable in principle, at the price of a faulty connector for
+  that handle. Two exist now: `authtest.Fault.RowsAfter` (used by
+  `internal/auth`, `night`, `traffic`) and `pooltest.Fault.RowsAfter`, which
+  took the `pool` half of this entry on 2026-09-26.
+- **A scan into `*any` cannot fail**, so every `rows.Scan` error branch whose
+  destinations are `*any` is unreachable by any fixture. `database/sql`'s
+  `convertAssign` ends `case *any: *d = src; return nil` — there is no driver
+  value it refuses, and a failed `Next` is answered by `rows.Err()` rather than
+  by `Scan`, so the loop body is never entered. That is six statements in
+  `internal/pool` alone (`scanRecord` plus `GetCards`' and `Search`' wrappers,
+  `ArtFor`, `tokenParts`, `tokenIdentities`, `tokenArtByOracle`). The one pool
+  read that scans into a typed destination, `Columns` into `*string`, is
+  unreachable for a different reason: **DuckDB's types are strict**, so the
+  SQLite trick of leaving a text in a REAL column has no equivalent.
 - **`lib.Mine()` failing** needs `Authenticated && UserID == 0`, which
   `auth.scopeFor` cannot produce; `myCrypts`/`myWritableLibraries`' empty
   answer likewise.
@@ -168,7 +188,12 @@ as meaningful to whoever finds it next.
   beyond the check. A card moving between those columns is news.
 - **`deckread/commander.go`**'s seven statements that need `GetCards` to
   succeed and a later `oracle_cards` query to fail: a pool that breaks
-  mid-flight, which no fixture yet is.
+  mid-flight. **The fixture exists now and cannot be plugged in** —
+  `pooltest.OpenFaulty` is exactly that pool, but `deckread` reaches it through
+  a `*pool.Pool`, and a Pool opens its own file inside `acquire`. One field on
+  `Pool` closes this and three other packages' equivalents; it is a daybreak
+  item (White, 2026-09-26) rather than something a coverage lane took on its
+  own.
 
 ## Levers that worked
 
@@ -290,6 +315,34 @@ them is reusable:
     deck that would not save and none can fire on a working disk;
     `writeAtomicallyOn(disk, …)` is a struct of five functions, a value
     rather than a hook so the package's tests stay parallel.
+
+These are from the rainbow of 2026-09-26. **If #504's or #512's own additions
+land first, renumber — integrator's call.**
+
+25. **The pool that goes away mid-read.** `pooltest.OpenFaulty` is lever 15 one
+    database across: the tiny pool on a real disk, behind a `driver.Connector`
+    that spends a budget of statements or of rows and then refuses. A wrapper
+    over the real driver, never a fork — DuckDB is cgo. It is what makes
+    `probeStaleness` refusable at each of its six statements, and what makes
+    `rows.Err()` reachable in six pool reads at once. Reach for it for any
+    branch that asks *what happens after the first statement succeeded*; the
+    schemaless pool (lever 7) is still the right fixture for the first one.
+26. **Sweep the budget, never guess it.** A budget is spent across **every**
+    query on the handle, so the number at which a given read breaks is a fact
+    about today's schema: `GetCards` reads the pool's column list before it
+    reads a card, which is one row per column (twenty-eight, plus the one that
+    ends the set), so its *own* first row is budget thirty. Sweep a range and
+    assert the invariant — *refuse, or answer exactly what the whole pool
+    answers* — plus both floors, and the test stops being about the column
+    count. A third check is worth adding for a budget sweep: **monotonicity.**
+    If a larger budget ever refuses after a smaller one answered, the sweep
+    below it proves nothing.
+27. **Drive the trigger with a name, not the function with an argument.**
+    `sweep.datedDay` is unexported and unit-testable, and testing it that way
+    would have proved nothing about the sweep. Three *ten-character* misspelt
+    stamps on a real shelf (`oracle_cards-2026_08-20.jsonl` and friends) reach
+    the same arms through `SweepBulk` and assert the thing that matters — that a
+    file the sweep cannot confidently name is left where it is.
 
 ## Corrections to this file
 
@@ -415,6 +468,19 @@ and `ci.yml` gated on the other.
   working because the non-deck routes did reach the pool. A sweep aimed at
   a deck that exists **fails on a 404** now. A route sweep's filler is part
   of the assertion.
+- **A wrapped DuckDB connection must forward `CheckNamedValue`.** Every
+  batched card lookup in `internal/pool` binds `?::VARCHAR[]` from a Go
+  `[]string`, which `database/sql` only hands to the driver when the connection
+  speaks `driver.NamedValueChecker` — DuckDB's does. A wrapper that forwards
+  only `ExecerContext` and `QueryerContext` sends every list parameter to
+  `driver.DefaultParameterConverter`, which refuses it, and the failure looks
+  like a broken query rather than a missing method. `pooltest`'s connector
+  refuses a driver missing any of the three at connect time, by name, and
+  `TestTheFaultyHandleStillBindsAListParameter` is the positive half. The
+  matching probe for any new driver is three type assertions in a throwaway
+  test: DuckDB is `ExecerContext`, `QueryerContext`, `ConnBeginTx`,
+  `ConnPrepareContext` and `NamedValueChecker`, and is **not** a `Pinger`, a
+  `SessionResetter` or a `Validator`.
 
 ## Recorded rather than fixed
 
