@@ -415,3 +415,42 @@ func TestAShelfThatWillNotSweepDoesNotFailTheRefresh(t *testing.T) {
 		t.Errorf("the shelf holds\n  %v\nwant everything, swept by nobody:\n  %v", got, want)
 	}
 }
+
+// A stamp that is the right *length* and the wrong *shape* is not a date, and a
+// file the sweep cannot confidently name is a file it leaves alone.
+//
+// `oracle_cards-2026-8-4.jsonl` in the shape test above covers the short stamp;
+// these are the three ways a ten-character one can still be wrong — a separator
+// that is not a hyphen in either of the two places one belongs, and a digit that
+// is not a digit. Erring this way costs a few megabytes on the volume; erring
+// the other way takes a file that was not ours to take, and `/data/scryfall`
+// shares a disk with things nothing upstream can put back.
+func TestASweepLeavesATenCharacterStampThatIsNotADate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	seedShelf(t, dir, "oracle_cards-2026_08-20.jsonl", 16) // no hyphen at the year
+	seedShelf(t, dir, "oracle_cards-2026-08x20.jsonl", 16) // no hyphen at the month
+	seedShelf(t, dir, "oracle_cards-2026-08-2O.jsonl", 16) // a letter for a digit
+	// One real leaving, so the sweep is proved to be working at all rather than
+	// proved to be doing nothing.
+	seedShelf(t, dir, "oracle_cards-2026-08-20.jsonl", 32)
+
+	swept, err := pool.SweepBulk(dir, map[string]string{
+		pool.OracleBulk: filepath.Join(dir, "oracle_cards-2026-08-24.jsonl"),
+	})
+	if err != nil {
+		t.Fatalf("sweeping: %v", err)
+	}
+	if swept.Files != 1 || swept.Bytes != 32 {
+		t.Errorf("the sweep took %+v; want only the one properly dated copy", swept)
+	}
+	want := []string{
+		"oracle_cards-2026-08-2O.jsonl",
+		"oracle_cards-2026-08x20.jsonl",
+		"oracle_cards-2026_08-20.jsonl",
+	}
+	if got := onTheShelf(t, dir); !slices.Equal(got, want) {
+		t.Errorf("the shelf holds\n  %v\nwant the three misspelt stamps:\n  %v", got, want)
+	}
+}
