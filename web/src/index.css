@@ -1722,8 +1722,12 @@ button:hover .tarot-fan-card {
    clipped to, keeping the loops and exit strokes that overhang the line
    box out of the mask's shears — the same job the clip-path fallback
    does with negative insets. Deliberately NOT an animated custom
-   property: @property registration is off the table on this site's
-   Safari floor. */
+   property, though not for want of one: what the quill sweeps is a mask
+   `position`, which a keyframe holds on its own, so registering an angle
+   would buy this nothing. (This line used to say `@property` was off the
+   table on the site's Safari floor. It is not — registered properties
+   arrived in Safari 16.4 and 16.4 *is* the floor, which is why the board's
+   crown, the pod's turn rim and the buttons' gleam all animate one.) */
 @supports (mask-size: 250% 100%) or (-webkit-mask-size: 250% 100%) {
   .ink-word {
     padding: 0.15em;
@@ -6263,6 +6267,23 @@ button:hover .tarot-fan-card {
    this one line exists to have avoided. */
 .btn-accent-vine { --btn-accent: var(--vine); --btn-ink: var(--page); }
 
+/* The fortune-teller's, and it exists for `.btn-arena`'s reason word for
+   word. The act at that table — *Turn them over*, *Begin the reading* — was
+   wearing `--series-1`, which means "series one of a line chart", on a
+   candle-lit table whose every other edge is brass: three `.btn-felt`s in the
+   same corner warm to `#c9a227` on hover and the one control the room is
+   actually for was a form's submit button in cobalt. Seen on the real table
+   on 2026-09-26, two feet from the `.btn-felt` row that proves the material.
+
+   `#c9a227` is the same lantern brass `.btn-felt` warms to, deliberately the
+   literal the rest of this room uses rather than a fourth near-miss. The ink
+   is `.btn-copper`'s dark roast rather than black, for that button's reason —
+   a pure black label on warm metal reads as a sticker — and it is fixed
+   rather than themed because the felt commits to one palette in both themes,
+   so unlike `.btn-accent-vine` there is no second column for it to be wrong
+   in. Measured rather than assumed: #241507 on #c9a227 is 7.3:1. */
+.btn-accent-brass { --btn-accent: #c9a227; --btn-ink: #241507; }
+
 .btn-quiet {
   background: var(--page);
   border-color: var(--hairline);
@@ -6364,6 +6385,301 @@ button:hover .tarot-fan-card {
 .btn-felt:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: none;
+}
+
+/* ------------------------------------------------- the gleam on the edge
+ *
+ * A light that walks the rim of a control, faintly, forever — and flares when
+ * a hand arrives. Aaron, 2026-09-26: *"I want a gleaming edge that circles
+ * around the button, blood, fire, whatever is appropriate."* The glints above
+ * are a light crossing the **face** once on hover; this is a light going
+ * **round the edge** and not stopping, which is the half a single sweep cannot
+ * do — commandment 6 wants a control that is alive before it is touched, not
+ * one that wakes up when it is.
+ *
+ * **The mechanism is the board's, not a new one.** `.field-card.is-commander`
+ * walks a crown around a commander and `.field-quad.is-on-turn` walks one
+ * around a seat; this is that device at the scale of a button, and the
+ * arithmetic is theirs: a short arc of a conic gradient, two masks subtracting
+ * the content box out of the border box so what survives is the ring alone,
+ * and the *gradient* turning rather than the element — rotating the box would
+ * spin a visible rectangle. Turning a gradient needs the angle to be an
+ * animatable value, which is what `@property` is for; the mask never moves.
+ * `.btn`'s own `overflow: hidden` rounds the ring's corners for free.
+ *
+ * **Why `::before`.** Every voice in this family already spends `::after` on
+ * its face glint. `::before` is earlier in tree order, so the ring paints
+ * under the glint without either of them naming a z-index.
+ *
+ * **One ring, and a voice opts in by declaring its material.** Two selectors
+ * carry the whole family (plus the Wheel's button, which is not a `.btn` and
+ * never was), and what decides whether a given voice gleams is whether the
+ * table below gives it colours. `--gleam-lit: 1` is the switch; a voice that
+ * sets nothing has an inert transparent pseudo-element and pays nothing for
+ * it. That is the showcase-frame idea the card frames get right: one
+ * component, many registers, and no register forks the class.
+ *
+ * **Two tiers, because light is how a page says what matters.** Thirty rims
+ * orbiting at once is not a room that breathes, it is a room that fidgets, and
+ * a ball walks one girl at a time.
+ *
+ *   a plate voice   the one action a surface is for. It adds `--gleam-rest`
+ *                   and `--gleam-play: running`, so its lap is already turning
+ *                   at a low light before anybody arrives.
+ *   a quiet voice   dark at rest: it sets only its colours, and the orbit
+ *                   *starts* when the hand does. The reply is a light
+ *                   appearing rather than a light getting brighter.
+ *
+ * `.btn-ghost` is deliberately absent from the table, and this is the note
+ * that stops it being rediscovered every cycle: it is prose with an underline,
+ * a transparent border and no plate, and a ring floating around a run of text
+ * is a box nobody drew. Commandment 20 already gave it three replies of its
+ * own. The arena's gate is excluded by selector rather than by omission,
+ * because it *is* a `.btn-arena` — see the note on the `:not()`.
+ *
+ * **The materials, each able to name its ancestor** (house rule: ornament that
+ * can say where it comes from):
+ *
+ *   .btn-primary    the surface's own accent, whitened. Foil — a sheen that
+ *                   only shows when the card moves. `.btn-accent-vine` makes
+ *                   that sheen the Library's vine by changing nothing here.
+ *   .btn-quiet      the vine, faint. Foliage catching light at the edge of a
+ *                   clearing.
+ *   .btn-danger,    blood, with the dark it dries to. `--arena-blood-*` is the
+ *   .btn-danger-solid  arena's own, named once so a second surface cannot
+ *                   invent a slightly different red.
+ *   .btn-arena      blood under brass: the gate's two materials, hot centre at
+ *                   `--anvil-glint` because candlelight is not white.
+ *   .btn-copper,    a lantern crossing hammered copper, which is what the face
+ *   .btn-copper-hot glint next door already is; the pour takes the brew's own
+ *                   `--lit` at its hot centre, so the rim goes green exactly
+ *                   when the pot does.
+ *   .btn-felt       the lantern's brass over the fortune-teller's baize
+ *                   (commandment 15 — that room is tailored, never handed
+ *                   down).
+ *   .btn-deal       the gold rule off Ancestral Recall's plate.
+ *   .btn-sigil      gold leaf on an illuminated page, deep enough to read on
+ *                   the pale washes a guild page is printed in.
+ *   .btn-brass      the token shelf's own brass, which crosses both themes
+ *                   already.
+ *   .btn-goldfish   brass over felt: the table the goldfish swims on.
+ *   .wheel-spin-btn ember. The Wheel's rim walks a warm highlight forever and
+ *                   this is the button admitting it is made of the same thing.
+ *                   It stays the loud one: widest band, brightest rest,
+ *                   shortest lap.
+ *
+ * **Cycle times**, because nobody should stare at a hole waiting for a snake
+ * (commandment 16): **7.5s** a lap at rest, **2.6s** while a hand is on it,
+ * and the Wheel's own **6s / 2.2s**. The lit lap re-times a running animation
+ * rather than restarting it, so the light steps forward as it flares; walked
+ * on the real page at 1440 and at 375, and what the eye reads is the flare.
+ *
+ * **The back of the card.** Under reduced motion the light stops walking and
+ * does not go out: the registered angle rests at 34deg, so every ring parks on
+ * the same upper-right shoulder instead of wherever a lap happened to stop — a
+ * frozen mid-sweep is a smudge, an arc at rest is a highlight. The hover reply
+ * survives as a brightening. A disabled control does not gleam at all: it is
+ * already at 0.4 opacity and a travelling light on top of that would read as a
+ * thing still working. Contrast is untouched — the ring is `padding`-thick at
+ * the very rim and the label is never under it — and nothing here is a
+ * `filter`, which is the one thing that may never touch a card (commandment
+ * 19).
+ *
+ * **Where `@property` is absent** the `var()` fallback hands the gradient a
+ * literal 34deg: a static gleam on that same shoulder, and an animation with
+ * nothing to animate. Registered properties arrived in Safari 16.4 and 16.4 is
+ * this site's declared floor (`web/README.md`), so that path is for what is
+ * older than the floor rather than for anything we support. */
+@property --btn-gleam {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 34deg;
+}
+@keyframes btn-gleam-orbit {
+  from { --btn-gleam: 34deg; }
+  to { --btn-gleam: 394deg; }
+}
+
+/* Without the two-mask subtraction the pseudo-element is a conic gradient laid
+   over the whole face, which is a worse button than the one we started with —
+   so the ring exists only where the composite does. */
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  /* `.arena-gate` is a `.btn btn-arena` wearing a whole Magic card, and it
+     spends its own `::before` on the shut gate's portcullis wash. Masking that
+     down to a 2px ring would put a hairline where a gate should be. */
+  .btn:not(.arena-gate)::before,
+  .wheel-spin-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    /* The ring's thickness. Thinner than the crown's two pixels: a button's
+       rim is eight pixels of radius rather than a card's printed border, and
+       two here reads as a second border rather than as a light on the first. */
+    padding: var(--gleam-width, 1.5px);
+    /* The arc is short and the dark is long — about a quarter of the lap
+       carries any light at all — which is what makes it read as a highlight
+       *travelling* rather than as a control that pulses. A pulse is an alert;
+       this is a thing that is simply alive. */
+    background: conic-gradient(from var(--btn-gleam, 34deg) at 50% 50%,
+      transparent 0deg,
+      var(--gleam-dim, var(--gleam-shoulder)) 26deg,
+      var(--gleam-hot, transparent) 48deg,
+      var(--gleam-dim, var(--gleam-shoulder)) 70deg,
+      transparent 98deg 360deg);
+    /* The shoulders are the hot centre gone thin, so a voice that wants a
+       plain gleam declares ONE colour and the arc falls off on its own. A
+       voice whose shoulders are a different material — the arena's blood under
+       its brass — sets `--gleam-dim` on itself and says so; it is read as the
+       `var()` fallback rather than as a second declaration here, because a
+       declaration on this pseudo-element would outrank the one it inherits.
+       Unset, the whole arc is transparent and the control does not gleam. */
+    --gleam-shoulder: color-mix(in srgb, var(--gleam-hot, transparent) 42%, transparent);
+    -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+    mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+    -webkit-mask-clip: content-box, border-box;
+    mask-clip: content-box, border-box;
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: var(--gleam-rest, 0);
+    /* Paused is the default and it is the whole reason a quiet voice costs
+       nothing at rest: a paused lap holds the registered angle and asks for no
+       frames. The play state rides in the shorthand so the hover rule can
+       raise it with a longhand, and so the reduced-motion rule below can put
+       out `animation-name` alone without either of them fighting. */
+    animation: btn-gleam-orbit var(--gleam-cycle, 7.5s) linear infinite
+      var(--gleam-play, paused);
+    transition: opacity 180ms ease, padding 180ms ease;
+  }
+
+  /* The hand arrives: a quiet voice's light appears and sets off, a plate
+     voice's quickens, both widen and both go to full. `:focus-visible` gets
+     every word of it — a keyboard never sees a hover, and a reply only a mouse
+     can hear is two-thirds of a control. */
+  .btn:not(.arena-gate):is(:hover, :focus-visible):not(:disabled)::before,
+  .wheel-spin-btn:is(:hover, :focus-visible):not(:disabled)::before {
+    --gleam-width: 2px;
+    opacity: var(--gleam-lit, 0);
+    animation-duration: var(--gleam-cycle-lit, 2.6s);
+    animation-play-state: running;
+  }
+
+  /* The press settles it. Hover adds light and press takes it away — this
+     family's own grammar, on the same beat as the lift collapsing. */
+  .btn:not(.arena-gate):active:not(:disabled)::before,
+  .wheel-spin-btn:active:not(:disabled)::before {
+    --gleam-width: 1.5px;
+    /* A fraction of full rather than back to `--gleam-rest`, because a quiet
+       voice rests at nothing and a light that goes out under the thumb reads as
+       a control switching off. Gleamless voices multiply by zero and stay
+       dark. */
+    opacity: calc(var(--gleam-lit, 0) * 0.42);
+  }
+
+  /* Nothing gleams that cannot be pressed. */
+  .btn:disabled::before,
+  .wheel-spin-btn:disabled::before {
+    display: none;
+  }
+
+  /* ---- the material table. A hot centre plus `--gleam-lit: 1` makes a quiet
+     voice; `--gleam-rest` and `--gleam-play: running` make it a plate voice.
+     Every hot centre is a light rather than a hue — the accent pushed most of
+     the way to white — because a rim light that is merely the plate's own
+     colour is a border, and the thing this replaces was a border. The two
+     exceptions declare themselves: the arena's shoulders are blood under a
+     brass peak, and the guild sigil's gold has to be a metal rather than a
+     white, because it is printed on pale washes. */
+  .btn-primary {
+    --gleam-lit: 1;
+    --gleam-rest: 0.55;
+    --gleam-play: running;
+    --gleam-hot: color-mix(in srgb, var(--btn-accent, var(--vine)) 16%, #fff);
+  }
+  .btn-quiet {
+    --gleam-lit: 1;
+    --gleam-hot: color-mix(in srgb, var(--vine) 30%, #fff);
+  }
+  .btn-danger,
+  .btn-danger-solid {
+    --gleam-lit: 1;
+    --gleam-hot: color-mix(in srgb, var(--arena-blood-lit) 28%, #ffe4dc);
+    --gleam-dim: color-mix(in srgb, var(--arena-blood-deep) 72%, transparent);
+  }
+  .btn-danger-solid {
+    --gleam-rest: 0.5;
+    --gleam-play: running;
+  }
+  .btn-arena {
+    --gleam-lit: 1;
+    --gleam-rest: 0.58;
+    --gleam-play: running;
+    --gleam-hot: var(--anvil-glint);
+    --gleam-dim: color-mix(in srgb, var(--arena-blood-lit) 62%, transparent);
+  }
+  .btn-copper {
+    --gleam-lit: 1;
+    --gleam-hot: color-mix(in srgb, var(--copper-lit, #e3a45f) 26%, #fff4de);
+  }
+  .btn-copper-hot {
+    --gleam-lit: 1;
+    --gleam-rest: 0.55;
+    --gleam-play: running;
+    --gleam-hot: color-mix(in srgb, var(--lit, #a8e86a) 34%, #fff4de);
+  }
+  .btn-felt {
+    --gleam-lit: 1;
+    --gleam-hot: #fff0c6;
+  }
+  .btn-deal {
+    --gleam-lit: 1;
+    --gleam-rest: 0.55;
+    --gleam-play: running;
+    --gleam-hot: #fff3d2;
+  }
+  .btn-sigil {
+    --gleam-lit: 1;
+    --gleam-rest: 0.62;
+    --gleam-play: running;
+    /* Gold leaf, not a highlight: the plate is a pale wash in both themes and
+       a white arc on it is nothing at all. */
+    --gleam-hot: #c8a33c;
+    --gleam-dim: color-mix(in srgb, #8a6d18 62%, transparent);
+  }
+  .btn-brass {
+    --gleam-lit: 1;
+    --gleam-hot: color-mix(in srgb, var(--token-brass) 34%, #fff6dc);
+  }
+  .btn-goldfish {
+    --gleam-lit: 1;
+    --gleam-rest: 0.55;
+    --gleam-play: running;
+    --gleam-hot: var(--anvil-glint);
+  }
+  /* The loud one stays the loud one: an ember rather than a candle, the widest
+     band, the brightest rest and the shortest lap in the app. */
+  .wheel-spin-btn {
+    --gleam-lit: 1;
+    --gleam-rest: 0.7;
+    --gleam-play: running;
+    --gleam-width: 2px;
+    --gleam-cycle: 6s;
+    --gleam-cycle-lit: 2.2s;
+    --gleam-hot: #ffe9bc;
+    --gleam-dim: color-mix(in srgb, #e0952f 66%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* `animation-name` alone, so that neither the hover rule's duration and
+       play state nor the shorthand above can put the lap back — a longhand
+       nobody else writes cannot lose a specificity argument. */
+    .btn:not(.arena-gate)::before,
+    .wheel-spin-btn::before {
+      animation-name: none;
+      transition: none;
+    }
+  }
 }
 
 /* ---------------------------------------------------------- the hut's voice
