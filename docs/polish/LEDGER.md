@@ -7871,6 +7871,38 @@ is quoted only where it was taken at a load this entry names.
   **`fly status --app mtglab` does not exist** — the Fly app is
   `sylvan-library` (Red met the same thing today, so it is two lanes now).
 
+**Follow-on the same evening, by the testing facet's third leg: queued item 1
+above is BUILT (PR #515), once #502 had landed and the conflict it was deferred
+for was gone.** `pool_age_days` is in the `/api/health` body beside
+`disk_free_mb`, and both the readings it needed were decisions rather than
+arithmetic:
+
+- **Off Scryfall's stamp, not off the pool file.** `pool.BulkDataDay` reads the
+  date out of the parked bulk filenames, through the sweep's *own* parser rather
+  than a second copy of it — `parkedBulk` and the new reader are one function now
+  (`parkedBulkDay`), so the suffix list and the date rule stay in one place. The
+  pool file's mtime was the obvious alternative and it is wrong: a rebuild
+  rewrites `mtg.duckdb` and does not make month-old rows younger, so a pool
+  rebuilt this morning out of a six-week-old download would have read as fresh.
+- **The OLDEST kind on the shelf, never the newest.** `--oracle-only` is a
+  supported refresh and a run that fell over between its two loads leaves the
+  same shape, so a shelf can hold a day-old oracle file beside a month-old
+  printings file. The pool built from those is a month behind on prices and
+  printings whatever the oracle half says. Per kind it is still the *newest*
+  copy, because the older ones are rollbacks `SweepBulk` has not taken yet.
+  Mutation-verified: flipping the comparison answers 0 where the truth is 42.
+- **`null`, never a small number, for anything unanswerable** — no shelf, an
+  undated name, ten characters that are not a day (`2026-13-45`), and a stamp in
+  the *future*, which is a container whose clock has not synchronised. Clamping
+  that last one to zero would print "the library is current" at exactly the
+  moment the machine cannot be trusted about time; it is `diskFreeMB`'s
+  never-`0`-for-an-unanswered-read rule, one key across, and it is
+  mutation-verified too.
+- Nine table cases plus three shelf-shape tests (a directory wearing a bulk
+  file's exact name dates nothing; an unreadable shelf says so rather than
+  answering the zero time). `HOSTING.md`'s health-key list gains the fourth
+  bullet and its "three" becomes "four", in the same diff.
+
 ### 2026-09-19 (rainbow) — no PR of its own; ledger carried by the next leg
 
 Leg five of seven, run in daylight (10:28 PDT start, load `2.70 5.46 19.26` —
