@@ -19,9 +19,10 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-24 (the coverage
-  climb, outside the rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow),
-  2026-09-05 (rainbow, night), 2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-26 (rainbow, and its second leg — the grind).
+  Previous: 2026-09-24 (the coverage climb, outside the rainbow), 2026-09-19
+  (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
+  2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -290,6 +291,97 @@ ADR-shaped guard, and a dead test found while counting.
   things the ledger already knows. The address-grep chore fix 1 replaced is
   in the same file and the same paragraph family. **Not fixed here** because
   the skill is Colorless's territory by the pass's own rules.
+### 2026-09-26 (rainbow, leg two — the grind)
+
+**Where this entry belongs.** The same day's first leg is PR #504, which was
+still open when this branch was cut; its `### 2026-09-26 (rainbow)` block goes
+**directly above this one** when the two land, keeping the section's
+newest-first order. Everything below is leg two and nothing in it touches
+#504's files.
+
+Aaron's ask was *get our test coverage up*, and leg one named the next lever
+honestly: `internal/api` at 256 missing statements over 125 functions, `if err
+!= nil` ×67 and bare `return` ×69, **no lever left — a grind**. Ground.
+
+**The number.** `-func` over a `-coverpkg=./...` profile, the recipe at the top
+of `docs/polish/COVERAGE.md`, measured on the same commit either side:
+
+```
+before  96.6%   734 missing of 21,628
+after   96.9%   679 missing of 21,628      (+0.3 points, 55 statements)
+```
+
+The floor stays at **95.0** and that is deliberate — see the daybreak line.
+
+**The finding, which is the point of the entry.** The grind turned out not to
+be one. Read by *shape* rather than by package, what is left in this tree is
+one fault repeated in six places: **a handle that answers for a while and then
+stops.** `authtest.OpenFaulty` — the fixture the 2026-09-24 climb built for
+`internal/auth` — had four callers, and the packages that never got it are
+exactly the ones whose calls are longer than a single statement, which is where
+a failure stops being an error and becomes a *wrong answer*. A closed handle
+fails the first statement; nothing had ever failed the fourth.
+
+And the budget it is armed with had always been **hand-counted**, which is a
+restatement of today's statement order. Sweeping it from zero is the same
+fixture asking a better question, and it is lever 25 in COVERAGE.md now.
+
+By function, what closed:
+
+| package | before | after | how |
+|---|---|---|---|
+| `internal/sim/tier3/ledger` | 18 | 6 | a poisoned column, a failed commit, a set cut short |
+| `internal/api` | 256 | 239 | the budget sweep over every admin and account route |
+| `internal/auth/authtest` | 11 | 4 | the fixture's own three refusals, tripped |
+| `internal/library` | 22 | 15 | the sweep over every write, and over `Visible` |
+| `internal/sim/cache` | 11 | 5 | the sweep over `Put`'s five statements |
+| `internal/auth` | 28 | 24 | the sweep over the four account writes nobody swept |
+
+Per function: `Recent`, `tally`, `seats`, `Board`, `topBlows`, `topGiants`,
+`topStacks`, `boardSeats`, `cache.Put`, `library.WriteArtifacts`,
+`SQLSource.SetShared`, `auth.Delete`, `auth.HasPassword`,
+`auth.refuseIfLastAdmin`, `authtest`'s `Prepare`/`Begin`/`Connect`/`OpenFaulty`
+went to 100%; `api.listAccounts`, `revokeSessions`, `sendAccountReset`,
+`accountState`, `accountBody`, `refuseAdminWrite` likewise; `inviteAccount`
+7 → 3, `updateAccount` 4 → 2, `statsActivity` 4 → 2, `library.Visible` 5 → 2.
+
+**Four classes proved unreachable, and they are worth more than the tenths.**
+Each is now in COVERAGE.md's *Left deliberately* as a shape to recognise:
+`res.RowsAffected()` after a successful `Exec` cannot fail on this driver (that
+is the *whole* of what is left in `internal/night`'s store — six statements —
+plus `crypt.Empty` and `record`'s `LastInsertId`); `sql.Open` never fails for a
+registered driver, which kills the two warn-and-degrade arms in
+`api.accountsDB` and `api.appDB` that read like the obvious lever for "the
+volume did not mount"; a scan of an aggregate cannot be given the wrong type; a
+`json.Marshal` of a `[]string` and a `wire.MarshalOrdered` of a payload the
+route just built cannot fail.
+
+**One test written, run green, and deleted.** A full-lifecycle budget sweep
+over the night store (`StartRun → PlanBouts → ClaimNext → MarkDone →
+SkipRemaining → CloseRun → FinishRun`, once per budget, asserting the store's
+answer and its rows agree at every step). It closed **zero** statements — every
+arm it aimed at is the `RowsAffected` class — and cost three seconds of suite.
+Deleted rather than kept: a coverage lane that leaves behind a test measuring
+nothing has spent the suite's time on its own appearance. The note in
+COVERAGE.md says what to write if a future driver makes `RowsAffected`
+fallible.
+
+**Suite cost, watched.** `internal/api` is 86% of the package wall on this
+machine and the sweep is 800-odd requests. Read-only routes share one fixture
+across their whole sweep (healed between budgets) and only writes get a fresh
+scratch `app.db`: **38.7s with the sweep against 39.4s without it**, measured
+on the same machine minutes apart. Without that split it was 23s of sweep
+alone.
+
+**Traps, all four in COVERAGE.md:** a whole-table poison is refused by any
+UNIQUE the column is in (`forge_seats.seat` failed first); a row budget is
+spent across *every* query on the handle, so `statsActivity`'s result-set walk
+is 24 rows deep and a sweep to four never reaches it; a budget sweep needs a
+floor at **both** ends, and the "at least one succeeded" half is what caught a
+lifecycle whose `CloseRun` came after `FinishRun` — an order the store refuses
+on a healthy database, which the other floor would have read as 27 correct
+refusals; and widening the api sweep to `/api/auth` bought zero statements for
+triple the wall time, and was reverted.
 
 ### 2026-09-24 (the coverage climb)
 
