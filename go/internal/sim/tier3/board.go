@@ -60,7 +60,7 @@ import (
 //     travel with it and it is not attacking anything any more. Forge raises
 //     no event saying so — `GameEventCardCounters` fires when a counter is
 //     put on or taken off, never when the card carrying them stops existing —
-//     so the board sheds them itself, on the zone change (Aaron, 2026-08-26:
+//     so the board sheds them itself, on the zone change (Aaron:
 //     *"counters are following things into exile, the graveyard, and the
 //     command zone"*). `shed` is the rule and `magicZone` is the care it
 //     needs: the [ZoneLand] split below is this package's furniture rather
@@ -115,7 +115,7 @@ type BoardCard struct {
 	// CopiedBy is the board id of the card whose ability made this one, and it
 	// is set only when this card is a **copy** of something.
 	//
-	// Populate is the ask (Aaron, 2026-08-26: *"It really is making a clone, or
+	// Populate is the ask (Aaron: *"It really is making a clone, or
 	// splitting one thing into two"*), and its presence is the copy: a token
 	// minted fresh carries nothing here and a populated one carries this, so
 	// "was this card copied into existence" is answerable at all for the first
@@ -143,8 +143,8 @@ type BoardCounter struct {
 // BoardCounterMove is one counter event: which kind moved, and from what to
 // what.
 //
-// **The set says what a card has; this says how it got there** (Aaron,
-// 2026-08-26: *"keep a history of why a creature has all of the counters it
+// **The set says what a card has; this says how it got there** (Aaron:
+// *"keep a history of why a creature has all of the counters it
 // does"*). A hover wants the account — two counters on turn four, one more on
 // turn six — and a current set of `+1/+1: 3` cannot produce it, because by
 // then the arithmetic that made the three has scrolled past.
@@ -285,7 +285,7 @@ type BoardChange struct {
 	// Live is every keyword this card **instance** has right now, granted ones
 	// included — not the keywords its printing carries.
 	//
-	// The difference is the whole reason it exists (Aaron, 2026-08-26: *"Some
+	// The difference is the whole reason it exists (Aaron: *"Some
 	// cards like Kaheera give vigilance or another effect to other cards, we
 	// currently are not representing that symbolically"*). The board's only
 	// keywords until now were Scryfall's, keyed by card *name*, so every copy of
@@ -321,7 +321,7 @@ type BoardChange struct {
 	// and nothing else.
 	//
 	// A Treasure cracked for mana raised no beat at all and folded silently into
-	// the next step (Aaron, 2026-08-26: *"things that tap before being
+	// the next step (Aaron: *"things that tap before being
 	// sacrificed… they must tap to sacrifice and they go into the ether"*). A
 	// fetchland is the same shape. `dies` cannot cover them: rule 700.4 gives
 	// that word to creatures and planeswalkers, and an artifact cracked for mana
@@ -365,7 +365,7 @@ type BoardFloating struct {
 //
 // Zone is Forge's own name for where the source was — `Command` for eminence,
 // `Battlefield` for the rest — which is what lets a room draw a commander doing
-// something from a zone it never leaves (Aaron, 2026-08-26: *"It can be used on
+// something from a zone it never leaves (Aaron: *"It can be used on
 // the battlefield or from the command zone… It should just visually indicate
 // that an ability is being used"*).
 type BoardAbility struct {
@@ -842,8 +842,8 @@ func (b *board) moved(id int, forgeZone, mode string, seat int, tapped bool) {
 	// a state-based action removes it from the game. It cannot move again.
 	//
 	// So it is never *in* a graveyard by the time anybody looks, and a board
-	// that piles tokens up in one is drawing a zone Magic does not have (Aaron,
-	// 2026-08-25: "they don't go to the graveyard, they go to the ether"). A
+	// that piles tokens up in one is drawing a zone Magic does not have (Aaron:
+	// "they don't go to the graveyard, they go to the ether"). A
 	// deck like Trostani's ends a long game with thirty Saprolings in a
 	// graveyard that should hold none of them, burying the real cards under
 	// them.
@@ -884,7 +884,7 @@ func (b *board) moved(id int, forgeZone, mode string, seat int, tapped bool) {
 	// event ([scribeLine.IsTapped] carries the bytecode). So the board drew a
 	// land the game had just tapped as untapped, and then drew it tapped a turn
 	// later when somebody actually used it — which reads as the board missing a
-	// beat rather than as a rule (Aaron, 2026-08-28).
+	// beat rather than as a rule (Aaron).
 	//
 	// The reset survives inside this: `tapped` is the *arrival's* state, which
 	// is false for the dying creature and true for the surveil land, so the
