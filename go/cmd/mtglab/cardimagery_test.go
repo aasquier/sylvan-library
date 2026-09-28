@@ -165,6 +165,41 @@ var artBearing = map[string]string{
 		"sits in, and the element that turns",
 	"seance-vision": "components/tarot.tsx: <img className='seance-vision' " +
 		"src={vision.image}> in the crystal ball -- commandment 15's room",
+
+	// --- the cards on the reading table, 2026-09-26 ------------------------
+	//
+	// `seance-vision` was the only entry the reading room had, and the ball is
+	// the *reflection*. The cards themselves were uncovered, and half of them
+	// are Scryfall paintings: a crossover wears the 1909 frame drawn in CSS
+	// with `<img className='tarot-rws-art' src={card.image}>` inside it, and
+	// `card.image` is a `cards.scryfall.io/art_crop/...` URL (the frozen deals
+	// in `internal/tarot/testdata/deals.json` are full of them). Credited in
+	// the same room, in words, by `.tarot-legend-aside` -- "after the Two of
+	// Cups - art by Caroline Gariba".
+	//
+	// Added by walking the JSX, not in response to a violation -- but this
+	// surface has already been where the reach happens: index.css's own
+	// ageing comment records that the first cut of it put "a desaturating
+	// filter, a cream screen and a honey wash" over exactly this element, and
+	// it came off for being ugly rather than for being forbidden. Nothing
+	// would have said so. The ancestors are here as well as the image because
+	// a filter on any of them reaches it, and because the flip, the hover zoom
+	// and the room's own lamp all live on those boxes -- which is to say, on
+	// precisely the elements a future "light it like the room" reaches for.
+	"tarot-rws-art": "components/tarot.tsx: <img className='tarot-rws-art' " +
+		"src={card.image}> in CrossoverFace -- a Scryfall art crop",
+	"tarot-rws-canvas": "components/tarot.tsx: the plate window that painting " +
+		"fills, and the element whose ::after carries the print grain",
+	"tarot-rws": "components/tarot.tsx: the drawn 1909 frame the painting is " +
+		"struck into, and the element a reversed card rotates",
+	"tarot-face-front": "components/tarot.tsx: the face a crossover's frame " +
+		"(or a 1909 scan) is mounted on",
+	"tarot-face": "components/tarot.tsx: either face of a dealt card, and the " +
+		"element whose ::after is the room's light laid ON it",
+	"tarot-card": "components/tarot.tsx: the element that turns, holding both " +
+		"faces",
+	"tarot-hinge": "components/tarot.tsx: the button a card is turned by, and " +
+		"the element that scales a turned card up under the pointer",
 	"arena-art": "routes/Coliseum.tsx: <img className='arena-art' " +
 		"src={arena.art.url}> -- the chosen arena's painting",
 	"coliseum-hero-art": "routes/Coliseum.tsx: the banner, <img> or <video>, " +
