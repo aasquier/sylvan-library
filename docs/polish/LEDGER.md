@@ -7717,7 +7717,7 @@ keyframe's literal, inside a filter list whose own comment warns against
 casual rearrangement.
 
 
-### 2026-09-26 (rainbow) — the fourth ball: the arena's crown of flame, and the blessing
+### 2026-09-26 (rainbow) — the fourth ball: the seat on fire, and the blessing
 
 **The ask, verbatim** (Aaron, 2026-09-27, awake and walking): *"I want the
 border around the active commander in the coliseum to pop more like our
@@ -7725,31 +7725,50 @@ buttons, it should look like a flame on top, and the whole border should be lit
 up. Maybe their name too. I would also like an effect for lifegain similar to
 the blood dripping for damage (which is really good by the way)."*
 
-**The board had run out of brass.** Every commander wears the crown and the
-walking light (`.field-card.is-commander`), which answers *which card is the
-commander* and is silent on the question a watcher asks next. The sand answers
-whose turn it is, and a brass card on lit brass sand is still brass on brass. So
-the commander of the seat on turn goes to **fire** — a different material, not
-the same one louder — and three clauses each got their own answer:
+**And the correction, the same evening, after he looked at the first build:**
+*"I didn't mean a fire effect on the commander card itself, I meant on their
+square part of the arena."* The first version put all of the fire on
+`.field-card.is-commander`. **The subject was always the seat**, and the
+difference is not a detail: a card is one permanent among a dozen and it moves
+around the sand, while a seat's square — a player's half in a duel, their
+quadrant at four — is a fixed place a watcher can find from the other side of a
+room. The card has a mark of its own already (the crown, which says *this is
+the commander*); burying it under the loud one answers a question nobody asked
+and leaves the real one still whispered. Everything below is the corrected
+build; the card is back to exactly the crown it had, and
+`go/cmd/mtglab/seatfire_test.go` holds it there by name so the tree cannot
+drift back to the box it was told once not to use.
 
-- **"the whole border should be lit up"** — the crown's conic arc runs a short
-  bright band round a rim that is nearly *transparent* between passes. Correct
-  for *is a commander* (the crown glyph carries that when the light is
-  elsewhere), wrong for *is on turn*, which has nothing else saying it. The
-  floor comes up off transparent and the walk becomes a brightening across a
-  lit ring. `.field-quad.is-on-turn` made exactly this move at the scale of a
-  seat and its comment argues it; this is that argument at the scale of a card.
-- **"pop more like our buttons"** — the lap goes **5.2s → 3.4s**, the Wheel's
-  ember end of the `.btn` family's range rather than the plate's. Same
-  mechanism, same masked conic ring, louder voice. `animation-duration` alone,
-  never the shorthand, so the reduced-motion guard above it cannot be undone by
-  specificity.
-- **"a flame on top"** — `.field-card::before` and `::after`, two sets of
-  tapering radial tongues on **two different clocks** (1700ms and 1150ms,
-  both `alternate` → 3.4s and 2.3s, back in phase every **78.2 seconds**,
-  which is never at the rate anybody watches a board). One layer on one clock
-  is a lamp blinking; two beating against each other is the only cheap thing
-  in CSS that reads as combustion.
+**The board had run out of brass.** The sand says whose turn it is — a warm
+wash on the half (`.field-side-lit`), a gold rim on a quadrant
+(`.field-quad.is-on-turn`), a lit lip on the trench — all of it brass on
+brass-coloured sand, which is a thing you find once you know it is there. So
+the square belonging to the seat on turn goes to **fire**: a different
+material, not the same one louder. Three clauses, each with its own answer:
+
+- **"the whole border should be lit up"** — the masked conic ring, at the
+  scale of a square. A duel's half never had one at all, so it gets the
+  quadrant's rim built a second time: the same registered angle
+  (`--field-turn-sweep`), the same `xor`/`exclude` pair of masks leaving the
+  padding ring and nothing else, the same keyframe. The quadrant's own ring
+  already refused to go dark between passes and says why in its comment; this
+  changes its **metal** and nothing else about it. Both squares now burn all
+  the way round and the walk is a brightening across a lit ring rather than an
+  arc appearing on a dark one.
+- **"pop more like our buttons"** — the material is the pop. The rate stays at
+  the quadrant's measured **9s**, which was chosen because a perimeter six
+  times a card's crossed at a card's angular rate is a light *running*; a
+  duel's half is the same order of perimeter (2330px against a quadrant's
+  1674) and takes the same nine. The first build shortened a *card's* ring to
+  3.4s, which was the right answer to the wrong box.
+- **"a flame on top"** — two sets of tapering radial tongues standing along
+  the square's top edge, on **two different clocks** (1700ms and 1150ms, both
+  `alternate` → 3.4s and 2.3s, back in phase every **78.2 seconds**, which is
+  never at the rate anybody watches a board). One layer on one clock is a lamp
+  blinking; two beating against each other is the only cheap thing in CSS that
+  reads as combustion. Each layout hangs the two layers on the free
+  pseudo-elements it has: a duel on the half and on the sand-light it already
+  draws, a pod on the head that runs along the top of the quadrant.
 - **"maybe their name too"** — `.field-plate.is-on-turn`, the quiet half:
   one step of warmth toward the fire (#ddbb51 → **#ffe1ab**, 12.7:1 on the
   trench) plus a low ember behind the letters and the plate's brass rule
@@ -7759,15 +7778,28 @@ the same one louder — and three clauses each got their own answer:
   blow and to a gain, both of which animate this element, and an animation
   outranks a declaration whatever the specificity.
 
-**Three numbers measured rather than chosen.** A lane clips at its own
-`--lane-lean`, so the flame is sized as a fraction of `--field-card-full`
-rather than in pixels: it rises **9.164px into a 9.648px lean** at the desk and
-**7.268 into 7.859** on a phone — about half a pixel of slack at both, because
-exactness with no slack is a bug this room has already paid for once
-(`--lane-turn`). And the tongues stand at 11 / 27 / 73 / 89 per cent because
-the crown chip is 22px on a 58px card — **31% to 69%** — and opaque by design;
-a tongue at 50% is a tongue behind a black plate. What the middle gets instead
-is the crown itself taking the fire's light.
+**Three things measured rather than chosen, and the first of them is the
+room.** Every square on this board that is flush with the top of `.field` —
+the far half of a duel, both upper quadrants of a pod — has **one pixel** of
+sky above it, because `.field` clips at its padding box and the table begins
+there. So a flame that only rises is invisible on exactly the seat a watcher
+looks at first. The band straddles the edge instead: roots just inside the
+square, tips above it, and where the arena cuts the tips off what is left is
+the rail alight rather than a gap. Seats with room (a duel's near half into
+the trench, a pod's lower row, and every seat on a phone, where the halves
+stack and the arena's top is 540px away) show the tongues whole. Sized in
+fractions of `--field-card-full` and not in pixels: **−26.1 / 35.95** at a
+desk, **−20.7 / 28.52** on a phone, **−17.1 / 23.55** inside a pod's smaller
+quadrant.
+
+**And the tongues are uneven because even ones are a graphic.** Twelve tongues
+at one width along an 805px rail read as a string of lights, and the fault
+survived two attempts to fix it with height and with opacity — the clip flattens
+every tongue to the same height, so height cannot vary what you see. What fixed
+it was uneven spacing, widths differing by nearly two to one, enough overlap
+that no plain sand shows between neighbours, and a continuous hot bed under all
+of them. **Narrower was also tried and was worse**: at 2%-ish widths the rail
+reads as a row of candles, which is a picture of twelve fires rather than one.
 
 **The blessing.** `useWounds` is `useLifeMarks` now, because a blessing is not
 a wound and a hook that returns one should not be named for the other. One
@@ -7804,12 +7836,17 @@ fault the pseudo pairing was taught to catch on 2026-09-26, arriving through
 the ancestor door. The pseudo belongs to the **subject** and to nothing in
 front of it now; run against the whole committed bundle the narrowing turns up
 **no** newly loose rule, so it was a hole rather than a trade.
-`go/cmd/mtglab/commanderfire_test.go` is the belt to that braces and says the
-two things the sweep structurally cannot: that the arrested flame **stays lit**
-(whose turn it is is information), and that the burning ring is lit **all the
-way round** while the plain crown is not — the distinction, checked in both
-directions, because the fault this catches is a future session tidying two
-gradients into one shape.
+`go/cmd/mtglab/seatfire_test.go` is the belt to that braces and says the three
+things the sweep structurally cannot: that the arrested flame **stays lit**
+(whose turn it is is information), that the seat's ring is lit **all the way
+round** while the card's crown is still a travelling highlight on a dark rim —
+the distinction, checked in both directions, because the fault this catches is
+a future session tidying two gradients into one shape — and that **no rule
+painting in the fire reaches a `.field-card` at all**, which is Aaron's
+correction kept as a ratchet. Its own guard check is per **layer**, and that
+too was bought by mutation: written as `:(?:before|after)` it let the outer
+layer's guard excuse the inner one's deletion, which is the same
+over-approximation as the sweep's, one file over, on the same afternoon.
 
 **`field-card` joined commandment 19's gate.** It was not in `artBearing`, and
 the gap was real rather than theoretical: a `filter` on `.field-card` reaches
@@ -7827,6 +7864,15 @@ world and never touches the page's own `fetch`. A 40-line **proxy** in front of
 the app — everything forwarded, `/api/jobs/fixture` answered from the dump —
 does the same job with no page patching at all, and a second copy of it pointed
 at 8765 serves the *committed* bundle, which is a free before-and-after pair.
+
+**And a pod can be walked, which the first build said it could not.** The
+memory's step 2 is real and cheap: append two seats to `board.seats` in the
+dumped job, copy a handful of cards onto seats 3 and 4, and the room draws a
+genuine four-quadrant board — 490×347 apiece, exactly as
+[[a-pod-quadrant-is-490px-forever]] says. Twenty lines of Python and a third
+copy of the proxy. So the quadrant half of this was looked at rather than
+written blind, at the top row (flush, the rail alight) and at the bottom
+(tongues whole, reaching into the six-pixel gap above).
 
 
 ## Green — Growth & Resilience

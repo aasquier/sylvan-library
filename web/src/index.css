@@ -7256,13 +7256,18 @@ button:hover .tarot-fan-card {
      invent a slightly different green. */
   --arena-verdigris: #3f7a52;
   --arena-glisten: #8fe053;
-  /* **The fire, for the commander whose turn it is.** The board's brass says
-     *this card is the commander*; it had nothing left to say with when the
-     question became *and it is their turn* (Aaron, 2026-09-27: *"I want the
-     border around the active commander in the coliseum to pop more like our
-     buttons, it should look like a flame on top, and the whole border should
-     be lit up"*). Brass lit harder is brass; fire is a different material, and
-     a different material is the only honest way to say a different thing.
+  /* **The fire, for the seat whose turn it is.** The board's brass says *this
+     card is the commander*; it had nothing left to say with when the question
+     became *and it is their turn* (Aaron, 2026-09-27: *"I want the border
+     around the active commander in the coliseum to pop more like our buttons,
+     it should look like a flame on top, and the whole border should be lit
+     up"* — and then, correcting the first build of it: *"I didn't mean a fire
+     effect on the commander card itself, I meant on their square part of the
+     arena."* The subject is the **seat**: a player's own square of sand in a
+     duel, their quadrant at four. A card is one permanent among a dozen; the
+     square is the thing a watcher finds from across a room, and it is the
+     thing the sentence was always about.) Brass lit harder is brass; fire is
+     a different material, and
      Three steps because that is what a flame is made of and one hex is not —
      a near-white heart, the orange body, and the deep root where it leaves the
      metal. Named here beside the blood for the blood's own reason: a material
@@ -14600,231 +14605,6 @@ button:hover .tarot-fan-card {
   .field-card.is-commander .field-card-turn::before { animation: none; }
 }
 
-/* ------------------------------------------ the commander whose turn it is
- *
- * **The brass had run out of things to say.** Every commander on the board
- * wears the crown and the walking light, which answers *which card is the
- * commander* and is silent on the question a watcher actually asks next —
- * *and whose turn is it*. The sand answers that (`.field-side-lit`, and the
- * pod's `.field-quad.is-on-turn` rim) and a card standing on lit sand is
- * still lit brass on lit brass. Aaron, 2026-09-27: *"I want the border around
- * the active commander in the coliseum to pop more like our buttons, it
- * should look like a flame on top, and the whole border should be lit up."*
- *
- * **A different material, rather than the same one louder.** Brass turned up
- * is brass; what this has to say is not *more commander*, it is *this one, now*
- * — so the metal goes to fire (`--arena-fire-*`, declared with the blood).
- * Three things change and each answers a clause of the ask:
- *
- *   - **"the whole border should be lit up"** — the crown's conic arc runs a
- *     short bright band round a rim that is nearly dark between passes, which
- *     is correct for *is a commander* (the crown glyph carries that when the
- *     light is elsewhere) and wrong for *is on turn*. So the gradient's floor
- *     comes up off transparent: the whole ring burns, and the walk is a
- *     brightening across it rather than an appearance. `.field-quad.is-on-turn`
- *     made exactly this move for exactly this reason and its comment argues it.
- *   - **"pop more like our buttons"** — the lap shortens from 5.2s to **3.4s**,
- *     which is the Wheel's ember end of the `.btn` family's range rather than
- *     the plate's. Same mechanism, same masked ring, louder voice; nothing
- *     here is a second way to walk a light.
- *   - **"it should look like a flame on top"** — below.
- *
- * **Nothing reaches through the painting** (commandment 19). The ring is on
- * the card's own black border and the bloom is outside it, exactly as the
- * crown's own note says; the fire is a layer laid above the card, and the only
- * part of it that crosses Wizards' art at all is the few pixels of heat where
- * a flame meets the edge it is burning from. No `filter` touches the card, in
- * this block or anywhere near it.
- *
- * **One hook for two tables.** `.field-side.is-active` is set on a duel's half
- * and on a pod seat's half alike (`FieldSide`'s `active`, `components/board.tsx`),
- * so the whole of this reads once and answers at two and at four seats. */
-.field-side.is-active .field-card.is-commander .field-card-turn {
-  box-shadow:
-    0 2px 5px rgba(0, 0, 0, 0.45),
-    0 0 0 1.5px color-mix(in srgb, var(--arena-fire-lit) 82%, #fff6e2),
-    0 0 12px -1px color-mix(in srgb, var(--arena-fire) 80%, transparent),
-    0 0 30px 2px color-mix(in srgb, var(--arena-fire) 42%, transparent);
-}
-.field-side.is-active .field-card.is-commander .field-card-turn::before {
-  background: conic-gradient(from var(--field-crown-sweep) at 50% 50%,
-    color-mix(in srgb, var(--arena-fire) 78%, transparent) 0deg,
-    color-mix(in srgb, var(--arena-fire-lit) 94%, #fff) 26deg,
-    /* The apex is the Wheel's ember rather than white. A white-hot arc on a
-       58px card reads as an LED; this room's hottest light is candle and
-       coal, and `.wheel-spin-btn`'s gleam has said so since it was tuned. */
-    #ffe9bb 50deg,
-    color-mix(in srgb, var(--arena-fire-lit) 94%, #fff) 74deg,
-    color-mix(in srgb, var(--arena-fire) 78%, transparent) 104deg 360deg);
-  /* The duration alone, never the shorthand: the reduced-motion guard above
-     stops this ring with `animation: none`, and a shorthand here would put the
-     name back on at a higher specificity and silently undo it. The gleam's
-     block learned that the same way. */
-  animation-duration: 3.4s;
-}
-
-/* **The flame on top.**
- *
- * Drawn, not fetched, and for the blood's reason (commandment 5): a flame is a
- * *shape under light* rather than a picture of one, and a fire GIF at
- * fifty-eight pixels is the clip art the commandment bans. Two pseudo-elements
- * of tapering radial tongues, each rising off the card's top edge — `::before`
- * carries three, `::after` two narrower ones between them.
- *
- * **Two layers on two different clocks, so the fire never repeats.** 1700ms
- * and 1150ms, both `alternate`, so the cycles are 3.4s and 2.3s and the pair
- * comes back into phase every **78.2 seconds** — which is to say never, at the
- * rate anybody watches a board. One layer on one clock is a lamp blinking; two
- * beating against each other is the only cheap thing in CSS that reads as
- * combustion.
- *
- * **It burns upward into room that exists.** A lane's own `--lane-lean` is the
- * clearance a turned card leans into — `0.1491` of a card plus a pixel, about
- * ten at the desk and eight on a phone — and `.field-row` clips at its padding
- * box, so that lean is exactly how far anything may rise above a card before
- * it is cut off. The flame is sized as fractions of `--field-card-full` for
- * that reason: it scales with the card, and the tongues' faint tips are what
- * meet the clip rather than their bodies. It is *not* sized in pixels; a
- * constant measured against one screen is how this room has been bitten
- * before.
- *
- * `z-index: 2` puts it above the painting and **below `.field-card-arm`** at
- * 3, so the crown glyph stands in front of the fire rather than under it. A
- * commander in a burning frame still wears their crown. */
-.field-side.is-active .field-card.is-commander::before,
-.field-side.is-active .field-card.is-commander::after {
-  content: '';
-  position: absolute;
-  left: -2%;
-  right: -2%;
-  /* Up into the lane's lean, and eight-ish pixels down onto the card's own
-     top border, which is where a fire meets the thing it is burning.
-     **Measured, with slack.** `--lane-lean` is `0.1491` of a card plus a
-     pixel — 9.65 at the desk, 7.86 on a phone — and this rises `0.158`, which
-     leaves about half a pixel at both sizes. Exactness with no slack is a bug
-     in this room specifically: `--lane-turn` was set to the true overhang to
-     three decimals once and rounding ate the difference on a live board. */
-  top: calc(var(--field-card-full) * -0.158);
-  height: calc(var(--field-card-full) * 0.30);
-  z-index: 2;
-  pointer-events: none;
-  transform-origin: 50% 100%;
-}
-/* **The tongues stand where the crown is not.** The crown chip is 22px on a
-   58px card, anchored top-centre — 31% to 69% — and it is opaque by design
-   (a drawn mark on an arbitrary painting is invisible about a third of the
-   time, which is the keyword chips' whole argument). So a tongue at 50% would
-   be a tongue behind a black plate. The four here flank it at 11, 27, 73 and
-   89, and what the chip gets instead is the heat *behind* it: a dark crown
-   standing in a fire, which is a better picture than the one that was
-   planned.
-   Each tongue is an ellipse anchored at the bottom of the box, hottest at its
-   root and transparent by its tip — a flame's own value range, which is why
-   nothing here needs a blur to read as fire. Under them, a low bed of heat
-   along the card's top edge: the part that says the card is *alight* rather
-   than merely near a flame. */
-.field-side.is-active .field-card.is-commander::before {
-  background:
-    radial-gradient(ellipse 7% 60% at 11% 100%,
-      #fff3d6 0%,
-      var(--arena-fire-lit) 16%,
-      var(--arena-fire) 42%,
-      color-mix(in srgb, var(--arena-fire-deep) 70%, transparent) 70%,
-      transparent 100%),
-    radial-gradient(ellipse 9% 100% at 27% 100%,
-      #fff8e6 0%,
-      var(--arena-fire-lit) 14%,
-      var(--arena-fire) 40%,
-      color-mix(in srgb, var(--arena-fire-deep) 74%, transparent) 68%,
-      transparent 100%),
-    radial-gradient(ellipse 9% 92% at 73% 100%,
-      #fff8e6 0%,
-      var(--arena-fire-lit) 14%,
-      var(--arena-fire) 40%,
-      color-mix(in srgb, var(--arena-fire-deep) 74%, transparent) 68%,
-      transparent 100%),
-    radial-gradient(ellipse 7% 54% at 89% 100%,
-      #fff3d6 0%,
-      var(--arena-fire-lit) 16%,
-      var(--arena-fire) 42%,
-      color-mix(in srgb, var(--arena-fire-deep) 70%, transparent) 70%,
-      transparent 100%),
-    /* The bed: the card's own top edge alight. Tight and saturated rather
-       than a wide pale haze — the first cut of this was `66% 30%` of
-       near-white and it read as fog over a card, not as a card on fire. */
-    radial-gradient(ellipse 52% 20% at 50% 100%,
-      var(--arena-fire) 0%,
-      color-mix(in srgb, var(--arena-fire-deep) 76%, transparent) 48%,
-      transparent 100%);
-  animation: field-burn 1700ms ease-in-out infinite alternate;
-}
-/* The second set, on its own clock: two short tongues inboard of the first
-   pair, standing in the gaps. A fire is not four candles.
-   **Nothing at 50%**, and that is measured rather than taste: the crown chip
-   is 86% opaque, so a tongue drawn behind it would arrive at fourteen per
-   cent of itself. What the middle gets instead is the chip's own metal, two
-   rules down. */
-.field-side.is-active .field-card.is-commander::after {
-  background:
-    radial-gradient(ellipse 6% 48% at 19% 100%,
-      #fff8e6 0%,
-      var(--arena-fire-lit) 18%,
-      var(--arena-fire) 46%,
-      transparent 100%),
-    radial-gradient(ellipse 6% 56% at 81% 100%,
-      #fff8e6 0%,
-      var(--arena-fire-lit) 18%,
-      var(--arena-fire) 46%,
-      transparent 100%);
-  animation: field-burn-cross 1150ms ease-in-out infinite alternate;
-}
-/* **And the crown takes the fire's light**, because the chip it sits on is
-   opaque and would otherwise be a black rectangle standing in a flame with
-   nothing happening to it. Metal near a fire is lit by the fire: the glyph
-   goes from brass to the fire's own pale gold and the chip's hairline warms
-   with it. The chip's *ground* stays dark — that ground is the whole reason a
-   drawn mark is legible over an arbitrary painting, and a fire is not a
-   reason to give it up. */
-.field-side.is-active .field-card.is-commander .field-card-crown.is-commander {
-  color: color-mix(in srgb, var(--arena-fire-lit) 84%, #fff);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7),
-    inset 0 0 0 0.5px color-mix(in srgb, var(--arena-fire-lit) 70%, transparent),
-    0 0 9px -1px color-mix(in srgb, var(--arena-fire) 60%, transparent);
-}
-/* The tongues stretch and settle. `scaleY` about the foot, so the flame grows
-   out of the card's edge and never lifts off it; a touch of `scaleX` the other
-   way, because a flame that is taller is also thinner. */
-@keyframes field-burn {
-  from { transform: scaleY(0.8) scaleX(1.05); opacity: 0.8; }
-  to   { transform: scaleY(1.08) scaleX(0.96); opacity: 1; }
-}
-/* The cross-draught: the inner pair lean, which is what makes the whole thing
-   look blown rather than pumped. */
-@keyframes field-burn-cross {
-  from { transform: scaleY(1.1) translateX(-4%); opacity: 0.9; }
-  to   { transform: scaleY(0.74) translateX(4%); opacity: 0.5; }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* **The fire holds still and does not go out**, which is the crown's own
-     ruling three rules up and the turn rim's: whose turn it is, is
-     *information*, and stillness may not answer it with less than everybody
-     else gets. A still flame is not frozen weather — weather stilled is a
-     smudge because a firefly holding perfectly still is a spot, and a flame
-     holding still is a flame in a painting, which is a thing people have drawn
-     on purpose for six hundred years. Parked at the middle of each layer's
-     travel rather than at an end, so neither is caught mid-stretch. */
-  .field-side.is-active .field-card.is-commander::before {
-    animation: none;
-    transform: scaleY(0.94) scaleX(1.01);
-    opacity: 0.92;
-  }
-  .field-side.is-active .field-card.is-commander::after {
-    animation: none;
-    transform: scaleY(0.92);
-    opacity: 0.7;
-  }
-}
-
 .field-card.is-companion .field-card-turn {
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.45),
@@ -16650,6 +16430,301 @@ button:hover .tarot-fan-card {
   .field-seam-on { animation: none; }
   .field-side { transition: none; }
   .field-side-lit { transition: none; }
+}
+
+/* --------------------------------------------- the seat whose turn it is is
+ * ON FIRE
+ *
+ * **The light on the sand was the answer, and it was not loud enough to be
+ * the answer.** Everything above this line says *whose turn it is* in the
+ * arena's own brass — a wash on the half, a gold rim on a quadrant, a lip on
+ * the trench — and brass on brass is a thing you find once you know it is
+ * there. Aaron, 2026-09-27: *"I want the border around the active seat in the
+ * coliseum to pop more like our buttons, it should look like a flame on top,
+ * and the whole border should be lit up."* Then, correcting the first build,
+ * which put all of this on the active commander's card: *"I didn't mean a
+ * fire effect on the commander card itself, I meant on their square part of
+ * the arena."*
+ *
+ * **So the subject is the square, and that is the whole correction.** A card
+ * is one permanent among a dozen and it moves; a seat's square is a fixed
+ * place a watcher can find from the other side of a room, and it is the only
+ * box on this board whose meaning is exactly *this player, now*. Brass turned
+ * up is still brass, so the square goes to a different material —
+ * `--arena-fire-*`, declared beside the blood — and says the thing once,
+ * enormously.
+ *
+ * **Two layouts, one square, one voice.** A duel's square is the player's
+ * half of the sand (`.field-side.is-active`); a pod's is the whole quadrant
+ * (`.field-quad.is-on-turn`), which already wears this exact mechanism in
+ * gold and simply changes metal. Each selector below carries both, and the
+ * two never meet: a board is `.field.is-pod` or it is not.
+ *
+ * **Nothing reaches through a painting** (commandment 19). The ring paints
+ * the border and nothing else — the same two masks the quadrant's rim and the
+ * crown already use — and the flame is a layer standing over the top edge.
+ * No `filter` appears anywhere in this block, and the one that would be
+ * reached for here (*"dim the other seats"*) is already answered two hundred
+ * lines up by a sheet laid over them, for this reason.
+ *
+ * ---- the whole border, lit --------------------------------------------- */
+
+/* The bloom, so a lit square reads as lit from the far side of the table and
+   not merely outlined. The inset that cancels the waiting seat's shade has to
+   be restated: it is the same property, and a `box-shadow` does not merge. */
+.field:not(.is-pod) .field-side.is-active {
+  box-shadow:
+    inset 0 0 0 999px rgba(8, 5, 2, 0),
+    0 0 0 1px color-mix(in srgb, var(--arena-fire) 44%, transparent),
+    0 0 34px -6px color-mix(in srgb, var(--arena-fire) 58%, transparent);
+}
+.field-quad.is-on-turn {
+  box-shadow:
+    inset 0 0 0 3px rgba(24, 14, 4, 0.42),
+    0 0 0 1px color-mix(in srgb, var(--arena-fire) 46%, transparent),
+    0 0 26px -4px color-mix(in srgb, var(--arena-fire) 64%, transparent);
+}
+/* The ring itself. The duel's half had none — this is the quadrant's rim
+   built a second time at the scale of a half, with the same two masks
+   (`xor`/`exclude` between the content box and the border box) leaving the
+   padding ring and nothing else. `--field-turn-sweep` and `field-turn-walk`
+   are the quadrant's own, reused rather than re-invented: one registered
+   angle, one keyframe, two boxes. */
+.field:not(.is-pod) .field-side.is-active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Above the sand and the cards, below nothing that matters: it paints the
+     rim alone, so no painting under it is touched. The quadrant's own rim
+     argues this at 3 and is the model. */
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 8px;
+  /* Three, not the crown's two. A perimeter of this order needs the width to
+     read at all — the quadrant's rim was measured to exactly this conclusion
+     on a real pod and a half's perimeter is larger still. */
+  padding: 3px;
+  background: conic-gradient(from var(--field-turn-sweep) at 50% 50%,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 0deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 30deg,
+    /* The apex is the Wheel's ember rather than white. A white-hot arc reads
+       as an LED; this room's hottest light is candle and coal, and
+       `.wheel-spin-btn`'s gleam has said so since it was tuned. */
+    #ffe9bb 58deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 86deg,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 116deg 360deg);
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-clip: content-box, border-box;
+  mask-clip: content-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: field-turn-walk 9s linear infinite;
+}
+/* **"the whole border should be lit up"**, at the scale it was asked about.
+   The quadrant's gold already refused to go out between passes and says why;
+   this changes its metal and nothing else about it, so the pod keeps the rate
+   that was measured for a perimeter this size — nine seconds, because a light
+   crossing a quadrant at a card's angular rate would be running. The duel's
+   half is the same order of perimeter and takes the same nine. */
+.field-quad.is-on-turn::before {
+  background: conic-gradient(from var(--field-turn-sweep) at 50% 50%,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 0deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 30deg,
+    #ffe9bb 58deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 86deg,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 116deg 360deg);
+}
+
+/* ---- the flame along the top edge ---------------------------------------
+ *
+ * Drawn, never fetched (commandment 5): a flame is a *shape under light*, and
+ * a fire GIF along an eight-hundred-pixel rail is the clip art the
+ * commandment bans. Tapering radial tongues rooted on the square's top edge,
+ * in two layers on two clocks — 1700ms and 1150ms, both `alternate`, so the
+ * cycles are 3.4s and 2.3s and the pair comes back into phase every **78.2
+ * seconds**, which is to say never at the rate anybody watches a board. One
+ * layer on one clock is a lamp blinking; two beating against each other is
+ * the only cheap thing in CSS that reads as combustion.
+ *
+ * **The tongues are irregular and they overlap, and that was measured rather
+ * than chosen.** Eleven evenly spaced tongues of one size along this rail
+ * read as a string of lights — a graphic, not a fire — and the fault survived
+ * two attempts to fix it with height and opacity. What fixed it was uneven
+ * spacing, widths that differ by nearly two to one, and enough overlap that
+ * no plain sand shows between neighbours.
+ *
+ * **It burns up into the room that exists, and on a flush edge that room is
+ * the rail itself.** `.field` clips at its padding box, and a board's top row
+ * is flush with it — the far seat of a duel and both upper quadrants of a
+ * pod. So the band straddles the edge: its roots sit just inside the square
+ * and its tips reach above, and where the arena cuts the tips off, what is
+ * left is the rail alight rather than a gap. The seats with sky above them
+ * (a duel's near half, a pod's lower row) show the tongues whole. Both read
+ * as the same fire and the difference is the room, which is the honest
+ * answer — the alternative is a flame sized for the smallest clearance on the
+ * page, which is one pixel.
+ *
+ * Sized in fractions of `--field-card-full` rather than pixels, so it scales
+ * with the board: about 26 and 36 at a desk, 21 and 29 on a phone, 17 and 24
+ * inside a pod's smaller quadrant. A constant measured against one screen is
+ * a bug this room has already paid for. */
+.field:not(.is-pod) .field-side.is-active::after,
+.field-quad.is-on-turn .field-quad-head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--field-card-full) * -0.45);
+  height: calc(var(--field-card-full) * 0.62);
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 3.4% 120% at 4% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 4.6% 168% at 11% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 96% at 19% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 5.2% 190% at 28% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.6% 124% at 37% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4.2% 150% at 44% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 104% at 53% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 5% 182% at 61% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.8% 132% at 70% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4.4% 160% at 79% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.2% 108% at 88% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4% 140% at 96% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    /* The bed: the square's own top rail alight, under all of them, so the
+       tongues rise out of one fire instead of standing in a row. */
+    linear-gradient(to top,
+      color-mix(in srgb, var(--arena-fire) 72%, transparent) 0,
+      color-mix(in srgb, var(--arena-fire-deep) 46%, transparent) 26%,
+      transparent 60%);
+  animation: seat-burn 1700ms ease-in-out infinite alternate;
+}
+/* The second set, on its own clock and standing in the first set's gaps: a
+   fire is not twelve candles. Each layout hangs it on the free pseudo-element
+   it has — a duel on the sand-light it already draws, a pod on the head that
+   sits along the top of the quadrant — because a board has one element per
+   square and two layers to hang. */
+.field:not(.is-pod) .field-side.is-active > .field-side-lit::after,
+.field-quad.is-on-turn .field-quad-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--field-card-full) * -0.45);
+  height: calc(var(--field-card-full) * 0.55);
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 2.6% 110% at 8% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 140% at 24% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.4% 96% at 33% 100%, rgba(255, 248, 230, 0.7) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 66%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 58%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3.2% 150% at 49% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.6% 112% at 58% 100%, rgba(255, 248, 230, 0.75) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 70%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 62%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 138% at 75% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.4% 100% at 92% 100%, rgba(255, 248, 230, 0.7) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 66%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 58%, transparent) 46%,
+      transparent 100%);
+  animation: seat-burn-cross 1150ms ease-in-out infinite alternate;
+}
+/* The tongues stretch and settle. `scaleY` about the foot, so the flame grows
+   out of the rail and never lifts off it — and **no `scaleX` on this one**,
+   which the card's version had: a horizontal scale about the centre of an
+   eight-hundred-pixel rail slides its end tongues twenty pixels sideways, and
+   a fire that pans is a fire that is being dragged. */
+@keyframes seat-burn {
+  from { transform: scaleY(0.82); opacity: 0.82; }
+  to   { transform: scaleY(1.06); opacity: 1; }
+}
+/* The cross-draught: the inner layer leans and dips, which is what makes the
+   whole thing read as blown rather than pumped. The lean is a fraction of a
+   per cent because the box is the width of a seat. */
+@keyframes seat-burn-cross {
+  from { transform: scaleY(1.08) translateX(-0.6%); opacity: 0.85; }
+  to   { transform: scaleY(0.72) translateX(0.6%);  opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* **The fire holds still and does not go out.** Whose turn it is is
+     *information*, and stillness may not answer it with less than everybody
+     else gets — the crown's ruling, the turn rim's, and the sand light's, all
+     three already settled above. A still flame is not frozen weather: weather
+     stilled is a smudge because a firefly holding perfectly still is a spot,
+     and a flame holding still is a flame in a painting, which is a thing
+     people have drawn on purpose for six hundred years. Parked at the middle
+     of each layer's travel rather than at an end, so neither is caught
+     mid-stretch. */
+  .field:not(.is-pod) .field-side.is-active::before { animation: none; }
+  .field:not(.is-pod) .field-side.is-active::after,
+  .field-quad.is-on-turn .field-quad-head::before {
+    animation: none;
+    transform: scaleY(0.94);
+    opacity: 0.92;
+  }
+  .field:not(.is-pod) .field-side.is-active > .field-side-lit::after,
+  .field-quad.is-on-turn .field-quad-head::after {
+    animation: none;
+    transform: scaleY(0.9);
+    opacity: 0.66;
+  }
 }
 
 /* ------------------------------------------------------------------ the

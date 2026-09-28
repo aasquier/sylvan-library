@@ -126,13 +126,18 @@ knows the covered list is kept by walking JSX, not by waiting for a violation.
 Worth one Colorless slice asking which *other* rooms render card art with no
 entry. Ledger: Green, 2026-09-26 (rainbow).
 
-**Red: the commander on turn is on fire and lifegain has a blessing — both
-want your eye.** PR (the fourth ball) is green and parked: `/coliseum`, a
-match with a board. The commander of the seat whose turn it is wears a lit ring
-the whole way round with a flame on its top edge — **3.4s** a lap for the ring,
+**Red: the seat on turn is on fire and lifegain has a blessing — both want
+your eye.** PR (the fourth ball) is green and parked: `/coliseum`, a match with
+a board. The square belonging to the seat whose turn it is — their half of the
+sand in a duel, their quadrant at four — is ringed in fire the whole way round
+with flame standing along its top edge: **9s** a lap for the ring (the
+quadrant's own measured rate, which the duel's half now shares),
 **1.7s/1.15s** for the two flame layers (they come back into phase every
 **78.2s**, so the fire never visibly repeats) — and that seat's name on the
-trench warms to the fire's gold. A life total going *up* now sends three motes
+trench warms to the fire's gold. **The first build of this put the fire on the
+commander's card and Aaron corrected it the same evening** (*"I meant on their
+square part of the arena"*); the card is back to its plain crown and a test
+holds it there. A life total going *up* now sends three motes
 of green-gold light off the **upper** rim of its dial, the blood drip's sibling
 with every axis reversed; **1.9s**, same window as the blood. Walked on a real
 recorded match in both themes, at 1440 and at 375, with the flame's still
@@ -143,6 +148,10 @@ person can say whether *up is up* actually lands. · **Recommendation:** walk
 `/coliseum` with a match on screen and say whether the fire is the right
 loudness and whether the name's warmth reads or shouts; I made it the quiet
 half deliberately and that is the one taste call with two defensible answers.
+Second taste call, smaller: a seat flush with the top of the arena shows the
+flame's **roots** (the rail alight) rather than whole tongues, because there is
+one pixel of sky above it — the seats with room show the tongues. I chose the
+room that exists over a flame sized for the smallest clearance on the page.
 Ledger: Red, 2026-09-26 (rainbow).
 
 **Red: the reduced-motion sweep was excusing one box with another box's guard,
