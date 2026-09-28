@@ -62,6 +62,7 @@
  * opinion about a number any more.
  */
 
+import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -89,6 +90,8 @@ import { CrossedSwordsGlyph } from '../components/glyphs'
 import { reducedMotion, useCardMotion } from '../lib/motion'
 import { HelpTip, Term } from '../components/term'
 import secutorArt from '../assets/coliseum/secutor.webp'
+import custosIuvenisArt from '../assets/coliseum/custos-iuvenis.webp'
+import custosBarbatusArt from '../assets/coliseum/custos-barbatus.webp'
 
 /** Every control and figure here, keyed to the served glossary — the same
  *  contract the Simulator's own controls use. */
@@ -233,6 +236,47 @@ const HERO = {
  *  one loop that was made for it or the painting, and nothing in between. */
 const HERO_EFFECTS = ['daynight'] as const
 
+/** The two who stand at the arena's shoulders.
+ *
+ *  The painting already has them — `HERO.alt` says the arena is "crowned by
+ *  two tall statues" — and the page around it never did. Above 1280px the
+ *  route's 1024-pixel column leaves a few hundred pixels of bare page on each
+ *  side, and that margin is where they stand: not on the banner, beside it.
+ *
+ *  Roman marble, first century, photographed on the Met's own sweep and given
+ *  away (`custodes.recipe.yaml` carries the licence and the derivation). They
+ *  are Hercules twice over on purpose rather than for want of a second
+ *  subject — he is the gladiator's patron, the name the men on that sand
+ *  swore by. The younger one turns to his right and the bearded one to his
+ *  left, so stood in the two margins they face the arena between them.
+ *
+ *  **They are described rather than hidden.** A decoration that repeats what
+ *  the prose beside it already said is noise to a screen reader — that is why
+ *  the secutor below is `aria-hidden` — but nothing on this page says these
+ *  two are here, and "the arena is guarded" is a fact about the room. */
+const CUSTODES = {
+  iuvenis: {
+    src: custosIuvenisArt,
+    alt: 'A marble Hercules, young and unbearded, the lion\'s skin folded '
+       + 'over one arm and his club at his side, standing on a carved plinth.',
+  },
+  barbatus: {
+    src: custosBarbatusArt,
+    alt: 'A marble Hercules, bearded and heavy-shouldered, the lion\'s skin '
+       + 'knotted at his throat, standing on a carved plinth.',
+    /** **His plate arrives with its own floor on it.** He throws a hard cast
+     *  shadow across the museum's sweep, and a connectivity matte cannot tell
+     *  a shadow from the figure it belongs to — the recipe measured it and
+     *  says so. Kept on purpose (a figure standing on nothing is a sticker),
+     *  and the stylesheet is told, because a plate with a lit floor in it
+     *  needs the room taken down around its feet and a plate without one
+     *  does not. Keyed to the picture rather than to the side it stands on:
+     *  the two swap places if anybody ever reverses them, and the shadow
+     *  would not. */
+    ground: true,
+  },
+} as const
+
 function Hero() {
   // One status pass. `ready: false`, an error, or an instance that never had
   // the loop pushed to it all land in the same place: the still, which is the
@@ -256,6 +300,14 @@ function Hero() {
   }, [loop])
   return (
     <>
+    {/* **The arch, and it exists to be measured against.** The two guardians
+        stand in the page's margin, which is space no element on this page
+        owns — so they are positioned against the one box whose height is the
+        banner's own, and their footing line is its bottom edge. It wraps the
+        frame and nothing else: the heading and the credit are outside it, or
+        `bottom: 0` would be the credit's baseline rather than the arena's
+        floor. */}
+    <div className="coliseum-arch">
     <div className={`coliseum-hero${loop ? ' is-moving' : ''}`}>
       {loop ? (
         // `role="img"` with the still's own description: what a screen reader
@@ -268,6 +320,15 @@ function Hero() {
         <img className="coliseum-hero-art" src={HERO.url} alt={HERO.alt} />
       )}
       <div className="coliseum-hero-sky" aria-hidden="true" />
+    </div>
+    {/* The plate is handed to the stylesheet twice: once as the picture, and
+        once as the shape the room's dusk is allowed to land on. A sheet of
+        umber over the whole lane would be a rectangle of weather; masked to
+        the figure's own alpha it is light falling on marble, which is the
+        only place light on a page may be laid (commandment 19's shape, and
+        the reason this is a layer rather than a `filter` on the plate). */}
+    <Custos who="iuvenis" side="left" />
+    <Custos who="barbatus" side="right" />
     </div>
     {/* **The title is read, not seen.** The banner says "coliseum" better than
         the word does (Aaron: "we can drop the Coliseum title since the video
@@ -291,7 +352,44 @@ function Hero() {
       {loop ? <>Motion inspired by </> : null}
       <em>Grand Coliseum</em>, {HERO.printing} — art by {HERO.artist}
     </p>
+    {/* **The guardians are credited in the room they stand in**, and in a line
+        of their own rather than tacked onto the painting's: two pictures, two
+        claims, and the one above is about the thing inside the frame.
+
+        It comes and goes with them. The stylesheet draws the statues only
+        where the margin is wide enough to hold one, so a credit for two
+        figures nobody can see would be a sentence about an empty page — and
+        both are gated on the same width, in the same block, so the two can
+        never disagree about whether there is anything to credit. */}
+    <p className="coliseum-custos-credit">
+      Their guardians: two marble Hercules, Roman, first century —
+      photographed by The Metropolitan Museum of Art, public domain
+    </p>
     </>
+  )
+}
+
+/** One guardian, in one of the page's two margins.
+ *
+ *  The plate goes in twice — as the picture, and as `--custos-plate`, the
+ *  shape the dusk sheet is masked to. Handing it over as a custom property is
+ *  the only way the stylesheet can learn a bundled filename, and it is the
+ *  idiom this app already uses for exactly that (`--leaf-art` on the board).
+ *
+ *  `draggable={false}` for the reason every other decoration here carries it:
+ *  a statue that can be picked up and dropped on the page is furniture that
+ *  answers the wrong gesture. */
+function Custos({ who, side }: { who: keyof typeof CUSTODES; side: 'left' | 'right' }) {
+  const it = CUSTODES[who]
+  const ground = 'ground' in it && it.ground ? ' has-ground' : ''
+  return (
+    <div className={`coliseum-custos is-${side}${ground}`}
+         style={{ '--custos-plate': `url(${it.src})` } as CSSProperties}>
+      <span className="coliseum-custos-figure">
+        <img className="coliseum-custos-art" src={it.src} alt={it.alt}
+             draggable={false} />
+      </span>
+    </div>
   )
 }
 

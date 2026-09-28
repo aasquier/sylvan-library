@@ -2185,6 +2185,32 @@ and the escalation worth Aaron's yes is an *exhaustive* run over one module,
 which is what those tools do that this one does not. Ask again when a module's
 kill rate is bad enough to want every mutant rather than a sample.
 
+### 2026-09-26 (rainbow) — two more committed photographs, and their record
+
+The Coliseum's two new guardians (Green's entry above) are the first committed
+assets this repository has taken from the Met since `secutor`, and the licence
+record is here because that is where a licence record belongs.
+
+- **Met object 247000**, *Marble statue of a youthful Hercules*, Roman, 69–96
+  CE, 246.9 cm. **Met object 247001**, *Marble statue of a bearded Hercules*,
+  Roman, 68–98 CE, 238.2 cm.
+- Both read **CC0** through the museum's own API, confirmed **2026-09-27** at
+  fetch time by `animist`'s gate rather than off a landing page — the Met
+  publishes no licence string, only `isPublicDomain`, and `sources.py` maps
+  that boolean onto the single vocabulary word that may pass and refuses
+  anything else as `restricted`. The dated confirmation is written into
+  `web/src/assets/coliseum/PROVENANCE.md` by the tool, not by hand.
+- **Both halves of a statue photograph's rights are clear**, which is the
+  thing that has to be true and usually is not: the sculptor has been dead for
+  nineteen centuries, and the photographer is the institution that released
+  the plate. This is why the Met's Greek and Roman department is the seam for
+  this kind of asset and a Commons search for "Colosseum" is not — that one is
+  almost entirely CC BY-SA and the gate refuses it.
+- Credited in the room they stand in, in the house's own idiom (the Learn
+  page's Spitzweg line): "two marble Hercules, Roman, first century —
+  photographed by The Metropolitan Museum of Art, public domain". CC0 asks for
+  no attribution; commandment 9 does.
+
 ## Blue — Craft & Knowledge
 
 *Go craft and the modern-Go sweep · the boot sequence and its configuration ·
@@ -9653,6 +9679,77 @@ was handed as an open item were **already converted** by the second ball; the
 three that remain are the zero-alpha gradient stops, where `color-mix(… 0%,
 transparent)` is transparent *black* and the conversion is wrong. A claim
 re-checked rather than inherited.
+
+### 2026-09-26 (rainbow) — the arena gets its two guardians
+
+Critchlow's painting has said since the banner was built that the Grand
+Coliseum is "crowned by two tall statues" (it is in `HERO.alt`, verbatim), and
+the page around it had none. Above the breakpoint the route's 1024-pixel
+column leaves a few hundred pixels of bare page on each side. Two Roman
+Hercules now stand in it — Met 247000 and 247001, `custodes.recipe.yaml`.
+
+**The two `TUNE` markers the sourcing lane left, re-measured on the real
+things rather than on the rig.**
+
+- **The lane.** The sheet modelled it as `(vw − 1024) / 2` and that is exactly
+  right above 1280, which was worth proving rather than assuming: measured at
+  1728 with `getBoundingClientRect`, `.page-main` is 1280 wide, its padding is
+  24 each side, and the 1024 column sits centred in the remaining 1232 — and
+  `(vw − 1280)/2 + 24 + 104` *is* `(vw − 1024)/2`. Below about 1072 the column
+  stops shrinking and the model diverges, which is well under the floor.
+- **The matte.** The sheet's "247000 cuts perfectly at t34" was measured on a
+  1200×1600 probe counting only pixels above alpha 200. On the full 2902×3869
+  plate, t34 leaves **20.73%** of the border ring at a faint alpha (mean
+  8/255) — invisible on white, a pale cloud across the top-left on this app's
+  own `--page: #0d0d0d`. At t42 it is **0.66%**, mean under one. Above 42 the
+  flood stops taking ground and starts taking figure (erosion in both plates'
+  shadowed legs at 50, unmistakable at 58). **t42 on both.**
+- **A third number nobody had looked for:** the two plates do not put the
+  plinth at the same height. 247001's runs to the bottom edge of his frame;
+  247000's stops at 0.9385 with bare sweep under it — a 29-pixel mismatch in
+  the footing line at the size the 1728 layout gives them. Measured on the
+  *stone* rather than on the alpha (opaque **and** not near-white, stable
+  across luma cut-offs of 170/190/210, because an alpha test finds the bearded
+  one's cast shadow and not his feet). So 247000 is cropped to `[0, 0, 1,
+  0.94]`, 247001 is not cropped at all, and both figures end up at ~0.945 of
+  their own box.
+
+**What the walk found that no test could** (headless, against this branch's
+own no-pool door, 1280 / 1440 / 1728 / 390, both themes):
+
+- The first vignette — a radial fade to `--page`, inset past the lane to reach
+  the plate's corners — pushed `document.scrollWidth` to **1755 in a 1728
+  window** and laid a page-coloured disc over the right-hand end of the credit
+  line under the banner, which read "art by Carl C". Replaced with three inset
+  box-shadows on the plate's own box: no overflow, and no banding, which a
+  radial fade to a flat near-black does visibly on this page.
+- **The masked dusk cannot reach the bearded one's shadow pool**, and three
+  passes raising the gradient moved it by nothing. The sheet is masked to the
+  plate's alpha so the umber lands on marble and not on the page; the pool's
+  alpha is about a half, so it gets half the umber over a region already
+  composited at half strength. What reaches it is a second, **unmasked**
+  multiply sheet over the lane: the lane is its own blending group, so over
+  the empty three-quarters it multiplies the page by the page — a no-op you
+  can measure at zero — and over the pool it is the room going dark at full
+  strength. Dark theme only; on paper a pale shadow on white is a shadow.
+- **80rem was the wrong floor.** At 1280 the lane is 120px and the pair render
+  120×150 beside a 558-pixel banner. The sheet's own readout refuses a lane
+  under 150px; the lane is `(vw − 992)/2 − 24`, which reaches 150 at 1340, so
+  the floor is **84rem**. This is the one departure from the written brief
+  ("the sheet says 1280 and up") and it is Aaron's to overrule.
+
+Three guards in `go/cmd/mtglab/coliseumcustodes_test.go`, all three
+mutation-verified: the plates are committed, recipe-accounted, **byte-equal to
+their `web_dist/` copies** (which is the assumption `mediaprovenance_test.go`
+states in prose to justify exempting that directory, and which nothing
+checked) and asked for by a script; the statues and the sentence that credits
+them are both gone below the floor and both come back inside exactly one
+width-gated block, so they cannot disagree; and the dusk is a masked multiply
+layer with no `filter` anywhere on the plate.
+
+One trap worth the line: the back-off for the bearded one's own umber was
+first written as a lower `opacity`, which `custos-dusk` animates — the
+animation would have eaten it silently. It is a weaker gradient instead.
 
 
 ## Colorless — The Artifacts

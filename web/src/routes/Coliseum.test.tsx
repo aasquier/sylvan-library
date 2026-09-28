@@ -939,6 +939,45 @@ describe('the tale of the tape', () => {
     // The still is not left underneath it: one banner, not two stacked.
     expect(container.querySelector('img.coliseum-hero-art')).toBeNull()
   })
+
+  it('stands two guardians beside the frame, described and credited',
+     async () => {
+    // **What this can see and what it cannot.** A suite has no layout, so
+    // whether these two are in the page's margin is the stylesheet's promise
+    // and `coliseumcustodes_test.go` holds it. What is checkable here is the
+    // half that lives in the markup: two of them, one per side, inside the
+    // arch (so `bottom: 0` is the banner's footing line and not the credit's),
+    // each carrying its own description rather than an empty `alt` — the
+    // secutor below is decoration that repeats its own caption, and these are
+    // the only thing on the page that says the arena is guarded.
+    const { container } = show()
+    await screen.findByText(/harena/)
+    const arch = container.querySelector('.coliseum-arch')
+    const left = container.querySelector('.coliseum-custos.is-left')
+    const right = container.querySelector('.coliseum-custos.is-right')
+    expect(arch).toBeTruthy()
+    expect(left).toBeTruthy()
+    expect(right).toBeTruthy()
+    for (const side of [left!, right!]) {
+      expect(arch!.contains(side),
+             'a guardian stands against the frame, inside the arch').toBe(true)
+      const plate = side.querySelector('img.coliseum-custos-art')
+      expect(plate?.getAttribute('alt')).toMatch(/Hercules/)
+      // The plate is handed to the stylesheet a second time, as the shape the
+      // dusk sheet may land on. Without it the mask has nothing and the
+      // umber covers the whole lane.
+      expect(side.getAttribute('style') ?? '')
+        .toMatch(/--custos-plate:\s*url\(/)
+    }
+    expect(left!.querySelector('img')?.getAttribute('src'))
+      .not.toBe(right!.querySelector('img')?.getAttribute('src'))
+    // Two pictures, two claims: the painting's credit is not asked to carry
+    // the photographs', and the statues' line names who took them.
+    expect(container.querySelector('.coliseum-custos-credit')?.textContent)
+      .toMatch(/Metropolitan Museum of Art/)
+    expect(container.querySelector('.coliseum-footnote')?.textContent)
+      .not.toMatch(/Metropolitan/)
+  })
 })
 
 /**
