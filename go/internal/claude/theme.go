@@ -1418,10 +1418,16 @@ func CheckProposal(transcript, slots, requested any, budget *float64, avoid stri
 // RunProposal is `theme.run_proposal`: read around, name legends, check every
 // one.
 //
-// **Measured at 226 seconds** with four searches, since it reads a dozen-odd
-// pages and resolves every legend it names against the pool. That is why the
-// caller may hand in an `OnTurn` -- run as a background job this is the only
-// thing that says it is still moving.
+// **Measured at 226 seconds**, since it reads a dozen-odd pages and resolves
+// every legend it names against the pool. That is why the caller may hand in
+// an `OnTurn` -- run as a background job this is the only thing that says it
+// is still moving.
+//
+// The number used to say "with four searches", which this mode has never had:
+// its hosted search is bounded at three in `data/modes.json` and always was,
+// and four is the dossier's and research's budget. The figure stands; the
+// clause describing the run that produced it did not, so it is gone rather
+// than corrected to a search count nobody recorded.
 func RunProposal(ctx context.Context, conn *pool.Conn, plan *ProposalPlan, run ThemeRun) (any, error) {
 	if plan.Answer != nil {
 		return *plan.Answer, nil
