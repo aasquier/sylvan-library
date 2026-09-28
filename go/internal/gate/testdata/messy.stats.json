@@ -7,7 +7,7 @@
  ],
  "bracket": 2,
  "total_cards": 106,
- "land_count": 96,
+ "land_count": 97,
  "curve": {
   "average_mv": 3.33,
   "nonland_cards": 9,
@@ -171,42 +171,42 @@
   "deck_size": 106,
   "hand_size": 7,
   "lands": {
-   "count": 96,
+   "count": 97,
    "distribution": [
     {
      "lands": 0,
-     "chance": 4.924073292894162e-09
+     "chance": 1.4772219878682488e-09
     },
     {
      "lands": 1,
-     "chance": 8.272443132062193e-07
+     "chance": 3.3434457658751364e-07
     },
     {
      "lands": 2,
-     "chance": 4.71529258527545e-05
+     "chance": 2.4072809514300983e-05
     },
     {
      "lands": 3,
-     "chance": 0.0012312152861552563
+     "chance": 0.0007623056346195311
     },
     {
      "lands": 4,
-     "chance": 0.016357574516062692
+     "chance": 0.011942788275705987
     },
     {
      "lands": 5,
-     "chance": 0.11286726416083258
+     "chance": 0.09520108368348487
     },
     {
      "lands": 6,
-     "chance": 0.3804044829124357
+     "chance": 0.3649374874533587
     },
     {
      "lands": 7,
-     "chance": 0.4890914780302745
+     "chance": 0.5271319263215181
     }
    ],
-   "keepable": 0.017635942728070703
+   "keepable": 0.01272916671983982
   },
   "categories": [
    {

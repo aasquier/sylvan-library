@@ -162,6 +162,48 @@ func isLand(rec *pool.CardRecord) bool {
 	return rec != nil && rec.IsLand()
 }
 
+// LandCountOf is `land_count`: how many land drops this deck can make.
+//
+// **It is the exact complement of [CurveOf]'s skip, and written as the same
+// expression on purpose** — a card counts as a land here precisely when the
+// mana curve leaves it out as one. The wire's `land_count` used to come from a
+// category tally alone (`counts["land"]`, on a `deck.Deck` method that is
+// deliberately gone now) while [CurveOf] and [PipRequirements] asked
+// [pool.CardRecord.IsLand], and the two arithmetics disagreed on one shape: a
+// **modal DFC filed under a spell category**.
+//
+// `Stump Stomp // Burnwillow Clearing` is `Sorcery // Land`, layout
+// `modal_dfc` — you may put it onto the battlefield as a land instead of
+// casting it, which is why `IsLand` says yes and why `sim/compile` has always
+// shuffled it in as a land. Filed by hand under `interaction`, it fell out of
+// the curve as a land and out of the land count as a spell, and
+// [OpeningHand]'s land probabilities were computed one land short. The
+// population is `layout = 'modal_dfc'` with a land on a back face and no land
+// on the front — a query to re-run rather than a count to inherit; the polish
+// ledger records what the day's reading was.
+//
+// **The union rather than the record alone is the rule**, and the `||` is
+// load-bearing in both directions. A name the pool cannot resolve has a nil
+// record, so the deck's own filing is the only fact there is about it; and a
+// card somebody filed under `land` that the pool says is not one keeps
+// counting, because this change is allowed to add lands and not to take any
+// away. Nothing that was counted before stops being counted.
+//
+// The gate's `category-mismatch` warning still fires, both ways, and that is
+// not this function's business to silence: a category is where somebody
+// shelved the card and this count is what the card does. An invalid deck is
+// analysed rather than refused, so the diagnosis and the arithmetic arrive
+// together.
+func LandCountOf(d *deck.Deck, cards map[string]*pool.CardRecord) int {
+	n := 0
+	for _, entry := range d.Cards {
+		if entry.Category == "land" || isLand(cards[entry.Name]) {
+			n += entry.Qty
+		}
+	}
+	return n
+}
+
 // round2 rounds to two decimals, half to even on the scaled value.
 func round2(x float64) float64 {
 	return math.RoundToEven(x*100) / 100
@@ -432,19 +474,25 @@ func atLeastOne(deckSize, copies, seen int) float64 {
 // OpeningHand is the draw odds for the opening seven and the
 // seen-it-by-turn table, on the draw (`7 + t` cards by the end of turn t).
 //
+// It takes the card records only to count lands, through [LandCountOf], which
+// argues why a category tally is not that count. The `categories` table below
+// still reads categories and is meant to: those rows are how the deck is
+// *shelved*, so a modal DFC filed under `interaction` appears there under
+// `interaction` while counting as a land in the table above it.
+//
 // `keepable` goes through `floats.Fsum` and not a `+=` loop, because the
 // recorded numbers are compensated sums and an accumulation loop is a
 // different arithmetic in its last bits. Three terms is enough to see it --
 // swept over every deck size from 8 to 250, the two arithmetics disagree in
 // 5,098 shapes, 33 of them ordinary Commander decks, and the difference
 // reaches the JSON.
-func OpeningHand(d *deck.Deck) Opening {
+func OpeningHand(d *deck.Deck, cards map[string]*pool.CardRecord) Opening {
 	n := d.TotalCards()
 	hand := 7
 	if n < hand {
 		hand = n
 	}
-	lands := d.LandCount()
+	lands := LandCountOf(d, cards)
 	total := comb(n, hand)
 	dist := []LandRow{}
 	keep := []float64{}
@@ -492,8 +540,8 @@ func DeckStats(d *deck.Deck, cards map[string]*pool.CardRecord) Stats {
 	}
 	return Stats{
 		Slug: d.Slug, Name: d.Name, Commander: append([]string{}, d.Commander...), Bracket: d.Bracket,
-		TotalCards: d.TotalCards(), LandCount: d.LandCount(),
+		TotalCards: d.TotalCards(), LandCount: LandCountOf(d, cards),
 		Curve: CurveOf(d, cards), Categories: CategoryReport(d), GameChangers: GameChangersOf(d, cards),
-		Opening: OpeningHand(d), Colors: PipRequirements(d, cards), Types: TypeBreakdown(d, cards),
+		Opening: OpeningHand(d, cards), Colors: PipRequirements(d, cards), Types: TypeBreakdown(d, cards),
 	}
 }
