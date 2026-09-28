@@ -39,6 +39,35 @@ it. Run the recipe; re-read the recipe.
 
 ## Open — a walk before a merge (commandment 16)
 
+**Black: the mode prompts are repaired and the PR is green and parked — this is
+the "nine of ten prompts have drifted" item, built.** Nine stale sentences
+across seven modes; five modes that held between two and five tools and named
+one; seven that now say what their own scope dial widens, through the
+`ScopeNotes` field that exists for exactly that. The three intake modes stop
+telling the model its brief carries counts, a curve and the other cards — it
+carries none of them, and that was the one costing answer quality, because a
+model told it already has a fact does not go and get it; they name `get_deck`
+and `deck_stats` instead. Two prompts stop calling the gate by a language it has
+never been. The slot argument stops naming three filters where four run, and
+stops saying the deck file records only what its owner wrote (ADR 41);
+`research` stops saying a rationale is composed nowhere. `deck-description`
+stops assuming an import is asking. The theme interview learns there are two
+corpora of true things, not one. The dossier is untouched on purpose — its
+instructions and schema are hash-frozen in `testdata/dossier.json` — and its own
+drift (`allies` missing from the search enumeration, in the prompt and again in
+`dossierOpening`) is recorded for a branch of its own, since landing it moves a
+frozen golden and invalidates every stored dossier. · *Cost of leaving it:*
+every sentence fixed here is one a model is currently believing on the surfaces
+a newcomer actually talks to, the tarot table among them. · **Recommendation:**
+walk and merge. **Nothing renders differently and there is no page to click
+through** — the walk is a *read*: `git show <pr> -- go/internal/claude/data/modes.json`
+and read the seven changed prompts as sentences somebody is about to be told.
+The two questions left unanswered are the line below, under *a ruling*. Then,
+once merged, the cheapest place to see it working on the deployed site is the
+**deck description** — any deck → Description → ask: one call, one paragraph,
+about ten seconds. The interview is the richer read and costs six questions to
+get through. Ledger: Black, 2026-09-26 (rainbow, prompts).
+
 **Red: PR (the Queen's ball) is green and parked — every plate in the app now
 carries a light that walks its rim.** Aaron asked for "a gleaming edge that
 circles around the button, blood, fire, whatever is appropriate"; one block in
@@ -284,26 +313,34 @@ takes it, using 09-19's recorded baselines (tarot seed 1909 → 741 bytes, sha25
 `e406f504…`; brew → 503 bytes, sha256 `54c5036e…`; Tier 1 in the two-ask
 cached form). Ledger: White, 2026-09-26.
 
-**Black: nine of the ten Claude mode prompts have drifted from the code around
-them, and the drift is in what the model is told.** Three runs of this reading
-ended "the prompts are byte-untouched, so there is nothing to read" — true of
-the prompts and false of the reading, because a prompt goes stale when its code
-moves. The worst three: the intake, draft and description modes all promise the
-model "the counts and the curve ... were given to you" when the brief carries
-neither and the two tools that do are granted but never named; nine of ten
-modes end on a scope paragraph about a card, a deck or a gate that is not there
-(`scan` — a two-string transcription — is told not to range into the rest of the
-deck); and `theme-conversation` is told a re-stated slot set *replaces* the
-previous one when the code unions them. Six smaller ones behind those. · *Cost
-of leaving it:* every one of these is a sentence a model is currently believing,
-on the surfaces a newcomer actually talks to, and the tarot table is one of
-them. · **Recommendation:** "yes" — one branch, one PR, one walk; brief
-sentences first, the scope paragraphs through each mode's own `ScopeNotes`
-field (which exists for exactly this), and two of them — the interview's "three
-to five questions" against a cap of six, and the theme's replace-versus-union
-rule — put to you rather than guessed. Queued rather than landed because it is
-all model-facing text and the dossier's instructions are hash-frozen in a
-corpus. Ledger: Black, 2026-09-26.
+**Black: the two prompt sentences the "nine of ten prompts" item said to put to
+you rather than guess — and in both, the *code* may be the wrong side.** The
+rest of that item is built and parked (see *a walk before a merge*); these two
+are left exactly as they are, one word each. · **(a) The interview asks for
+"three to five questions" and `MaxQuestions = 6` truncates the answer.** Note
+where each lives: the ask is in `interviewOpening` (`interview.go:533`), not the
+prompt, and the cap is a constant whose comment says "more than this and it
+stops being an interview and starts being a wall". So a model that follows the
+ask perfectly is never cut, and a sixth question is kept while a seventh
+vanishes silently. *Cost of leaving it:* nothing visible — a seam nobody has
+tripped. **Recommendation:** say **"six"** and make the ask read "up to six" —
+the cap is the number a person actually feels, six is not a wall, and a prompt
+whose number *is* the cap cannot drift from it. "five" is the other consistent
+answer and brings the constant down instead. · **(b) The theme interview's
+schema tells the model a re-stated slot set "replaces the previous set rather
+than adding to it", and `Carry` unions.** The code is deliberately the newer
+side: `Carry`'s own comment says the replace rule "is a rule enforced by
+nothing, and it drifts", and records what it cost — driven with the short
+answers a first-timer actually gives, the readiness count went 0, 1, 0, 1, 0, so
+somebody answering honestly watched a reading that never became ready. That is
+commandment 2's failure exactly. *Cost of leaving it:* the model is told its
+omission erases an earlier reading when it does not, so it re-states
+defensively and spends output tokens proving what the code already guarantees.
+**Recommendation:** say **"unions"** — the sentence becomes "everything you have
+learned since your last answer; anything you said before is remembered whether
+you repeat it or not" — since both halves still pass `Ground` against the same
+transcript, so nothing is carried that the person did not say. Ledger: Black,
+2026-09-26 (rainbow, prompts).
 
 **Colorless: this file's own rule says "one line per item" and not one item has
 obeyed it for a month — is the rule wrong, or is the file?** Every item here is

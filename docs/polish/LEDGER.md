@@ -4457,6 +4457,145 @@ will notice it moving.
   a test that every model in `Table` is on a recorded list of models whose
   cache reads really are a tenth, so the next one added has to say.
 
+### 2026-09-26 (rainbow, prompts)
+
+**This is the follow-on to the 2026-09-26 (rainbow) entry's queued item about
+the mode prompts, and it should be read as its last paragraph.** That run's
+recommendation was "yes — one branch, one PR, one walk; brief sentences first,
+the scope paragraphs through each mode's own `ScopeNotes` field, and two of
+them put to Aaron rather than guessed." This is that branch. It is **parked for
+Aaron's walk** and deliberately not merged: every byte of it is text that
+reaches a model and thence a newcomer's screen.
+
+- **Fixed: the sentences with one right answer, nine of them, across seven
+  modes.** Each was checked against the code that assembles the input or reads
+  the answer back, never against another prompt.
+  - Two prompts called the gate "deterministic **Python**". It is Go, and
+    naming a language was never the true sentence: both now read "the gate …
+    is deterministic and it has already run".
+  - The slot argument told the model alternatives are filtered against three
+    things. Four filters run, `already-in-deck` is checked **first**
+    (`argue.go:261`), and the schema's own `alternatives` description beside it
+    already said four — so the prompt was the stale copy of its own file.
+  - The slot argument said "this deck file records rationales the user wrote",
+    which ADR 41 ended. It now says a rationale is its owner's account of their
+    own thinking, that one other surface drafts them on an import when asked
+    and marks every sentence, and that this is not that surface.
+  - `research` said of a rationale that "this tool refuses to compose it
+    anywhere" — same ADR, same fix.
+  - `research` said "List every card you name"; `ResolveCards` cuts the list at
+    `MaxResearchCards = 12` silently. The prompt now says twelve.
+  - **All three intake modes told the model its brief carries the category
+    counts, the curve and the other cards.** It carries none of them:
+    `intakeDeckFacts` (`intake.go:442`) is name/slug/stage/status, the
+    commander, the declared themes and at most six rationales the owner wrote,
+    and its own comment says the counts and the list are the tools' job. This
+    is the item that actually cost answer quality — a model told it already has
+    a fact does not go and get it — so all three now say what the brief holds
+    and name the two doors (`get_deck`, `deck_stats`) that hold the rest.
+  - `deck-description` opened "Someone has just imported a deck". The deck
+    page's description editor is a second caller of the same mode
+    (`description.go`'s whole file comment is that difference), so it no longer
+    assumes which one is asking.
+  - The theme interview described **one** corpus of true things and one id
+    spelling. `KeepFact` takes two: `tarot:` and `cauldron:` (`theme.go:512`),
+    and `CauldronOffer` hands the ids out through `frameFor`. Both the prompt
+    and the schema's `source` description now name both rooms, and the count
+    ("one of those three ways", "One of three") is gone rather than corrected —
+    a third arm would rot it again.
+- **Fixed: five modes held tools they never mentioned.** The interview holds
+  four and named one; the slot argument holds five and named one; the three
+  intake modes hold three each and named one. `Mode.Effort` is `high`
+  *precisely* because a lower level reaches for tools less often and a mode
+  answering from recall is rule 1 failing quietly — a granted tool the prompt
+  never names is that same failure one step earlier. Each now names what it has
+  and what each one is for, in one bullet.
+- **Fixed, and this is the cross-cutting one: seven modes now supply their own
+  `ScopeNotes`.** `Mode.System` always appends a scope paragraph, and
+  `Mode.ScopeNotes`' own doc comment says a mode with no card and no deck "has
+  to say what its own scope axis widens, or the prompt tells it to stay on
+  something that does not exist". Exactly one of the ten did. So the scan — two
+  strings off a photograph, no deck, no gate, no tools — ended on "stay on the
+  card you were asked about, and on anything the gate flagged about it. Do not
+  range into the rest of the deck"; both theme modes ended on a paragraph about
+  cards that interact with each other while being told there is no decklist;
+  and the two intake modes were told not to range into the rest of the deck by
+  prompts whose whole rule is to use it. Written per mode, in the register
+  `research`'s table already set. The scan's three levels deliberately say the
+  same thing three ways: **this dial does not widen a camera**, which is the
+  honest answer and the one the field exists to let a mode give.
+- **Fixed: two code comments that had rotted the same way the prompts did.**
+  `modes.go`'s file comment said "All seven definitions load" and then — in the
+  very next paragraph, arguing that a count in a comment is a claim to
+  re-check — "Seven, and this comment said six until 2026-08-23". There are
+  ten. The number is gone from that file entirely and the paragraph now records
+  both times it was wrong, because the second one had no bug behind it: the
+  modes arrived and the sentence did not move. And `theme.go:1421` said the
+  proposal was "Measured at 226 seconds **with four searches**"; its hosted
+  search has been bounded at three since #262 and four is the dossier's and
+  research's budget, so the clause is gone and the figure stands.
+- **NOT fixed, deliberately: the dossier, and the reason is a hash.**
+  `Fingerprint` (`dossier.go:145`) hashes `DossierVersion`, `mode.Instructions`
+  and `dumpJSON(mode.ResponseSchema)`, and `testdata/dossier.json` pins that
+  digest (`instructions_sha256`) plus the brief's opening message as bytes. So
+  the drift stays recorded rather than repaired: `allies` is a **required,
+  source-bearing** section added by `DossierVersion = 3` and it is missing from
+  the prompt's enumeration of what to search for *and* from `dossierOpening`'s
+  brief (`dossier.go:131`) — a later bullet does cover it, so the miss is one
+  enumeration written twice. Landing it means moving a frozen golden and
+  invalidating every stored dossier, which is a branch of its own on a morning
+  somebody is watching. The dossier **did** get a `ScopeNotes` table, which the
+  fingerprint does not hash and which no golden carries: it is the one mode
+  whose scope paragraph was about a gate and a deck it has never seen.
+- **Queued (new, and both are one word): what the interview's question count
+  should be, and whether a re-stated slot set replaces or unions.** Both are
+  places where the code and the text disagree and **the code might be the wrong
+  side**, which is why neither was guessed. Daybreak lines below.
+- **No spend. `$0.00`, no live call, no key.** `mtglab claude check` needs
+  `ANTHROPIC_API_KEY` and this laptop's checkout has none (the binary never
+  reads `.env`), so nothing here was verified against a real turn — which is
+  the right shape anyway: every assertion added is a prompt read against Go in
+  the same repository, and a model's opinion of a prompt is not evidence about
+  whether the prompt is true.
+
+**Numbers.** Instruction lengths, before → after: `rationale-interview`
+2,829 → 3,102 · `slot-argument` 2,889 → 3,453 · `research` 3,670 → 3,890 ·
+`rationale-draft` 3,265 → 3,384 · `intake-filing` 2,015 → 2,084 ·
+`deck-description` 2,306 → 2,472 · `theme-conversation` 14,521 → 14,606 ·
+`theme-proposal` 13,680 (untouched) · `commander-dossier` 4,548 (untouched,
+hash-frozen) · `scan` 1,364 (untouched; it got a scope table, not a prompt
+edit). Seven new `scope_notes` tables, three entries each. The whole diff is
+`data/modes.json`, two doc comments and one new test file; `may_write` is empty
+on all ten and every schema still carries `additionalProperties: false`.
+
+**The instrument, and it is the part worth keeping.** `internal/claude` had no
+test holding an *instruction* to anything — `modes_test.go` holds each schema
+to the design it encodes, which is why three runs of this reading concluded
+"the prompts are byte-untouched, so there is nothing new to read" and were
+reading the wrong half. `promptdrift_test.go` is eight tests, each read off a
+source of truth rather than restating the prose: the tool grant
+(`mode.ToolNames`), the caps that truncate (`MaxCharges`, `MaxAlternatives`,
+`MaxFindings`, `MaxResearchCards`, spelled as the words a sentence uses), the
+verdicts a dropped alternative can get (**reflection over
+`DroppedAlternatives`**, so a sixth arm fails until somebody says how the
+prompt names it), the source prefixes `KeepFact` accepts (`TarotSource`,
+`CauldronSource`), the brief the intake really assembles (`intakeDeckFacts`,
+built for a fixture deck and read), the scope axis itself (`Scope`), and the
+one bidirectional check: a mode takes the default scope table exactly when its
+own prompt says it is about "one card in one deck".
+
+**Mutation-verified, ten mutants, ten caught, and one of them was caught the
+second time.** The alternatives test first swept the instructions and the
+schema as one joined string, and removing `already runs` from the instructions
+alone LIVED — because the schema still said it. That is the drift being fixed,
+wearing the test's own clothes: the two halves disagreed for a year and a sweep
+over their concatenation could never see it. It now checks each half
+separately, and both mutants are caught. The other nine: the language coming
+back, a granted tool losing its mention, a mode reverting to the default scope
+table, a level dropped from a mode's own table, the research cap going unsaid,
+"refuses to compose it anywhere" returning, `cauldron:<id>` removed from the
+schema, and an intake prompt promising the counts again.
+
 ### 2026-09-19 (cleanup)
 
 - **Queued item 3 (08-24, the carried list) is closed — done elsewhere, by
