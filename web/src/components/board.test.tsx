@@ -2249,7 +2249,7 @@ it('stops pulsing at a player who is already dead', () => {
  * blow reddens the name, flushes the dial it landed on and runs blood off its
  * rim (Aaron, 2026-09-20). Read off the fold, never accumulated — so a scrub
  * back is life going *up* and no wound, and a first sight of a total is not a
- * blow. `useWounds` in `components/board.tsx` is the reader.
+ * blow. `useLifeMarks` in `components/board.tsx` is the reader.
  */
 function plateOf(container: HTMLElement, who: string) {
   const plate = [...container.querySelectorAll('.field-plate')]
@@ -2259,6 +2259,7 @@ function plateOf(container: HTMLElement, who: string) {
     plate,
     life: plate.querySelector('.field-life') as HTMLElement,
     drips: plate.querySelectorAll('.field-blood-drip'),
+    motes: plate.querySelectorAll('.field-grace-mote'),
     crowns: [...plate.querySelectorAll('.field-bead.is-general')],
   }
 }
@@ -2363,6 +2364,170 @@ it("bleeds the crown's clock when a commander connects, and no other", () => {
   } finally {
     vi.useRealTimers()
   }
+})
+
+/* --------------------------------------------------------- the blessing
+ *
+ * The wound's sibling, asked for in the same breath (Aaron, 2026-09-27: *"I
+ * would also like an effect for lifegain similar to the blood dripping for
+ * damage"*). Same reader, same serial, same nineteen hundred milliseconds,
+ * pointed the other way — and the thing these tests are really for is the one
+ * sentence the stylesheet cannot enforce on its own: **a gain is never dressed
+ * as a blow.** Half of white and green is lifegain; a newcomer watching a
+ * Congregate resolve has to read *up* off the picture with nothing learned
+ * (commandment 2), so `is-blessed` and `is-bleeding` may never arrive
+ * together, and the motes may never be drips.
+ */
+const MENDED: ForgeBoard = {
+  seats: [
+    { seat: 1, slug: 'goreclaw-stompy', name: 'Goreclaw — Stompy', life: 40 },
+    { seat: 2, slug: 'gyome-food', name: 'Gyome — Food', life: 40 },
+  ],
+  cards: [],
+  steps: [
+    { turn: 1, seat: 1, life: [{ seat: 2, life: 24 }] },
+    { turn: 2, seat: 1, life: [{ seat: 2, life: 31 }] },
+    { turn: 3, seat: 1, life: [{ seat: 2, life: 38 }] },
+  ],
+} as unknown as ForgeBoard
+
+function mending(shown: number) {
+  return (
+    <MatchBoard board={MENDED} shown={shown} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+}
+
+it('lights when a life total rises, and only on the plate that was mended', () => {
+  vi.useFakeTimers()
+  try {
+    const { container, rerender } = render(mending(1))
+    // A first sight of twenty-four life is not a gain, for the blow's reason:
+    // a plate arriving already lit would be claiming something nobody watched.
+    expect(plateOf(container, 'Gyome — Food').plate.className)
+      .not.toContain('is-blessed')
+    expect(plateOf(container, 'Gyome — Food').motes).toHaveLength(0)
+
+    rerender(mending(2))
+    // Gyome's seat went from twenty-four to thirty-one.
+    const lit = plateOf(container, 'Gyome — Food')
+    expect(lit.plate.className, 'the whole plate says somebody was mended')
+      .toContain('is-blessed')
+    expect(lit.life.className, 'the life ring is the dial that took it')
+      .toContain('is-blessed')
+    expect(lit.motes, 'three motes off the rim').toHaveLength(3)
+    // The number's own flash is kept: it still says the total changed.
+    expect(lit.life.className).toContain('is-up')
+    // And nobody else's plate is lit.
+    const dark = plateOf(container, 'Goreclaw — Stompy')
+    expect(dark.plate.className).not.toContain('is-blessed')
+    expect(dark.motes).toHaveLength(0)
+
+    // **The light runs its course and the dial is the dial it was.**
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className)
+      .not.toContain('is-blessed')
+    expect(plateOf(container, 'Gyome — Food').motes).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('never lets a gain wear the blood, or a blow wear the light', () => {
+  vi.useFakeTimers()
+  try {
+    // Up: blessed, and not one drip anywhere on the plate.
+    const gain = render(mending(1))
+    gain.rerender(mending(2))
+    const up = plateOf(gain.container, 'Gyome — Food')
+    expect(up.plate.className).toContain('is-blessed')
+    expect(up.plate.className,
+      'a life total going up is never dressed as a hit')
+      .not.toContain('is-bleeding')
+    expect(up.drips, 'no blood on a player who was healed').toHaveLength(0)
+    expect(up.life.className).not.toContain('is-bleeding')
+
+    // Down: bleeding, and not one mote. `DYING` takes Gyome nine to three.
+    const at = (shown: number) => (
+      <MatchBoard board={DYING} shown={shown} game={1} running={false}
+                  name={(_slug, fallback) => fallback}
+                  speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                  games={[1]} playing={1} chooseGame={vi.fn()} />)
+    const loss = render(at(1))
+    loss.rerender(at(2))
+    const down = plateOf(loss.container, 'Gyome — Food')
+    expect(down.plate.className).toContain('is-bleeding')
+    expect(down.plate.className).not.toContain('is-blessed')
+    expect(down.motes, 'no rising light on a player who was hit')
+      .toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('starts the light over when a second gain lands inside the first', () => {
+  vi.useFakeTimers()
+  try {
+    const { container, rerender } = render(mending(1))
+    rerender(mending(2))
+    const first = plateOf(container, 'Gyome — Food').motes[0]
+    act(() => { vi.advanceTimersByTime(1000) })
+    rerender(mending(3))
+    // A fresh set of motes — a new key, so the animation restarts rather than
+    // the old one being told to keep going.
+    const again = plateOf(container, 'Gyome — Food')
+    expect(again.plate.className).toContain('is-blessed')
+    expect(again.motes).toHaveLength(3)
+    expect(again.motes[0], 'the second gain is its own light').not.toBe(first)
+    // The first gain's timer must not put out the second gain's light.
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className)
+      .toContain('is-blessed')
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(plateOf(container, 'Gyome — Food').plate.className)
+      .not.toContain('is-blessed')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+/* ----------------------------------------------- the plate on turn
+ *
+ * The last clause of the same ask — *"Maybe their name too"* — and the reason
+ * it is a flag on the plate rather than a selector off an ancestor: a duel's
+ * plates live in the trench between the halves and a pod's live inside the
+ * quadrant, so no one class in the tree is above both. These two tests are the
+ * pair; a fix that reaches one table and not the other fails here.
+ */
+it("warms the name of the seat on turn, at two seats", () => {
+  // `DYING`'s every step is seat 1's turn, and seat 1 is Goreclaw.
+  const { container } = render(
+    <MatchBoard board={DYING} shown={1} game={1} running={false}
+                name={(_slug, fallback) => fallback}
+                speed="play" setSpeed={vi.fn()} of={3} seek={vi.fn()}
+                games={[1]} playing={1} chooseGame={vi.fn()} />)
+  expect(plateOf(container, 'Goreclaw — Stompy').plate.className)
+    .toContain('is-on-turn')
+  expect(plateOf(container, 'Gyome — Food').plate.className,
+    'the seat that is waiting is not lit')
+    .not.toContain('is-on-turn')
+})
+
+it("warms the name of the seat on turn, at four", () => {
+  // `POD`'s only step is seat 2's turn, and seat 2 is Atla.
+  const { container } = showPod([])
+  const lit = [...container.querySelectorAll('.field-plate.is-on-turn')]
+  expect(lit, 'one plate is on turn and only one').toHaveLength(1)
+  expect(lit[0]?.querySelector('.field-plate-name')?.textContent)
+    .toBe('Atla Palani — Eggs')
+})
+
+it("takes the warmth off a seat that has fallen", () => {
+  // A chair nobody sits in cannot be on turn — the quadrant's own rule, and
+  // the plate inside it has to agree or the board says two things at once.
+  const { container } = showPod(['Atla Palani — Eggs'])
+  expect(container.querySelectorAll('.field-plate.is-on-turn')).toHaveLength(0)
 })
 
 /* ---------------------------------------------- the three materials

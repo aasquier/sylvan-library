@@ -124,6 +124,14 @@ var artBearing = map[string]string{
 		"and the element that turns when a permanent taps",
 	"field-card-leaf": "components/board.tsx: style={{'--leaf-art': " +
 		"`url(${card.image})`}}, drawn by index.css as background-image",
+	// The outer box, added 2026-09-27 when the commander on turn was given a
+	// flame. It was not here, and the gap was real rather than theoretical: a
+	// filter on `.field-card` reaches `.field-card-turn` and the `<img>`
+	// inside it exactly as one on the turn box does, and this is the element
+	// anybody reaching for "make the commander glow" lands on first, because
+	// it is the one the state class is written on.
+	"field-card": "components/board.tsx: the slot every permanent is drawn " +
+		"in, and the ancestor of field-card-turn and its art <img>",
 	"stage-face": "components/stage.tsx: <img className='stage-face' " +
 		"src={item.image}> -- the whole card face, big",
 	"stage-frame": "components/stage.tsx: the span the stage face is inside",

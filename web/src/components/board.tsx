@@ -1538,7 +1538,15 @@ const STARTING_LIFE = 40
  *
  * The flash on change stays: a total that changed silently is a total nobody
  * notices changing. */
-function LifeTotal({ life, wound = 0 }: { life: number; wound?: number }) {
+function LifeTotal({ life, wound = 0, bless = 0 }: {
+  life: number
+  /** The serial of the blow bleeding here, or nought — see `useLifeMarks`. */
+  wound?: number
+  /** The serial of the gain blessing here, or nought — the same reader's
+   *  other half. A dial is never both at once: one fold moves a life total
+   *  one way. */
+  bless?: number
+}) {
   const previous = useRef(life)
   const [hit, setHit] = useState<'up' | 'down' | null>(null)
   useEffect(() => {
@@ -1571,7 +1579,8 @@ function LifeTotal({ life, wound = 0 }: { life: number; wound?: number }) {
                note={dire ? 'One good swing from nothing — almost anything on '
                  + 'this board can deal five.' : undefined}
                className={`field-life${hit ? ` is-${hit}` : ''}${
-                 dire ? ' is-dire' : ''}${wound ? ' is-bleeding' : ''}`}
+                 dire ? ' is-dire' : ''}${wound ? ' is-bleeding' : ''}${
+                 bless ? ' is-blessed' : ''}`}
                style={{ '--life-left': left,
                  '--life-spent': spent } as CSSProperties}>
       <svg className="field-life-ring" viewBox="0 0 48 48" aria-hidden="true"
@@ -1581,6 +1590,7 @@ function LifeTotal({ life, wound = 0 }: { life: number; wound?: number }) {
       </svg>
       <span className="field-life-n tabular">{life}</span>
       {wound > 0 && <Blood key={wound} />}
+      {bless > 0 && <Blessing key={bless} />}
     </FieldHint>
   )
 }
@@ -1682,7 +1692,7 @@ function GeneralBead({ name, damage, wound = 0 }: {
   name: string
   damage: number
   /** The serial of the blow that raised this count, or nought while the dial
-   *  is dry — see `useWounds`. */
+   *  is dry — see `useLifeMarks`. */
   wound?: number
 }) {
   const full = Math.max(0, Math.min(1, damage / GENERAL_KILLS))
@@ -1775,7 +1785,7 @@ function GeneralBead({ name, damage, wound = 0 }: {
 function GeneralDamage({ generals, struck }: {
   generals: { id: number; name: string; damage: number }[]
   /** Which commanders' dials are bleeding, by board id, each with the serial
-   *  of the blow — see `useWounds`. */
+   *  of the blow — see `useLifeMarks`. */
   struck?: ReadonlyMap<number, number>
 }) {
   if (generals.length === 0) return null
@@ -1789,18 +1799,25 @@ function GeneralDamage({ generals, struck }: {
   )
 }
 
-/** How long a wound bleeds, in milliseconds. Longer than the figure's own
- *  700ms flash on purpose: the flash says *the number changed*, this says
- *  *somebody got hurt*, and hurt is not over when the arithmetic is. Not
- *  scaled with the reel's speed, for the flash's reason — a blow landed at
- *  Fast is still a blow, and a drip that had 150ms to fall would never be
- *  seen to. A second blow inside the window starts the bleeding over rather
- *  than queueing behind the first: it is a serial, and a new serial is a new
- *  drip. */
-const BLEED_MS = 1900
+/** How long a mark on a plate runs, in milliseconds — a wound bleeding or a
+ *  gain rising. Longer than the figure's own 700ms flash on purpose: the flash
+ *  says *the number changed*, this says *somebody got hurt* or *somebody was
+ *  mended*, and neither is over when the arithmetic is. Not scaled with the
+ *  reel's speed, for the flash's reason — a blow landed at Fast is still a
+ *  blow, and a drip that had 150ms to fall would never be seen to. A second
+ *  change inside the window starts the mark over rather than queueing behind
+ *  the first: it is a serial, and a new serial is a new drip.
+ *
+ *  **One window for both, because one serial runs both.** The blow and the
+ *  blessing are read off the same delta by the same hook and cleared by the
+ *  same timer; two lengths would be two timers to say the one thing this
+ *  number says, which is *how long a plate keeps talking about what just
+ *  happened to it*. */
+const MARK_MS = 1900
 
 /**
- * What a blow does to a player's plate: the blood, and where it comes from.
+ * What just happened to a player, read off their plate: the blow, and the
+ * blessing.
  *
  * **The dials could already say a total changed and could not say a player
  * was hit.** Life's figure swelled for 700ms and went back; commander damage
@@ -1815,22 +1832,47 @@ const BLEED_MS = 1900
  * dials run at once, which is the truth of it: the commander's blow *is* the
  * life lost.
  *
- * **Read off the fold, never accumulated**, for the combat marks' reason: the
- * board is a pure function of a count, so a scrub backwards is life going *up*
- * and no wound at all, and the first render of any seat draws nothing — a
- * plate arriving already bloody would be claiming a blow nobody watched land.
- * Only a drop in life or a rise in one commander's tally is a wound; a
- * lifegain deck going up, and a poison counter (which has its own colour and
- * is not blood), leave the plate alone.
+ * **And then a life total could say a player was hit and could not say a
+ * player was mended.** Aaron, 2026-09-27: *"I would also like an effect for
+ * lifegain similar to the blood dripping for damage."* A gain is the same
+ * delta read the other way — so it is read here, in the one place that
+ * already asks whether a life total moved, rather than in a second hook that
+ * would be a second answer to one question. Half of Magic's white and green is
+ * this: *Healing Salve*'s "Target player gains 3 life", *Congregate*'s "Target
+ * player gains 2 life for each creature on the battlefield", *Essence
+ * Warden*'s "Whenever another creature enters, you gain 1 life." A deck built
+ * on those had nothing on this board to show for it.
  *
- * Returns a **serial** for each thing that is bleeding rather than a boolean,
- * because the drip is a CSS animation that has to restart when a second blow
- * lands inside the first one's window — and the one honest way to restart an
- * animation from React is a new `key`. Nought is dry.
+ * **Up and down are never the same picture** (commandment 2: a newcomer must
+ * never read a gain as a hit). The blow runs blood *down* off the dial's lower
+ * rim in the arena's reds; the blessing sends light *up* off its upper rim in
+ * the green-gold the figure's own rise-flash already uses. Different
+ * direction, different colour, different word.
+ *
+ * **Read off the fold, never accumulated**, for the combat marks' reason: the
+ * board is a pure function of a count, so the first render of any seat draws
+ * nothing — a plate arriving already bloody would be claiming a blow nobody
+ * watched land, and one arriving already lit would be claiming a gain. A
+ * commander's tally only ever rises, so it has a wound and no blessing; a
+ * poison counter has its own colour and is neither.
+ *
+ * **A scrub backwards is the honest cost of that, and it is paid in the right
+ * direction.** Walking the reel back over a blow is life going up, which now
+ * reads as a gain rather than as nothing. That is what the fold says: at this
+ * count the total is higher than it was at the last one. The transport is
+ * already a thing you drive, and a player driving it backwards is not being
+ * told a lie about the game — they are being shown the arithmetic run in
+ * reverse, which is what scrubbing is.
+ *
+ * Returns a **serial** for each thing that is marked rather than a boolean,
+ * because the drip and the motes are CSS animations that have to restart when
+ * a second change lands inside the first one's window — and the one honest way
+ * to restart an animation from React is a new `key`. Nought is quiet.
  */
-function useWounds(side: BoardSide): {
+function useLifeMarks(side: BoardSide): {
   life: number
   struck: ReadonlyMap<number, number>
+  blessed: number
 } {
   // Seeded from the plate's first sight of the seat, both halves: a dial that
   // already stands at twenty when the plate mounts is a fact, not a blow.
@@ -1841,6 +1883,7 @@ function useWounds(side: BoardSide): {
   })
   const serial = useRef(0)
   const [life, setLife] = useState(0)
+  const [blessed, setBlessed] = useState(0)
   const [struck, setStruck] = useState<ReadonlyMap<number, number>>(
     () => new Map())
   // **The timers outlive the effect that set them, on purpose.** `generals`
@@ -1856,8 +1899,9 @@ function useWounds(side: BoardSide): {
   }, [])
   useEffect(() => {
     const was = seen.current
-    const hit = { life: false, generals: [] as number[] }
+    const hit = { life: false, mended: false, generals: [] as number[] }
     if (side.life < was.life) hit.life = true
+    if (side.life > was.life) hit.mended = true
     for (const one of side.generals) {
       if (one.damage > (was.generals.get(one.id) ?? 0)) {
         hit.generals.push(one.id)
@@ -1867,9 +1911,10 @@ function useWounds(side: BoardSide): {
       life: side.life,
       generals: new Map(side.generals.map((g) => [g.id, g.damage])),
     }
-    if (!hit.life && hit.generals.length === 0) return
+    if (!hit.life && !hit.mended && hit.generals.length === 0) return
     const n = ++serial.current
     if (hit.life) setLife(n)
+    if (hit.mended) setBlessed(n)
     if (hit.generals.length > 0) {
       setStruck((prior) => {
         const next = new Map(prior)
@@ -1877,21 +1922,23 @@ function useWounds(side: BoardSide): {
         return next
       })
     }
-    // One timer per blow, and each clears only what it set: a life wound and
-    // a crown wound from different beats each run their own course.
+    // One timer per change, and each clears only what it set: a life wound, a
+    // crown wound and a blessing from different beats each run their own
+    // course.
     const id = window.setTimeout(() => {
       timers.current.delete(id)
       setLife((held) => (held === n ? 0 : held))
+      setBlessed((held) => (held === n ? 0 : held))
       setStruck((prior) => {
         if (![...prior.values()].includes(n)) return prior
         const next = new Map(prior)
         for (const [key, held] of prior) if (held === n) next.delete(key)
         return next
       })
-    }, BLEED_MS)
+    }, MARK_MS)
     timers.current.add(id)
   }, [side.life, side.generals])
-  return { life, struck }
+  return { life, struck, blessed }
 }
 
 /**
@@ -1916,6 +1963,40 @@ function Blood() {
       <i className="field-blood-drip" />
       <i className="field-blood-drip" />
       <i className="field-blood-drip" />
+    </span>
+  )
+}
+
+/**
+ * The blessing: light rising off the rim of a dial that has just been mended.
+ *
+ * **The blood's sibling, built the same way and pointed the other way.** Three
+ * unequal things, each with its own place on the rim, its own size and its own
+ * pace, so what a person sees is something that happened rather than a pattern
+ * stamped on — and, as with the blood, they are *shapes under light* rather
+ * than pictures of anything, which is commandment 5 read carefully rather than
+ * skirted. There is no free photograph of healing.
+ *
+ * **Everything about it is the drip's opposite, deliberately.** The drips hang
+ * off the lower rim, gather, and fall; these leave the *upper* rim and climb.
+ * The drips are the arena's reds; these are the green-gold the figure's own
+ * rise-flash has always used. A newcomer must be able to read *up* without
+ * having learned anything (commandment 2), and "it moves the other way in the
+ * other colour" is the only version of that which needs no legend.
+ *
+ * Its ancestor is the one tradition in Magic this belongs to — white and
+ * green's lifegain, from *Healing Salve* to *Congregate* — where the picture
+ * is always light arriving on somebody rather than a number going up.
+ *
+ * Nothing for the ear, for the drip's reason: this is the eye's copy of a
+ * number that already changed and a panel that already reads it out.
+ */
+function Blessing() {
+  return (
+    <span className="field-grace" aria-hidden="true">
+      <i className="field-grace-mote" />
+      <i className="field-grace-mote" />
+      <i className="field-grace-mote" />
     </span>
   )
 }
@@ -2673,27 +2754,44 @@ function FieldZones({ side, facing }: {
  * this game has no poison in it — and nearly every game has none, so nearly
  * every plate draws life alone.
  */
-function FieldPlate({ side, facing, name }: {
+function FieldPlate({ side, facing, name, onTurn = false }: {
   side: BoardSide
   facing: 'far' | 'near'
   /** Whose plate this is: the deck's name as the room says it. */
   name: string
+  /**
+   * Whether this is the seat whose turn it is.
+   *
+   * **Decided by the caller and carried on the plate, because the plate is
+   * the one element both layouts put it on.** A duel's plates live in the
+   * trench between the halves and a pod's live inside the quadrant, so the
+   * sand's own `.field-side.is-active` cannot reach a duel's plate and
+   * `.field-quad.is-on-turn` cannot reach a pod's trench — there isn't one.
+   * One flag here is the single named place; the stylesheet asks
+   * `.field-plate.is-on-turn` once and both tables answer.
+   */
+  onTurn?: boolean
 }) {
   // **The plate bleeds as a whole and the dials bleed one at a time.** The
   // name reddens on any blow, because a name is how a player is found from
   // across the table and "who just got hit" is the first thing anyone at it
-  // wants to know; which dial runs says what kind of blow it was.
-  const wounds = useWounds(side)
-  const bleeding = wounds.life > 0 || wounds.struck.size > 0
+  // wants to know; which dial runs says what kind of blow it was. The
+  // blessing follows the same shape: the plate lifts, and the dial that was
+  // mended is the one the light rises off.
+  const marks = useLifeMarks(side)
+  const bleeding = marks.life > 0 || marks.struck.size > 0
   return (
     <span className={`field-plate field-plate-${facing}${
-      bleeding ? ' is-bleeding' : ''}`}>
+      bleeding ? ' is-bleeding' : ''}${
+      marks.blessed ? ' is-blessed' : ''}${
+      onTurn ? ' is-on-turn' : ''}`}>
       <span className="field-plate-rule" aria-hidden="true" />
       <span className="field-plate-body">
         <span className="field-plate-name" title={side.name}>{name}</span>
         <span className="field-plate-figures">
-          <LifeTotal life={side.life} wound={wounds.life} />
-          <GeneralDamage generals={side.generals} struck={wounds.struck} />
+          <LifeTotal life={side.life} wound={marks.life}
+                     bless={marks.blessed} />
+          <GeneralDamage generals={side.generals} struck={marks.struck} />
           <PlayerCounters counters={side.counters} />
         </span>
       </span>
@@ -3561,7 +3659,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
                           aria-pressed={pinned === s.seat}
                           onClick={() => setPinned(
                             pinned === s.seat ? null : s.seat)}>
-                    <FieldPlate side={s} facing={facing} name={seatName} />
+                    <FieldPlate side={s} facing={facing} name={seatName}
+                                onTurn={s.seat === state.active && !out} />
                     {/* **Whose turn it is, for the ear as well as the eye.**
                         The ring around this quadrant walks a light and says
                         nothing at all to a screen reader, and at four seats
@@ -3660,7 +3759,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           a person glances up to check, on the one strip both players are
           already looking at. `FieldPlate` argues the anchoring. */}
       <div className="field-seam">
-        <FieldPlate side={far} facing="far" name={farName} />
+        <FieldPlate side={far} facing="far" name={farName}
+                    onTurn={lit === 'far'} />
         <span className="field-seam-turn tabular">
           {/* **The light says which half; this says it in a second way.**
               A warm wash on sand is a beautiful signal and a soft one, and
@@ -3678,7 +3778,8 @@ export function MatchBoard({ board, shown, game, name, running, beat,
           {game > 0 && <span className="field-seam-game">Game {game}</span>}
           {onTurn && <span className="sr-only">, {onTurn} is on turn</span>}
         </span>
-        <FieldPlate side={near} facing="near" name={nearName} />
+        <FieldPlate side={near} facing="near" name={nearName}
+                    onTurn={lit === 'near'} />
       </div>
 
       <FieldSide side={near} facing="near" active={lit === 'near'}

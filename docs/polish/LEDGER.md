@@ -7717,6 +7717,118 @@ keyframe's literal, inside a filter list whose own comment warns against
 casual rearrangement.
 
 
+### 2026-09-26 (rainbow) — the fourth ball: the arena's crown of flame, and the blessing
+
+**The ask, verbatim** (Aaron, 2026-09-27, awake and walking): *"I want the
+border around the active commander in the coliseum to pop more like our
+buttons, it should look like a flame on top, and the whole border should be lit
+up. Maybe their name too. I would also like an effect for lifegain similar to
+the blood dripping for damage (which is really good by the way)."*
+
+**The board had run out of brass.** Every commander wears the crown and the
+walking light (`.field-card.is-commander`), which answers *which card is the
+commander* and is silent on the question a watcher asks next. The sand answers
+whose turn it is, and a brass card on lit brass sand is still brass on brass. So
+the commander of the seat on turn goes to **fire** — a different material, not
+the same one louder — and three clauses each got their own answer:
+
+- **"the whole border should be lit up"** — the crown's conic arc runs a short
+  bright band round a rim that is nearly *transparent* between passes. Correct
+  for *is a commander* (the crown glyph carries that when the light is
+  elsewhere), wrong for *is on turn*, which has nothing else saying it. The
+  floor comes up off transparent and the walk becomes a brightening across a
+  lit ring. `.field-quad.is-on-turn` made exactly this move at the scale of a
+  seat and its comment argues it; this is that argument at the scale of a card.
+- **"pop more like our buttons"** — the lap goes **5.2s → 3.4s**, the Wheel's
+  ember end of the `.btn` family's range rather than the plate's. Same
+  mechanism, same masked conic ring, louder voice. `animation-duration` alone,
+  never the shorthand, so the reduced-motion guard above it cannot be undone by
+  specificity.
+- **"a flame on top"** — `.field-card::before` and `::after`, two sets of
+  tapering radial tongues on **two different clocks** (1700ms and 1150ms,
+  both `alternate` → 3.4s and 2.3s, back in phase every **78.2 seconds**,
+  which is never at the rate anybody watches a board). One layer on one clock
+  is a lamp blinking; two beating against each other is the only cheap thing
+  in CSS that reads as combustion.
+- **"maybe their name too"** — `.field-plate.is-on-turn`, the quiet half:
+  one step of warmth toward the fire (#ddbb51 → **#ffe1ab**, 12.7:1 on the
+  trench) plus a low ember behind the letters and the plate's brass rule
+  catching the same light. A **state, never an entrance** — `.field-side-lit`'s
+  settled ruling for this exact signal, because the turn changes constantly and
+  anything that *arrived* here would be a strobe by turn six. It yields to a
+  blow and to a gain, both of which animate this element, and an animation
+  outranks a declaration whatever the specificity.
+
+**Three numbers measured rather than chosen.** A lane clips at its own
+`--lane-lean`, so the flame is sized as a fraction of `--field-card-full`
+rather than in pixels: it rises **9.164px into a 9.648px lean** at the desk and
+**7.268 into 7.859** on a phone — about half a pixel of slack at both, because
+exactness with no slack is a bug this room has already paid for once
+(`--lane-turn`). And the tongues stand at 11 / 27 / 73 / 89 per cent because
+the crown chip is 22px on a 58px card — **31% to 69%** — and opaque by design;
+a tongue at 50% is a tongue behind a black plate. What the middle gets instead
+is the crown itself taking the fire's light.
+
+**The blessing.** `useWounds` is `useLifeMarks` now, because a blessing is not
+a wound and a hook that returns one should not be named for the other. One
+reader, one serial, one 1900ms window (`BLEED_MS` → `MARK_MS`), and the delta
+read both ways: `side.life < was.life` is a blow and `side.life > was.life` is
+a gain. `<Blessing/>` is `<Blood/>`'s sibling and every axis of it is reversed
+— the drips leave the **lower** rim and fall in the arena's reds, the motes
+leave the **upper** rim and climb in `--arena-grace-*`, the green-gold the
+figure's own rise-flash (`life-hit-up`, `#9fe0a4`) has used since the dial was
+built. Its ancestor is white and green's lifegain, where the picture is never a
+number going up: *Healing Salve* ("Target player gains 3 life"), *Congregate*
+("Target player gains 2 life for each creature on the battlefield"), *Essence
+Warden* ("Whenever another creature enters, you gain 1 life") — all three read
+out of the pool, never from memory.
+
+**The rise was cut by looking**, 19–34px down to 11–18: the far seat's plate is
+anchored to the *top* of the trench, so about six pixels above its dial the
+band ends and golden sand begins, and a pale green light on golden sand is
+nothing at all.
+
+**What is proved.** Six mutants, six failures, all restored — the gain never
+read (3 component tests fail), its timer never clearing (2), `onTurn` never
+reaching the plate (2), the reduced-motion guard putting the flame *out*
+instead of stilling it, the burning ring's floor put back to transparent, and
+the motes painted in `--arena-blood-lit`. Plus a seventh that found something:
+
+**The reduced-motion sweep had a hole and it is closed.** The flame's own guard
+was deleted, the bundle rebuilt, and `TestEveryAnimationInTheBundleCanBeArrested`
+stayed **green** — because `boxesIn` stapled the pseudo-element to *every*
+class in a selector, so the crown's guard on
+`.field-card.is-commander .field-card-turn::before` was read as also guarding
+`field-card::before`. One box's arrest excusing a different box is the exact
+fault the pseudo pairing was taught to catch on 2026-09-26, arriving through
+the ancestor door. The pseudo belongs to the **subject** and to nothing in
+front of it now; run against the whole committed bundle the narrowing turns up
+**no** newly loose rule, so it was a hole rather than a trade.
+`go/cmd/mtglab/commanderfire_test.go` is the belt to that braces and says the
+two things the sweep structurally cannot: that the arrested flame **stays lit**
+(whose turn it is is information), and that the burning ring is lit **all the
+way round** while the plain crown is not — the distinction, checked in both
+directions, because the fault this catches is a future session tidying two
+gradients into one shape.
+
+**`field-card` joined commandment 19's gate.** It was not in `artBearing`, and
+the gap was real rather than theoretical: a `filter` on `.field-card` reaches
+`.field-card-turn` and the art `<img>` inside it exactly as one on the turn box
+does, and it is the element anybody reaching for "make the commander glow"
+lands on first, because it is the one the state class is written on. Proved by
+planting `filter: brightness(1.25)` on the burning card and watching
+`TestNoFilterReachesACardPainting` name it.
+
+**The board was walked on a real match with no JVM**
+([[walk-the-coliseum-without-forge]]), and the memory's recipe needed one
+correction worth carrying: **the page-side `fetch` patch does not work in
+Aaron's Chrome**, because the extension's `javascript_tool` runs in an isolated
+world and never touches the page's own `fetch`. A 40-line **proxy** in front of
+the app — everything forwarded, `/api/jobs/fixture` answered from the dump —
+does the same job with no page patching at all, and a second copy of it pointed
+at 8765 serves the *committed* bundle, which is a free before-and-after pair.
+
+
 ## Green — Growth & Resilience
 
 *Browser, mobile & accessibility · cloud resource watch · scalability &

@@ -29,8 +29,11 @@ import (
 // # What "covered" means here, and what this file can and cannot see
 //
 // A rule is covered when any class in its selector appears inside a
-// `prefers-reduced-motion: reduce` block **wearing the same pseudo-element**.
-// A bare `.btn` in a guard covers `.btn`; it does not cover `.btn::before`.
+// `prefers-reduced-motion: reduce` block **wearing the same pseudo-element**,
+// and a pseudo-element belongs to the **subject** of a selector and to nothing
+// in front of it. A bare `.btn` in a guard covers `.btn`; it does not cover
+// `.btn::before`; and `.a .b::before` covers `.b::before` and says nothing at
+// all about `.a::before`.
 //
 // **That second sentence was bought.** It used to be one class, no pseudo, and
 // the hole was proven by mutation on 2026-09-26: a travelling light was added
@@ -44,6 +47,15 @@ import (
 // `buttongleam_test.go` — which had to pin that one animation by name because
 // this file could not see it — is now the belt to this file's braces rather
 // than the only strap.
+//
+// **And the third sentence was bought the same way, a day later.** Pairing the
+// pseudo with every class in the selector rather than only with the subject
+// left the same hole with a longer key: a flame on `.field-card::before` was
+// excused by the crown's guard on
+// `.field-card.is-commander .field-card-turn::before`, because `field-card`
+// appears in that selector and the pseudo was being stapled to all of it. The
+// mutation is recorded in [boxesIn] along with what narrowing it cost, which
+// was nothing. `commanderfire_test.go` is that animation's own strap.
 //
 // One escape stays, and it is the honest one: a guard that sets `display:
 // none` on a class removes the element, and an element that is not rendered
@@ -175,16 +187,38 @@ func boxesIn(selector string) []string {
 		for _, m := range cssPseudoEl.FindAllStringSubmatch(one, -1) {
 			pseudos = append(pseudos, m[1])
 		}
-		for _, c := range classes {
-			if len(pseudos) == 0 {
-				out = append(out, c)
-				continue
-			}
-			// A descendant selector may name a pseudo-element only at its end,
-			// so every class in it is read against that one -- which over-covers
-			// the ancestors and never under-covers the subject. Over-covering an
-			// ancestor is the safe direction: the thing actually painted is
-			// always in the list.
+		if len(pseudos) == 0 {
+			out = append(out, classes...)
+			continue
+		}
+		// **The pseudo-element belongs to the subject, and to nothing else.**
+		//
+		// A descendant selector may name a pseudo-element only at its end, so
+		// the box a rule paints is the *last* compound's, wearing that pseudo.
+		// The ancestors in front of it are a scope: `.a .b::before` says
+		// nothing whatever about `.a::before`.
+		//
+		// This used to pair the pseudo with **every** class in the selector,
+		// and the comment defended it as over-covering in the safe direction.
+		// It is not the safe direction, and a mutation proved it on
+		// 2026-09-27: a flame was added to `.field-card::before`, its own
+		// guard was deleted, the bundle was rebuilt, and this sweep stayed
+		// green -- because the crown's guard on
+		// `.field-card.is-commander .field-card-turn::before` had been read as
+		// guarding `field-card::before` as well. One box's arrest excusing a
+		// different box is the exact fault the pseudo pairing was taught to
+		// catch in the first place, arriving through the ancestor door.
+		//
+		// Narrowing it costs the tree nothing: run against the whole committed
+		// bundle it turns up **no** newly loose rule, which is what makes this
+		// a hole rather than a trade.
+		fields := strings.Fields(strings.NewReplacer(">", " ", "+", " ",
+			"~", " ").Replace(one))
+		var subject []string
+		if len(fields) > 0 {
+			subject = classesIn(fields[len(fields)-1])
+		}
+		for _, c := range subject {
 			for _, p := range pseudos {
 				out = append(out, c+"::"+p)
 			}

@@ -7256,6 +7256,33 @@ button:hover .tarot-fan-card {
      invent a slightly different green. */
   --arena-verdigris: #3f7a52;
   --arena-glisten: #8fe053;
+  /* **The fire, for the commander whose turn it is.** The board's brass says
+     *this card is the commander*; it had nothing left to say with when the
+     question became *and it is their turn* (Aaron, 2026-09-27: *"I want the
+     border around the active commander in the coliseum to pop more like our
+     buttons, it should look like a flame on top, and the whole border should
+     be lit up"*). Brass lit harder is brass; fire is a different material, and
+     a different material is the only honest way to say a different thing.
+     Three steps because that is what a flame is made of and one hex is not —
+     a near-white heart, the orange body, and the deep root where it leaves the
+     metal. Named here beside the blood for the blood's own reason: a material
+     the arena is allowed to use, said once, so a second surface cannot invent
+     a slightly different orange. */
+  --arena-fire-lit: #ffd489;
+  --arena-fire: #e8842a;
+  --arena-fire-deep: #a03a0c;
+  /* **And the light that arrives on somebody, for the other half of the ask**
+     (Aaron, same sitting: *"I would also like an effect for lifegain similar
+     to the blood dripping for damage"*). Green-gold rather than the white a
+     first draft reached for: the figure inside the ring has flashed `#9fe0a4`
+     on a rise since the dial was built, so the board already had an opinion
+     about what a gain looks like and the motes take it rather than starting a
+     second one. It is also, not by accident, the one colour on this plate that
+     could never be mistaken for the blood beside it — which is the whole job
+     (commandment 2: up is up, and a newcomer may not have to learn that). */
+  --arena-grace-lit: #d9f7c0;
+  --arena-grace: #8fdc8e;
+  --arena-grace-deep: #2f7a4a;
 }
 
 .btn-arena {
@@ -12144,6 +12171,47 @@ button:hover .tarot-fan-card {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 420ms ease, text-shadow 420ms ease;
+}
+/* **And the name of the player whose turn it is** — the last clause of the
+ * same ask (Aaron, 2026-09-27: *"Maybe their name too"*), answered quietly
+ * because the loud half is already on the sand and on their commander's
+ * border. What changes is one step of warmth toward the fire and a low ember
+ * behind the letters, plus the plate's own brass rule catching the same light.
+ * Not a second announcement; the light falling on the name that is already
+ * there.
+ *
+ * **A state, never an entrance**, which is `.field-side-lit`'s settled ruling
+ * for this exact signal: a match is about a hundred and thirty beats and the
+ * turn changes constantly, so anything that *arrived* here would be a strobe
+ * by turn six. It transitions, at the sand's own unhurried rate, and holds.
+ *
+ * **It yields to a blow and to a gain**, both of which animate this element:
+ * an animation outranks a declaration whatever the specificity, so a player
+ * struck on their own turn still reads as struck. That is the right order —
+ * whose turn it is will still be true in two seconds.
+ *
+ * One selector for both tables. `.field-plate.is-on-turn` is set by
+ * `FieldPlate` itself (`components/board.tsx`), because a duel's plate lives
+ * in the trench outside any half and a pod's lives inside the quadrant, and
+ * no ancestor class can reach both. */
+.field-plate.is-on-turn .field-plate-name {
+  color: color-mix(in srgb, var(--arena-fire-lit) 62%, #fff6e2);
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--arena-fire) 46%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.field-plate.is-on-turn .field-plate-rule {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--arena-fire-lit) 88%, transparent) 0%,
+    color-mix(in srgb, var(--arena-fire) 46%, transparent) 70%,
+    transparent 100%);
+}
+.field-plate-near.is-on-turn .field-plate-rule {
+  background: linear-gradient(270deg,
+    color-mix(in srgb, var(--arena-fire-lit) 88%, transparent) 0%,
+    color-mix(in srgb, var(--arena-fire) 46%, transparent) 70%,
+    transparent 100%);
 }
 /* **The figures, and the room kept for the one that is not here yet.**
  *
@@ -12612,6 +12680,10 @@ button:hover .tarot-fan-card {
   .field-life-arc { transition: none; }
   .field-life.is-down .field-life-n,
   .field-life.is-up .field-life-n { animation: none; }
+  /* The turn's warmth arrives at once instead of easing in. The step stays —
+     whose turn it is, is information — and only the fade between goes, which
+     is `.field-quad::after`'s own ruling in the pod. */
+  .field-plate-name { transition: none; }
 }
 
 /* ---- the wound
@@ -12621,7 +12693,7 @@ button:hover .tarot-fan-card {
  * in silence. Aaron: *"when a commander takes damage lets put a
  * red highlight on their main or commander damage health, and it would be
  * cool if we had some stylized dripping blood too and maybe red effect on
- * their name too."* `useWounds` in `components/board.tsx` reads the blow off
+ * their name too."* `useLifeMarks` in `components/board.tsx` reads the blow off
  * the fold and hands it down as three states, which is what these rules
  * dress: the plate as a whole (`.is-bleeding` on `.field-plate`, and the
  * name reddens), and the dial that took the blow (`.is-bleeding` on
@@ -12809,6 +12881,190 @@ button:hover .tarot-fan-card {
   .field-bead.is-bleeding::before { animation: none; opacity: 0.55; }
   .field-blood-drip { animation: none; height: var(--drip-len); opacity: 0.9; }
   .field-blood-drip::after { animation: none; transform: rotate(45deg) scale(1); }
+}
+
+/* ---- the blessing
+ *
+ * **The blood's sibling, and everything about it points the other way.**
+ *
+ * Aaron, 2026-09-27: *"I would also like an effect for lifegain similar to the
+ * blood dripping for damage (which is really good by the way)."* So this is
+ * the drip's own construction at the same tier of craft — one reader, one
+ * serial, three unequal things, the same nineteen hundred milliseconds — with
+ * every axis of it reversed, because the one thing it may never be is
+ * mistaken for a hit.
+ *
+ * | | the blow | the blessing |
+ * | --- | --- | --- |
+ * | leaves the dial | at the **lower** rim | at the **upper** rim |
+ * | travels | down, with gravity's easing | up, slowing as it goes |
+ * | colour | the arena's reds | `--arena-grace-*`, green-gold |
+ * | the figure's own flash | `life-hit-down`, `--arena-blood` | `life-hit-up`, `#9fe0a4` |
+ *
+ * That last row is why the green was not a choice: the number inside the ring
+ * has swelled green on a rise since the dial was built, so the board already
+ * had an opinion about what a gain looks like and this agrees with it rather
+ * than opening a second argument. **Commandment 2 is the whole specification
+ * here** — a person at their first game must read *up* off the picture alone,
+ * with no legend and nothing learned, and "the other way, in the other colour"
+ * is the only version of that which costs a newcomer nothing.
+ *
+ * **Its ancestor is white and green's lifegain**, which in thirty years of
+ * Magic's art direction is never a number going up — it is always light
+ * *arriving on somebody*: *Healing Salve* ("Target player gains 3 life"),
+ * *Congregate* ("Target player gains 2 life for each creature on the
+ * battlefield"), *Essence Warden* ("Whenever another creature enters, you gain
+ * 1 life"). So what rises off the rim is light: a mote with a bloom round it,
+ * brightest as it leaves and spent by the time it clears the plate.
+ *
+ * **Drawn, for the blood's reason**, which is commandment 5 read carefully
+ * rather than skirted: a rising mote is a *shape under light*, and the
+ * stylesheet can draw that out of the same gradients the brass and the felt
+ * are made of. A sparkle PNG is the clip art the commandment bans. */
+.field-plate.is-blessed:not(.is-bleeding) .field-plate-name {
+  animation: name-grace 1900ms ease-out both;
+}
+@keyframes name-grace {
+  0% {
+    color: var(--arena-grace-lit);
+    text-shadow: 0 0 10px var(--arena-grace), 0 0 22px var(--arena-grace-deep),
+      0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  34% {
+    color: color-mix(in srgb, var(--arena-grace-lit) 70%, #fff);
+    text-shadow: 0 0 7px color-mix(in srgb, var(--arena-grace) 70%, transparent),
+      0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  100% {
+    /* The resting colour, restated, for `name-bleed`'s reason: `both` keeps
+       the last frame, so the last frame has to be the name as it was. */
+    color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+}
+/* The bloom under the mended dial — `dial-bleed`'s sheet in the other colour,
+   laid in the same place beneath the ring and above the plate. It is a touch
+   softer and a touch slower off than the blood's: being hit is a shock and
+   being mended is a relief, and the two should not arrive at the same
+   volume. */
+.field-life.is-blessed::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--arena-grace) 52%, transparent) 0%,
+    color-mix(in srgb, var(--arena-grace-deep) 34%, transparent) 44%,
+    transparent 72%);
+  animation: dial-grace 1900ms ease-out both;
+}
+@keyframes dial-grace {
+  0%   { opacity: 0;   transform: scale(0.72); }
+  18%  { opacity: 1;   transform: scale(1.04); }
+  62%  { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1); }
+}
+/* And the arc goes to the healing light for the gain's own length — over the
+   gradient it is already on, so a player climbing from four and a player
+   climbing from thirty-six both read *mended* rather than one of them reading
+   merely *higher*. The blood's rule one block up is the same sentence. */
+.field-life.is-blessed .field-life-arc {
+  stroke: var(--arena-grace);
+  filter: drop-shadow(0 0 8px var(--arena-grace-lit));
+}
+/* The motes leave the ring's **upper** rim and climb past the plate's box,
+   which is why this wrapper is `inset: 0` with `overflow` left visible — the
+   drips' own arrangement, read upside down. Their places on the rim are where
+   a chord crosses it, the same arithmetic the blood uses: the ring is r=20 in
+   a 48 box, so at 52% of the width the rim is at 8.4% of the height, and a
+   little lower either side. Above the figure, because light passes in front of
+   what it is lighting. */
+.field-grace {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+/* A mote: a small round light with its own bloom, drawn as two stacked
+   gradients rather than one, so it has a heart and a halo the way a real spark
+   over a lamp does. Flat colour at this size is a dot, and a dot is a sticker
+   (commandment 5). */
+.field-grace-mote {
+  position: absolute;
+  top: var(--mote-top);
+  left: var(--mote-x);
+  width: var(--mote, 7px);
+  height: var(--mote, 7px);
+  margin-left: calc(var(--mote, 7px) / -2);
+  margin-top: calc(var(--mote, 7px) / -2);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 44%,
+      #ffffff 0%,
+      var(--arena-grace-lit) 32%,
+      color-mix(in srgb, var(--arena-grace) 72%, transparent) 62%,
+      transparent 100%);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--arena-grace-lit) 70%, transparent),
+    0 0 14px color-mix(in srgb, var(--arena-grace) 52%, transparent);
+  opacity: 0;
+  animation: grace-rise var(--mote-ms) cubic-bezier(0.2, 0.6, 0.35, 1)
+    var(--mote-wait) both;
+}
+/* Three motes, three tempos and three sizes, unequal for the drips' reason:
+   three of anything on one clock is a pattern, and a pattern reads as a
+   graphic rather than as something that happened.
+
+   **The rise is short, and it is short because it was measured.** The first
+   cut sent them 19 to 34 pixels up, and on a real board that is straight out
+   of the trench: the far seat's plate is anchored to the *top* of the band,
+   so there are about six pixels of dark above its dial and then golden sand —
+   and a pale green light on golden sand is nothing at all. Cut to 11–18, the
+   motes stay over the plate and over the dial's own green bloom, which is the
+   half of this that carries across a room. (The blood has the same asymmetry
+   the other way up, and its own note says the same thing about pixels.) */
+.field-grace-mote:nth-child(1) {
+  --mote-x: 40%; --mote-top: 10.4%; --rise: -14px;
+  --mote: 8px; --mote-ms: 1500ms; --mote-wait: 90ms;
+}
+.field-grace-mote:nth-child(2) {
+  --mote-x: 52%; --mote-top: 8.4%; --rise: -18px;
+  --mote: 10px; --mote-ms: 1750ms; --mote-wait: 0ms;
+}
+.field-grace-mote:nth-child(3) {
+  --mote-x: 64%; --mote-top: 11%; --rise: -11px;
+  --mote: 7px; --mote-ms: 1350ms; --mote-wait: 260ms;
+}
+/* Brightest as it leaves and spent before it clears the plate — light rising
+   off warm metal cools as it goes, and a mote still at full strength at the
+   top of its travel would read as a thing being thrown rather than a thing
+   being given. It drifts a little sideways on the way up, because nothing
+   rising through air goes straight. */
+@keyframes grace-rise {
+  0%   { transform: translate(0, 0) scale(0.45); opacity: 0; }
+  16%  { transform: translate(0, calc(var(--rise) * 0.16)) scale(1);
+         opacity: 1; }
+  62%  { transform: translate(2px, calc(var(--rise) * 0.68)) scale(0.86);
+         opacity: 0.78; }
+  100% { transform: translate(-1px, var(--rise)) scale(0.5); opacity: 0; }
+}
+/* Reduced motion keeps the fact and stills the rising, which is the blood's
+   own ruling one block up and for the same reason: *that a player was mended*
+   is information, and the climb is only the picture of it. The motes stand
+   where they left the rim, lit. */
+@media (prefers-reduced-motion: reduce) {
+  /* `:not(.is-bleeding)` here as well as on the animation above: with motion
+     off both rules are plain declarations, and a plate that was hit *and*
+     mended on one beat would otherwise take whichever colour is later in this
+     file. A blow outranks a gain, and it outranks it in both modes. */
+  .field-plate.is-blessed:not(.is-bleeding) .field-plate-name {
+    animation: none;
+    color: var(--arena-grace-lit);
+  }
+  .field-life.is-blessed::before { animation: none; opacity: 0.5; }
+  .field-grace-mote { animation: none; opacity: 0.9; }
 }
 
 .field-pile {
@@ -14343,6 +14599,232 @@ button:hover .tarot-fan-card {
      bloom and the crown are untouched: none of them ever moved. */
   .field-card.is-commander .field-card-turn::before { animation: none; }
 }
+
+/* ------------------------------------------ the commander whose turn it is
+ *
+ * **The brass had run out of things to say.** Every commander on the board
+ * wears the crown and the walking light, which answers *which card is the
+ * commander* and is silent on the question a watcher actually asks next —
+ * *and whose turn is it*. The sand answers that (`.field-side-lit`, and the
+ * pod's `.field-quad.is-on-turn` rim) and a card standing on lit sand is
+ * still lit brass on lit brass. Aaron, 2026-09-27: *"I want the border around
+ * the active commander in the coliseum to pop more like our buttons, it
+ * should look like a flame on top, and the whole border should be lit up."*
+ *
+ * **A different material, rather than the same one louder.** Brass turned up
+ * is brass; what this has to say is not *more commander*, it is *this one, now*
+ * — so the metal goes to fire (`--arena-fire-*`, declared with the blood).
+ * Three things change and each answers a clause of the ask:
+ *
+ *   - **"the whole border should be lit up"** — the crown's conic arc runs a
+ *     short bright band round a rim that is nearly dark between passes, which
+ *     is correct for *is a commander* (the crown glyph carries that when the
+ *     light is elsewhere) and wrong for *is on turn*. So the gradient's floor
+ *     comes up off transparent: the whole ring burns, and the walk is a
+ *     brightening across it rather than an appearance. `.field-quad.is-on-turn`
+ *     made exactly this move for exactly this reason and its comment argues it.
+ *   - **"pop more like our buttons"** — the lap shortens from 5.2s to **3.4s**,
+ *     which is the Wheel's ember end of the `.btn` family's range rather than
+ *     the plate's. Same mechanism, same masked ring, louder voice; nothing
+ *     here is a second way to walk a light.
+ *   - **"it should look like a flame on top"** — below.
+ *
+ * **Nothing reaches through the painting** (commandment 19). The ring is on
+ * the card's own black border and the bloom is outside it, exactly as the
+ * crown's own note says; the fire is a layer laid above the card, and the only
+ * part of it that crosses Wizards' art at all is the few pixels of heat where
+ * a flame meets the edge it is burning from. No `filter` touches the card, in
+ * this block or anywhere near it.
+ *
+ * **One hook for two tables.** `.field-side.is-active` is set on a duel's half
+ * and on a pod seat's half alike (`FieldSide`'s `active`, `components/board.tsx`),
+ * so the whole of this reads once and answers at two and at four seats. */
+.field-side.is-active .field-card.is-commander .field-card-turn {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 0 0 1.5px color-mix(in srgb, var(--arena-fire-lit) 82%, #fff6e2),
+    0 0 12px -1px color-mix(in srgb, var(--arena-fire) 80%, transparent),
+    0 0 30px 2px color-mix(in srgb, var(--arena-fire) 42%, transparent);
+}
+.field-side.is-active .field-card.is-commander .field-card-turn::before {
+  background: conic-gradient(from var(--field-crown-sweep) at 50% 50%,
+    color-mix(in srgb, var(--arena-fire) 78%, transparent) 0deg,
+    color-mix(in srgb, var(--arena-fire-lit) 94%, #fff) 26deg,
+    /* The apex is the Wheel's ember rather than white. A white-hot arc on a
+       58px card reads as an LED; this room's hottest light is candle and
+       coal, and `.wheel-spin-btn`'s gleam has said so since it was tuned. */
+    #ffe9bb 50deg,
+    color-mix(in srgb, var(--arena-fire-lit) 94%, #fff) 74deg,
+    color-mix(in srgb, var(--arena-fire) 78%, transparent) 104deg 360deg);
+  /* The duration alone, never the shorthand: the reduced-motion guard above
+     stops this ring with `animation: none`, and a shorthand here would put the
+     name back on at a higher specificity and silently undo it. The gleam's
+     block learned that the same way. */
+  animation-duration: 3.4s;
+}
+
+/* **The flame on top.**
+ *
+ * Drawn, not fetched, and for the blood's reason (commandment 5): a flame is a
+ * *shape under light* rather than a picture of one, and a fire GIF at
+ * fifty-eight pixels is the clip art the commandment bans. Two pseudo-elements
+ * of tapering radial tongues, each rising off the card's top edge — `::before`
+ * carries three, `::after` two narrower ones between them.
+ *
+ * **Two layers on two different clocks, so the fire never repeats.** 1700ms
+ * and 1150ms, both `alternate`, so the cycles are 3.4s and 2.3s and the pair
+ * comes back into phase every **78.2 seconds** — which is to say never, at the
+ * rate anybody watches a board. One layer on one clock is a lamp blinking; two
+ * beating against each other is the only cheap thing in CSS that reads as
+ * combustion.
+ *
+ * **It burns upward into room that exists.** A lane's own `--lane-lean` is the
+ * clearance a turned card leans into — `0.1491` of a card plus a pixel, about
+ * ten at the desk and eight on a phone — and `.field-row` clips at its padding
+ * box, so that lean is exactly how far anything may rise above a card before
+ * it is cut off. The flame is sized as fractions of `--field-card-full` for
+ * that reason: it scales with the card, and the tongues' faint tips are what
+ * meet the clip rather than their bodies. It is *not* sized in pixels; a
+ * constant measured against one screen is how this room has been bitten
+ * before.
+ *
+ * `z-index: 2` puts it above the painting and **below `.field-card-arm`** at
+ * 3, so the crown glyph stands in front of the fire rather than under it. A
+ * commander in a burning frame still wears their crown. */
+.field-side.is-active .field-card.is-commander::before,
+.field-side.is-active .field-card.is-commander::after {
+  content: '';
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  /* Up into the lane's lean, and eight-ish pixels down onto the card's own
+     top border, which is where a fire meets the thing it is burning.
+     **Measured, with slack.** `--lane-lean` is `0.1491` of a card plus a
+     pixel — 9.65 at the desk, 7.86 on a phone — and this rises `0.158`, which
+     leaves about half a pixel at both sizes. Exactness with no slack is a bug
+     in this room specifically: `--lane-turn` was set to the true overhang to
+     three decimals once and rounding ate the difference on a live board. */
+  top: calc(var(--field-card-full) * -0.158);
+  height: calc(var(--field-card-full) * 0.30);
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+/* **The tongues stand where the crown is not.** The crown chip is 22px on a
+   58px card, anchored top-centre — 31% to 69% — and it is opaque by design
+   (a drawn mark on an arbitrary painting is invisible about a third of the
+   time, which is the keyword chips' whole argument). So a tongue at 50% would
+   be a tongue behind a black plate. The four here flank it at 11, 27, 73 and
+   89, and what the chip gets instead is the heat *behind* it: a dark crown
+   standing in a fire, which is a better picture than the one that was
+   planned.
+   Each tongue is an ellipse anchored at the bottom of the box, hottest at its
+   root and transparent by its tip — a flame's own value range, which is why
+   nothing here needs a blur to read as fire. Under them, a low bed of heat
+   along the card's top edge: the part that says the card is *alight* rather
+   than merely near a flame. */
+.field-side.is-active .field-card.is-commander::before {
+  background:
+    radial-gradient(ellipse 7% 60% at 11% 100%,
+      #fff3d6 0%,
+      var(--arena-fire-lit) 16%,
+      var(--arena-fire) 42%,
+      color-mix(in srgb, var(--arena-fire-deep) 70%, transparent) 70%,
+      transparent 100%),
+    radial-gradient(ellipse 9% 100% at 27% 100%,
+      #fff8e6 0%,
+      var(--arena-fire-lit) 14%,
+      var(--arena-fire) 40%,
+      color-mix(in srgb, var(--arena-fire-deep) 74%, transparent) 68%,
+      transparent 100%),
+    radial-gradient(ellipse 9% 92% at 73% 100%,
+      #fff8e6 0%,
+      var(--arena-fire-lit) 14%,
+      var(--arena-fire) 40%,
+      color-mix(in srgb, var(--arena-fire-deep) 74%, transparent) 68%,
+      transparent 100%),
+    radial-gradient(ellipse 7% 54% at 89% 100%,
+      #fff3d6 0%,
+      var(--arena-fire-lit) 16%,
+      var(--arena-fire) 42%,
+      color-mix(in srgb, var(--arena-fire-deep) 70%, transparent) 70%,
+      transparent 100%),
+    /* The bed: the card's own top edge alight. Tight and saturated rather
+       than a wide pale haze — the first cut of this was `66% 30%` of
+       near-white and it read as fog over a card, not as a card on fire. */
+    radial-gradient(ellipse 52% 20% at 50% 100%,
+      var(--arena-fire) 0%,
+      color-mix(in srgb, var(--arena-fire-deep) 76%, transparent) 48%,
+      transparent 100%);
+  animation: field-burn 1700ms ease-in-out infinite alternate;
+}
+/* The second set, on its own clock: two short tongues inboard of the first
+   pair, standing in the gaps. A fire is not four candles.
+   **Nothing at 50%**, and that is measured rather than taste: the crown chip
+   is 86% opaque, so a tongue drawn behind it would arrive at fourteen per
+   cent of itself. What the middle gets instead is the chip's own metal, two
+   rules down. */
+.field-side.is-active .field-card.is-commander::after {
+  background:
+    radial-gradient(ellipse 6% 48% at 19% 100%,
+      #fff8e6 0%,
+      var(--arena-fire-lit) 18%,
+      var(--arena-fire) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 6% 56% at 81% 100%,
+      #fff8e6 0%,
+      var(--arena-fire-lit) 18%,
+      var(--arena-fire) 46%,
+      transparent 100%);
+  animation: field-burn-cross 1150ms ease-in-out infinite alternate;
+}
+/* **And the crown takes the fire's light**, because the chip it sits on is
+   opaque and would otherwise be a black rectangle standing in a flame with
+   nothing happening to it. Metal near a fire is lit by the fire: the glyph
+   goes from brass to the fire's own pale gold and the chip's hairline warms
+   with it. The chip's *ground* stays dark — that ground is the whole reason a
+   drawn mark is legible over an arbitrary painting, and a fire is not a
+   reason to give it up. */
+.field-side.is-active .field-card.is-commander .field-card-crown.is-commander {
+  color: color-mix(in srgb, var(--arena-fire-lit) 84%, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--arena-fire-lit) 70%, transparent),
+    0 0 9px -1px color-mix(in srgb, var(--arena-fire) 60%, transparent);
+}
+/* The tongues stretch and settle. `scaleY` about the foot, so the flame grows
+   out of the card's edge and never lifts off it; a touch of `scaleX` the other
+   way, because a flame that is taller is also thinner. */
+@keyframes field-burn {
+  from { transform: scaleY(0.8) scaleX(1.05); opacity: 0.8; }
+  to   { transform: scaleY(1.08) scaleX(0.96); opacity: 1; }
+}
+/* The cross-draught: the inner pair lean, which is what makes the whole thing
+   look blown rather than pumped. */
+@keyframes field-burn-cross {
+  from { transform: scaleY(1.1) translateX(-4%); opacity: 0.9; }
+  to   { transform: scaleY(0.74) translateX(4%); opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* **The fire holds still and does not go out**, which is the crown's own
+     ruling three rules up and the turn rim's: whose turn it is, is
+     *information*, and stillness may not answer it with less than everybody
+     else gets. A still flame is not frozen weather — weather stilled is a
+     smudge because a firefly holding perfectly still is a spot, and a flame
+     holding still is a flame in a painting, which is a thing people have drawn
+     on purpose for six hundred years. Parked at the middle of each layer's
+     travel rather than at an end, so neither is caught mid-stretch. */
+  .field-side.is-active .field-card.is-commander::before {
+    animation: none;
+    transform: scaleY(0.94) scaleX(1.01);
+    opacity: 0.92;
+  }
+  .field-side.is-active .field-card.is-commander::after {
+    animation: none;
+    transform: scaleY(0.92);
+    opacity: 0.7;
+  }
+}
+
 .field-card.is-companion .field-card-turn {
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.45),
