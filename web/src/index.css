@@ -121,6 +121,44 @@
      --mtg-g in the light theme (foliage against paper), lighter in the dark
      one (foliage against night). */
   --vine: #4a7c59;
+
+  /* The house's other metal, and the only one that was never named.
+     Lantern brass: the warm gold a lamp puts on a hinge, and the colour this
+     app has reached for fourteen separate times — the mark on a card in a
+     list, the felt controls' hover, the shelf's spine and its eyebrow rule,
+     the séance's plate, the board's own `--field-brass`, the Recall panel's
+     rule, the wordmark's tail. Every one of them wrote `#c9a227` out by hand
+     while the felt beside them said `var(--felt-base)` and the anvil said
+     `var(--anvil-brass)`, which is how a material becomes a rented colour:
+     nobody can change it, nobody can find it, and the fifteenth site is a
+     near-miss nobody sees.
+
+     **One value, both themes, and that is the material talking.** Brass does
+     not know what the page behind it is doing — `.btn-accent-brass` already
+     argues this for the felt, and the board, the shelf and the card mark all
+     reached the same answer independently. So there is deliberately no
+     second column for this one to be wrong in.
+
+     **It is a wash and it stays a wash.** 3.66:1 on the light page: the
+     shelf's own comment says it out loud, and every site keeps its own ink.
+     The single place it touches type is the wordmark's gradient, where it is
+     the 118% stop — past the end, so it tints the last letter's tail and
+     nothing carries meaning in it.
+
+     **Three sites keep the literal on purpose, and they are the interesting
+     ones.** An alpha of the token is written `color-mix(in srgb,
+     var(--lantern-brass) 28%, transparent)`, which is this file's idiom
+     everywhere and is *exactly* `rgba(201, 162, 39, 0.28)`. At **zero** it
+     stops being exact: `color-mix(… 0%, transparent)` is `transparent`, and
+     `transparent` is transparent **black**, so a gradient's far stop would
+     fade brass through grey instead of out. The three zero-alpha stops in the
+     board's plate rules therefore stay `rgba(201, 162, 39, 0)` — not a site
+     the sweep missed, a site where the conversion is wrong. The keyframe in
+     `verdict-gild` keeps its literal too, for a different reason: its
+     `drop-shadow` sits in a filter list whose other entries are already
+     `var()`-driven, and that block's own comment explains why nothing there
+     is to be rearranged casually. */
+  --lantern-brass: #c9a227;
 }
 
 /* The dark column, and it is written twice on purpose: a browser whose owner
@@ -365,10 +403,13 @@ body {
  * **The mark's materials are the hint panel's**, deliberately: a dark plate
  * with a brass hairline is what this app already uses for a caption that has
  * to stay readable over an arbitrary painting, and a second vocabulary for
- * the same problem would be two things to learn. The brass is a literal
- * rather than `var(--field-brass)`, which is scoped to the board -- an
- * undefined custom property does not fall back, it inherits, and this app has
- * turned muted text white that way once already.
+ * the same problem would be two things to learn. The brass used to be a
+ * literal here, and the reason written down was a good one: `--field-brass`
+ * is scoped to the board, an undefined custom property does not fall back but
+ * *inherits*, and this app has turned muted text white that way once already.
+ * That reason is answered rather than overruled -- `--lantern-brass` is
+ * declared on `:root`, so it is defined everywhere this mark can be rendered,
+ * and `--field-brass` now points at it rather than repeating it.
  */
 .card-plate {
   position: relative;
@@ -386,7 +427,7 @@ body {
   justify-content: center;
   padding: 2px;
   border-radius: 5px;
-  border: 1px solid color-mix(in srgb, #c9a227 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lantern-brass) 42%, transparent);
   background: rgb(14 11 7 / 0.82);
   color: #e8dfc8;
   cursor: pointer;
@@ -409,7 +450,7 @@ body {
 .card-flip:hover,
 .card-flip:focus-visible {
   background: rgb(20 16 10 / 0.94);
-  border-color: color-mix(in srgb, #c9a227 85%, transparent);
+  border-color: color-mix(in srgb, var(--lantern-brass) 85%, transparent);
   color: #f6edd6;
 }
 .card-flip:focus-visible {
@@ -431,7 +472,7 @@ body {
   transform: translateY(-50%);
   padding: 3px 7px;
   border-radius: 5px;
-  border: 1px solid color-mix(in srgb, #c9a227 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lantern-brass) 42%, transparent);
   background: rgb(14 11 7 / 0.95);
   color: #f0e7d2;
   font-size: 11px;
@@ -485,6 +526,28 @@ body {
      part is worth keeping. `LibraryMasthead` is where the whole painting is
      actually visible. */
   object-position: 50% 78%;
+}
+
+/* The same band, anchored for a different painting: the wrong-turn room's
+   signpost (`WrongTurn` in `App.tsx`).
+   `.hero-art`'s 78% is a fact about *one* picture — it keeps the Sylvan
+   Library canyon's floor, and the comment above says so. Misleading Signpost
+   is the opposite composition: one tall object in the middle of a mist, with
+   its boards reading from about a third of the way down. Anchoring that low
+   would keep the puddle and crop the sign off the top of its own room, which
+   is the fourth time this project would have thrown away the subject of a
+   painting to a band. It is a second declaration rather than a second class
+   for the whole treatment, because everything else about it — the cover, the
+   lift over it, the scrim over that, and the two themes pulling in opposite
+   directions — is identical and belongs in one place. */
+.lost-art {
+  /* 22%, chosen at 1230x368 in a real browser rather than guessed. The band
+     is 3.34:1 over a 1.62:1 painting, so cover keeps 48% of the height and
+     the only question is *which* 48%. At 34% the post's finial came off the
+     top and the sign read as a pole with its head cut off; at 12% there was
+     sky above it and three boards gone from the bottom. 22% is the whole
+     object: finial in, every board in, no dead air. */
+  object-position: 50% 22%;
 }
 
 /* The nameplate's copy of the painting, shown whole rather than cropped.
@@ -4075,7 +4138,7 @@ button:hover .tarot-fan-card {
   margin-left: -66px;
   margin-top: -66px;
   border-radius: 9999px;
-  border: 4px solid #c9a227;
+  border: 4px solid var(--lantern-brass);
   box-shadow:
     0 0 0 1px rgba(40, 28, 6, 0.9),
     inset 0 0 0 1px rgba(40, 28, 6, 0.7),
@@ -6147,7 +6210,20 @@ button:hover .tarot-fan-card {
   .card-action {
     transition: none;
   }
-  .entombing {
+  /* **Both boxes, and the second one was missed for a month.** The row sinks
+     and the shade closes over it — two animations on two elements, and this
+     guard only ever named the row. A reader who asked for no motion still got
+     a 340ms black wash crossing the card they had just entombed, which is the
+     one frame of this effect that is actually *over a painting*.
+     `1ms` rather than `none` for both, deliberately: `forwards` is what holds
+     the sunken, shaded frame until the refreshed list comes back without the
+     row, and removing the animation removes the fill with it — the row would
+     spring back to full brightness and sit there looking untouched until the
+     server answered. Instantly-arrived is the reduced version of a settle;
+     never-happened is not. Found by `reducedmotion_test.go` the day it was
+     taught that a `::after` is its own box. */
+  .entombing,
+  .entombing::after {
     animation-duration: 1ms;
   }
 }
@@ -6282,7 +6358,7 @@ button:hover .tarot-fan-card {
    rather than themed because the felt commits to one palette in both themes,
    so unlike `.btn-accent-vine` there is no second column for it to be wrong
    in. Measured rather than assumed: #241507 on #c9a227 is 7.3:1. */
-.btn-accent-brass { --btn-accent: #c9a227; --btn-ink: #241507; }
+.btn-accent-brass { --btn-accent: var(--lantern-brass); --btn-ink: #241507; }
 
 .btn-quiet {
   background: var(--page);
@@ -6358,6 +6434,44 @@ button:hover .tarot-fan-card {
 .btn-ghost-accent { color: var(--series-1); }
 .btn-ghost-accent:hover:not(:disabled) { color: var(--series-1); }
 
+/* The same argument for the *other* half of commandment 20: a real `<a>`
+ * going to a real destination, sitting in a paragraph of prose.
+ *
+ * `.btn-ghost` is a button wearing a link's clothes. This is the reverse and
+ * the app is full of it — a `<Link>` with `className="underline"` and
+ * `style={{ color: 'var(--series-1)' }}`, which is *series one of a line
+ * chart* inking a door. Twelve inline `--series-1`s were counted in `web/src`
+ * on 2026-09-26; this is the named place the rest of them are meant to come
+ * to, and the wrong-turn room in `App.tsx` is its first tenant because that
+ * room was being rewritten anyway.
+ *
+ * `--vine` rather than the chart blue: the house's own green, classified an
+ * ink with a measured 4.5:1 floor against both themes' page and card
+ * (`palettecontrast_test.go`). The underline is thin at rest and thickens
+ * under the hand rather than switching colour — a link has somewhere to go
+ * and does not need to shout, but it does have to answer (commandment 17). */
+.prose-link {
+  color: var(--vine);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-thickness 140ms ease, color 140ms ease;
+}
+.prose-link:hover {
+  color: color-mix(in srgb, var(--vine) 78%, var(--text-primary));
+  text-decoration-thickness: 2px;
+}
+.prose-link:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prose-link {
+    transition: none;
+  }
+}
+
 /* A disclosure that is open says so in its own face, not only in its label.
  * `aria-expanded` is the fact; this is the fact made visible, so the state is
  * legible to somebody who is not reading the verb. */
@@ -6379,8 +6493,8 @@ button:hover .tarot-fan-card {
 }
 .btn-felt:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, #c9a227 70%, var(--hairline));
-  box-shadow: 0 1px 6px rgba(201, 162, 39, 0.28);
+  border-color: color-mix(in srgb, var(--lantern-brass) 70%, var(--hairline));
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--lantern-brass) 28%, transparent);
 }
 .btn-felt:active:not(:disabled) {
   transform: translateY(0);
@@ -6682,6 +6796,103 @@ button:hover .tarot-fan-card {
   }
 }
 
+/* ------------------------------------------------------------ the phone's hand
+ *
+ * Every control a thumb can reach is at least 44 by 44.
+ *
+ * Measured on the committed bundle at 375x812 with a coarse pointer, before
+ * this block existed: **twenty of twenty-one controls on the library were
+ * under the floor, and twenty-three of twenty-five on the import page.** Ten
+ * `.nav-link`s at 32 tall on every route. `.btn` at 38, `.btn-sm` at 42 by
+ * **28** — the Back and Next that walk an arena's thirteen slides. Five
+ * `.field-shell` fields at 36. A thumb's contact patch is about nine
+ * millimetres; a 28-pixel control is under three, and the person it fails is
+ * the one who came to this site on a phone because somebody showed them Magic
+ * at a kitchen table. Commandment 2, and it is the Card Back: the part nobody
+ * examines, because the person writing the CSS has a mouse in their hand.
+ *
+ * **Two shapes were on the table, and the stylesheet itself settled it.** The
+ * second one grows nothing — a pseudo-element halo with a negative `inset`,
+ * which is what `.card-flip::before { inset: -6px }` does for the 13px mark on
+ * a 64px painting. It cannot work here: `.btn` is `overflow: hidden`, on
+ * purpose, because the glint sweep and the gleam's ring are both drawn inside
+ * it and would otherwise run off the plate. A halo on a clipping box is a
+ * halo that is not there. So a `.btn` **grows**, and the halo is kept for the
+ * one control that may not move a pixel — see `.wordmark` at the foot of this
+ * block.
+ *
+ * **`(pointer: coarse)`, not a width.** A breakpoint is a guess about the
+ * device; this asks the device. A 1280px tablet gets the floor and a 380px
+ * browser window on a desk does not, which is the right answer both times —
+ * and it is why the desktop composition is untouched by construction rather
+ * than by care.
+ *
+ * **`min-height` rather than padding**, and that is a cascade argument. These
+ * families do not own their own padding: the routes write it as utilities
+ * (`py-1.5`, `px-3`), which land at the same specificity as a class here and
+ * are settled by source order. Nothing competes for `min-height`, and it
+ * beats a `height` utility outright — `.field-shell` carries `h-9`, and the
+ * floor wins that without a word.
+ *
+ * **Why almost nothing needs a centring rule.** A `<button>` and a `<select>`
+ * centre their own contents vertically by UA stylesheet, so a grown box keeps
+ * its label in the middle for free. `.nav-link` is an `<a>` and gets nothing
+ * of the sort — a bare `min-height` would leave ten labels sitting on the top
+ * edge of their new boxes — so it is the one family here told how to hold
+ * what is in it. */
+@media (pointer: coarse) {
+  .btn,
+  .card-action,
+  .action-pick,
+  .chip-toggle,
+  .strip-tab,
+  .tier-select,
+  .disclosure-toggle,
+  .menu-row,
+  .field-shell,
+  .field-answer,
+  .nav-link {
+    min-height: 44px;
+  }
+
+  /* Width matters only where there is no label to supply it: a mark, a glyph,
+     a one-character step. A control with words in it cleared 44 wide long
+     before it cleared 44 tall. `.field-shell` and `.menu-row` are deliberately
+     out — a full-width field or menu row is never the narrow case, and a
+     floor on them could only ever stop a narrow column shrinking. */
+  .btn,
+  .card-action,
+  .action-pick,
+  .chip-toggle,
+  .strip-tab,
+  .tier-select {
+    min-width: 44px;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* The wordmark is a signature (house codes 9), and a signature does not get
+     resized by a media query — so this is the halo the buttons could not
+     have. `.wordmark` does not clip, so a pseudo-element may reach outside it;
+     it is `position: relative` already only by accident of the flex row, so
+     that is stated rather than assumed. 153x26 becomes 153x44 to the thumb and
+     stays 153x26 to the eye. Tighter at the sides than the top and bottom
+     because the row's `gap-x-6` is the only thing between this and the nav,
+     and a halo that reaches into a neighbour steals its taps. */
+  .wordmark {
+    position: relative;
+  }
+  .wordmark::before {
+    content: '';
+    position: absolute;
+    inset: -9px -4px;
+  }
+}
+
 /* ---------------------------------------------------------- the hut's voice
  *
  * `.btn-copper` — Agatha's room, and `.btn-felt`'s argument one room over: a
@@ -6973,7 +7184,7 @@ button:hover .tarot-fan-card {
      this is 5.7:1, which is AA at the button's size and better everywhere
      further down the gradient. */
   --recall-lit: #35619b;
-  --recall-rule: #c9a227;
+  --recall-rule: var(--lantern-brass);
   --recall-ink: #eef3fb;
 }
 
@@ -7051,7 +7262,7 @@ button:hover .tarot-fan-card {
     inset 0 1px 0 rgba(226, 240, 255, 0.38),
     inset 0 -6px 12px rgba(0, 0, 0, 0.26),
     0 5px 16px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(201, 162, 39, 0.25);
+    0 0 12px color-mix(in srgb, var(--lantern-brass) 25%, transparent);
 }
 .btn-deal:hover:not(:disabled)::after {
   transform: translateX(135%);
@@ -8561,7 +8772,7 @@ button:hover .tarot-fan-card {
   background:
     linear-gradient(
       100deg,
-      color-mix(in srgb, #c9a227 7%, transparent) 0%,
+      color-mix(in srgb, var(--lantern-brass) 7%, transparent) 0%,
       transparent 42%),
     var(--surface-1);
   transition:
@@ -8576,7 +8787,7 @@ button:hover .tarot-fan-card {
   inset-inline-start: 0;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: linear-gradient(180deg, var(--vine), #c9a227);
+  background: linear-gradient(180deg, var(--vine), var(--lantern-brass));
   opacity: 0.7;
   transition:
     opacity 220ms ease,
@@ -8609,7 +8820,7 @@ button:hover .tarot-fan-card {
   height: 1px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, #c9a227 75%, transparent),
+    color-mix(in srgb, var(--lantern-brass) 75%, transparent),
     transparent);
 }
 
@@ -8623,8 +8834,8 @@ button:hover .tarot-fan-card {
    order would hand it every one of these declarations back. */
 .field-hint.shelf-volume {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, #c9a227 38%, var(--hairline));
-  background: color-mix(in srgb, #c9a227 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lantern-brass) 38%, var(--hairline));
+  background: color-mix(in srgb, var(--lantern-brass) 8%, transparent);
   color: var(--text-secondary);
   padding: 0.1rem 0.5rem;
   transition:
@@ -8634,8 +8845,8 @@ button:hover .tarot-fan-card {
 }
 .field-hint.shelf-volume:hover,
 .field-hint.shelf-volume:focus-visible {
-  border-color: color-mix(in srgb, #c9a227 72%, transparent);
-  background: color-mix(in srgb, #c9a227 17%, transparent);
+  border-color: color-mix(in srgb, var(--lantern-brass) 72%, transparent);
+  background: color-mix(in srgb, var(--lantern-brass) 17%, transparent);
   color: var(--text-primary);
 }
 
@@ -8689,7 +8900,7 @@ button:hover .tarot-fan-card {
     105deg,
     var(--text-primary) 45%,
     #3f7d4e 85%,
-    #c9a227 118%
+    var(--lantern-brass) 118%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -9837,7 +10048,7 @@ button:hover .tarot-fan-card {
   --field-stone: #cfc6b4;
   --field-stone-deep: #9d9280;
   --field-stone-ink: #2b2519;
-  --field-brass: #c9a227;
+  --field-brass: var(--lantern-brass);
   --field-trench: #2a2015;
   --field-plate: rgba(43, 37, 25, 0.55);
 }
@@ -10592,14 +10803,14 @@ button:hover .tarot-fan-card {
   cursor: pointer;
   transition: background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
-.field-quad-grip:hover { background: rgba(201, 162, 39, 0.10); }
+.field-quad-grip:hover { background: color-mix(in srgb, var(--lantern-brass) 10%, transparent); }
 .field-quad-grip:focus-visible {
   outline: 2px solid var(--field-brass);
   outline-offset: 2px;
 }
 .field-quad-grip:active { transform: translateY(1px); }
 .field-quad-grip.is-pinned {
-  background: rgba(201, 162, 39, 0.16);
+  background: color-mix(in srgb, var(--lantern-brass) 16%, transparent);
   box-shadow: inset 0 0 0 1px var(--field-brass);
 }
 
@@ -11098,7 +11309,7 @@ button:hover .tarot-fan-card {
      the open one. */
   .field-quad:not(.is-open) .field-zone-l { display: none; }
   .field-quad:not(.is-open) {
-    border: 1px solid rgba(201, 162, 39, 0.18);
+    border: 1px solid color-mix(in srgb, var(--lantern-brass) 18%, transparent);
   }
   /* The open seat gets the whole width and the rails sit above it, so the
      table reads top-to-bottom as "who is here" then "what is happening". */

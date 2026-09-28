@@ -1103,8 +1103,29 @@ export default function ColiseumRoom() {
     setSlide(0)
   }, [])
 
+  // **Both clocks stop for somebody who asked the room to hold still, and the
+  // words do not go with them.**
+  //
+  // `web/README.md`'s ruling is that ambience is *removed* rather than frozen,
+  // and a carousel that walks itself is ambience — text sliding under a
+  // reader's eye on a timer they did not set is the exact thing
+  // `prefers-reduced-motion` is asked about. But the slides are *lore*, not
+  // weather: thirteen sentences about the house this match is being fought in,
+  // and the reduced-motion answer to information is never absence (the
+  // commander's crown in `index.css` argues this at length — it stops
+  // travelling and it stays lit). So the room holds its first slide, the
+  // counter underneath still reads "1 of 13", and **Back** and **Next** page
+  // it by hand exactly as they always did. Nothing is hidden; nothing moves
+  // that nobody asked for.
+  //
+  // These are component timers, which is why no stylesheet guard could ever
+  // have reached them — `reducedmotion_test.go` sweeps the bundle's
+  // animations and there is no animation here to find. The read is taken
+  // inside the effect rather than at the top of the component so that any
+  // re-render re-asks, which is the most a `matchMedia` poll can offer
+  // without growing a listener this file does not otherwise need.
   useEffect(() => {
-    if (facts.length < 2) return
+    if (facts.length < 2 || reducedMotion()) return
     const id = window.setInterval(
       () => setSlide((n) => (n + 1) % facts.length), SLIDE_MS)
     return () => window.clearInterval(id)
@@ -1113,7 +1134,7 @@ export default function ColiseumRoom() {
   // And the room itself walks on, so six arenas are seen rather than one.
   const arenaCount = data?.arenas.length ?? 0
   useEffect(() => {
-    if (arenaCount < 2) return
+    if (arenaCount < 2 || reducedMotion()) return
     const id = window.setInterval(() => {
       setChosen((n) => (n + 1) % arenaCount)
       setSlide(0)

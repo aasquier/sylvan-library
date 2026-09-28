@@ -19,11 +19,10 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-26 (rainbow — three legs of the testing facet, run in
-  parallel: the machine-checked claim, the grind, and the pool's faulty
-  connector). Previous: 2026-09-24 (the coverage climb, outside the rainbow),
-  2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
-  2026-08-24, 2026-08-19, 2026-08-16.
+- **Last run:** 2026-09-26 (rainbow, and its second leg — the grind).
+  Previous: 2026-09-24 (the coverage climb, outside the rainbow), 2026-09-19
+  (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
+  2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
   state.** Every one of them is about the Python app: `src/mtglab`, pytest,
   `fail_under`, `mtglab mutate`, `tests/test_isolation.py`. The Go crossing
@@ -31,75 +30,6 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
-
-### 2026-09-26 (rainbow, leg three — the pool's faulty connector)
-
-The testing facet's third leg, run beside legs one and two. Leg two (#504)
-landed while this one was in flight and its block sits directly below; leg
-one's (#512) was still open and will sort in beside them. Nothing in
-`internal/pool` was touched by either, so the only overlap was these three
-documents.
-
-Leg two's queued recommendation was the whole brief: *"the next grind is a
-fixture, not a sweep — `internal/pool`'s missing statements want a faulty
-DuckDB connector, the last named fixture gap in the tree."* That is what this
-leg built, and then swept with.
-
-- **`pooltest.OpenFaulty` exists** (`go/internal/pool/pooltest/faulty.go`).
-  `authtest.OpenFaulty` one database across: the tiny pool on a real disk,
-  reached through the real driver, behind a [driver.Connector] that spends a
-  budget of statements (`Fault.After`) or of rows (`Fault.RowsAfter`) and then
-  refuses every one. A wrapper, never a fork — DuckDB is cgo and its driver is
-  a prebuilt library. The fixture the suite already had is a **schemaless**
-  pool, which fails every read at its *first* statement; everything past the
-  first statement had no fixture at all.
-- **`internal/pool`: 58 → 41 missing statements; the tree 734 → 721 of
-  21,628 → 21,689, and 96.6% → 96.7% by `go tool cover -func`.** Seventeen
-  closed. The tree's 61 new statements are the fixture itself, four of them
-  undriveable and named in COVERAGE.md. Fourteen of the seventeen came through the
-  new fixture: `Columns`, `ArtFor`, `GetCards`, `tokenParts`,
-  `tokenIdentities` and `tokenArtByOracle` all have a `rows.Err()` branch that
-  only a result set dying mid-iteration can reach; `probeStaleness` refuses at
-  each of its **six** statements; `TokensMade`'s probe; `loadInto`'s BEGIN; and
-  both of `SnapshotPrices`' post-count faults.
-- **What the assertions are about, in every case: whether a *partial* answer is
-  handed on as a whole one.** A card lookup short by half is a page telling a
-  newcomer their decklist is wrong (commandment 2). A token sheet that comes
-  back `Read: true` and empty says *this deck makes nothing* about a deck full
-  of Food — and the mutation run proved that sentence live: deleting
-  `tokenParts`' `rows.Err()` check produced exactly `read=true` with no tokens
-  on a pool holding both. `SnapshotPrices` folds its *first* count's failure
-  into `ErrNoPool` on purpose, so the test holds that word **reserved**: a
-  volume that detached mid-write must not be reported as a library with no
-  prices, because that is the one command a cron runs unattended.
-- **Two classes proved unreachable, and they are the reason this leg is
-  seventeen statements rather than twenty-five.** A **scan into `*any` cannot
-  fail** — `database/sql`'s `convertAssign` ends `case *any: *d = src; return
-  nil` — which kills six `rows.Scan` error branches in this package outright
-  (`scanRecord` and its two callers, `ArtFor`, `tokenParts`,
-  `tokenIdentities`, `tokenArtByOracle`). And `Columns` scans into `*string`,
-  which **DuckDB's strict typing cannot poison**: leg two reached the same
-  shape in SQLite through affinity (a text left sitting in a REAL column) and
-  there is no DuckDB equivalent.
-- **Two cheap levers taken while in the package, both by driving the real
-  trigger rather than the function.** `datedDay`'s two remaining arms are now
-  reached by putting three *ten-character* misspelt stamps on the download
-  shelf (`oracle_cards-2026_08-20`, `…-08x20`, `…-08-2O`) and asserting the
-  sweep leaves all three — the existing test covered only a *short* stamp.
-  `ownerOf`'s no-Unix-stat arm is reached with an `fstest.MapFS` FileInfo, in
-  both shapes: a `Sys()` of another type, and a **typed nil**, which without
-  the `stat == nil` half of the guard is a nil dereference in the middle of a
-  refresh (mutation-verified: it panics).
-- **No production Go file touched.** Four new test files, two existing test
-  files extended, one test-only seam: `export_test.go` gains `ConnOver(db)`,
-  which is `&Conn{db: db, pool: New("", nil)}` — lever 19's shape, made
-  visible to the external test package. It is a test file rather than a
-  production field **on purpose**: a `Pool` opens its own file through
-  `pool.Open`, so a faulty *Pool* needs a seam in the app, which is queued
-  rather than taken.
-- **The floor did not move**, for the reason legs one and two both recorded:
-  `ci.yml` carries the 1.6-point gap as Aaron's own 2026-09-24 ruling, and the
-  lane brief said not to ratchet it.
 
 ### 2026-09-26 (rainbow)
 
@@ -7722,6 +7652,71 @@ structural; the Coliseum lore carousel still not stopping under reduced motion
 where every other material in this file is a named token.
 
 
+### 2026-09-26 (rainbow) — the second ball: the brass gets its name, and a room gets a painting
+
+*The Queen's second ball of the day, stacked on `the-gleaming-edge`. One PR:
+the branch `the-second-ball`, opened against that one. Walked on the committed
+bundle at 8765 in both themes, at 1280 and at 375x812 with a coarse pointer.*
+
+**`--lantern-brass`, and the sweep that follows it.** `#c9a227` was written out
+by hand in **fourteen** places in `index.css`, with another **eight** spellings
+of the same colour as `rgba(201, 162, 39, a)` — while the felt beside them said
+`var(--felt-base)` and the anvil said `var(--anvil-brass)`. It had even grown
+*two* local aliases independently (`--recall-rule` on the Recall panel,
+`--field-brass` on the board), which is a material telling you twice that it
+wants a name. It has one now, on `:root`, with its argument beside it, and
+twenty-one sites point at it. Zero pixel change, proven at the pixel: the
+fortune-teller's *Turn them over* still computes `rgb(201, 162, 39)`.
+
+- **Three sites keep the literal and that is the interesting part.** An alpha
+  of a token is `color-mix(in srgb, var(--lantern-brass) 28%, transparent)`,
+  which is *exactly* `rgba(201, 162, 39, 0.28)`. At **zero** it stops being
+  exact — `color-mix(… 0%, transparent)` is `transparent`, which is transparent
+  **black** — so the three zero-alpha far stops in the board's plate rules
+  would have faded brass through grey. Not sites the sweep missed; sites where
+  the conversion is wrong, and the token's comment says so.
+- The `.card-flip` comment that argued *for* the literal — "`--field-brass` is
+  scoped to the board, and an undefined custom property inherits rather than
+  falls back" — was **answered rather than overruled**: a `:root` token is
+  defined everywhere, and `--field-brass` now points at it.
+- Classified `wash` in `palettecontrast_test.go`, which refused the token until
+  it carried a decision in writing. 3.66:1 on paper; never a sentence's ink.
+
+**The 404 stopped being a stub.** It was one grey sentence in a box, and it is
+the surface a beginner is most likely to meet by accident. It is a room now:
+*Misleading Signpost*, Wilds of Eldraine Commander **#47** — the extended-art
+printing, whose crop is 745x460 against the ordinary frame's 626x457, so the
+mist survives on both sides of the post — hotlinked, painter and printing
+credited in words in the same room, in `FirstRun`'s credit grammar exactly.
+Object-position measured rather than guessed: 22% at 1230x368, because 34% took
+the post's finial off the top and 12% cost three boards at the bottom. The way
+out is still one `<Link>` and still underlined, because it really does go
+somewhere — it has stopped being drawn in `--series-1`.
+
+- **The art was chosen by looking, and the obvious card lost.** *Lost in the
+  Woods* is the name anybody would reach for; the painting is two frightened
+  people under a torch looking up at something. A newcomer who mistyped a URL
+  is not met with a horror card (commandment 2).
+- **`.prose-link`** is the new named place for the other half of commandment
+  20 — a real `<a>` in prose, in the house's vine, with an underline that
+  thickens under the hand and a focus ring. `grep -rn "color: 'var(--series-1)'"
+  web/src` counted **12** inline on 2026-09-26; this room is the first tenant
+  and the remaining eleven are the sweep to follow.
+
+**Item five was already built, and it is a ten.** The colours tour's build
+button (`routes/ColorPage.tsx:292`) is `.btn-sigil` with `--sigil-a` and
+`--sigil-b` handed in from the room's own colours: Azorius renders white into
+blue, Rakdos black into red, without forking the class. That is the
+`--btn-accent` / `--btn-ink` idea worn in thirty-two colours. Nothing to build.
+
+**Left as suggestions**, not built: the eleven remaining inline `--series-1`
+links; the eight `rgba(201, 162, 39, a)` spellings of the brass (an alpha
+conversion with a different failure mode — a dropped declaration rather than a
+wrong colour — and it wants its own walk of the board); the `verdict-gild`
+keyframe's literal, inside a filter list whose own comment warns against
+casual rearrangement.
+
+
 ## Green — Growth & Resilience
 
 *Browser, mobile & accessibility · cloud resource watch · scalability &
@@ -7963,38 +7958,6 @@ is quoted only where it was taken at a load this entry names.
   re-record trap above, which would have silently rewritten all nine), and
   **`fly status --app mtglab` does not exist** — the Fly app is
   `sylvan-library` (Red met the same thing today, so it is two lanes now).
-
-**Follow-on the same evening, by the testing facet's third leg: queued item 1
-above is BUILT (PR #515), once #502 had landed and the conflict it was deferred
-for was gone.** `pool_age_days` is in the `/api/health` body beside
-`disk_free_mb`, and both the readings it needed were decisions rather than
-arithmetic:
-
-- **Off Scryfall's stamp, not off the pool file.** `pool.BulkDataDay` reads the
-  date out of the parked bulk filenames, through the sweep's *own* parser rather
-  than a second copy of it — `parkedBulk` and the new reader are one function now
-  (`parkedBulkDay`), so the suffix list and the date rule stay in one place. The
-  pool file's mtime was the obvious alternative and it is wrong: a rebuild
-  rewrites `mtg.duckdb` and does not make month-old rows younger, so a pool
-  rebuilt this morning out of a six-week-old download would have read as fresh.
-- **The OLDEST kind on the shelf, never the newest.** `--oracle-only` is a
-  supported refresh and a run that fell over between its two loads leaves the
-  same shape, so a shelf can hold a day-old oracle file beside a month-old
-  printings file. The pool built from those is a month behind on prices and
-  printings whatever the oracle half says. Per kind it is still the *newest*
-  copy, because the older ones are rollbacks `SweepBulk` has not taken yet.
-  Mutation-verified: flipping the comparison answers 0 where the truth is 42.
-- **`null`, never a small number, for anything unanswerable** — no shelf, an
-  undated name, ten characters that are not a day (`2026-13-45`), and a stamp in
-  the *future*, which is a container whose clock has not synchronised. Clamping
-  that last one to zero would print "the library is current" at exactly the
-  moment the machine cannot be trusted about time; it is `diskFreeMB`'s
-  never-`0`-for-an-unanswered-read rule, one key across, and it is
-  mutation-verified too.
-- Nine table cases plus three shelf-shape tests (a directory wearing a bulk
-  file's exact name dates nothing; an unreadable shelf says so rather than
-  answering the zero time). `HOSTING.md`'s health-key list gains the fourth
-  bullet and its "three" becomes "four", in the same diff.
 
 ### 2026-09-19 (rainbow) — no PR of its own; ledger carried by the next leg
 
@@ -9353,6 +9316,102 @@ test failure reads exactly like a successful kill", one layer out.
 Still open after this: the volume's pool is stale until the refresh actually
 runs, so three decks show a set name with no painter. That is #195's designed
 degradation, not a new fault.
+
+### 2026-09-26 (rainbow) — the phone's hand: the 44px floor, and two clocks stopped
+
+*The Queen's second ball; the same PR as the Red entry above
+(`the-second-ball`, stacked on `the-gleaming-edge`). Measured in a real
+browser at 375x812 with `(pointer: coarse)` true, on the committed bundle.*
+
+**The floor, and the numbers it was built on.** This item had been
+re-measured four runs running and never built. Before:
+
+| route | controls | under 44px |
+| --- | --- | --- |
+| `/` | 21 | **20** |
+| `/import` | 25 | **23** |
+| `/coliseum` | 14 | **13** |
+
+Ten `.nav-link`s at **32** tall on every route. `.btn` at **38**; `.btn-sm` at
+42 by **28** — the Back and Next that walk an arena's thirteen slides. Five
+`.field-shell` fields at **36**. After: `/import` is **3 of 25**, and two of
+those three are the wordmark (halo, below) and an inline link inside a
+sentence. A thumb's contact patch is about nine millimetres; a 28-pixel
+control is under three.
+
+Two things the house already knew and nobody had joined up: `.whisper-sprout`
+is **44x44** and `.chip-toggle` is **197x44**. The number was never in doubt,
+only the reach.
+
+- **The shape was settled by the stylesheet, not by taste.** The alternative
+  was a pseudo-element halo with a negative `inset` — `.card-flip::before {
+  inset: -6px }` does exactly that for a 13px mark on a 64px painting. It
+  cannot work on `.btn`, which is `overflow: hidden` on purpose so the glint
+  and the gleam's ring stay on the plate. A halo on a clipping box is a halo
+  that is not there. So the plates **grow**, and the halo went to the one
+  control that may not move a pixel: `.wordmark`, a signature, 153x26 to the
+  eye and **153x44** to the thumb (verified with `elementFromPoint` 7px above
+  and below the visible box). Tighter at the sides than the top, because the
+  row's `gap-x-6` is all that separates it from the nav and a halo that
+  reaches into a neighbour steals its taps.
+- **`(pointer: coarse)` rather than a width**, so a tablet gets the floor and
+  a narrow window on a desk does not — and the desktop composition is
+  untouched by construction: `.btn-sigil` still measures 169x38 and
+  `min-height: auto` at 1280.
+- **`min-height` rather than padding**, because these families do not own
+  their padding — the routes write it as utilities at the same specificity,
+  settled by source order. Nothing competes for `min-height`, and it beats
+  `.field-shell`'s `h-9` outright.
+- **Almost nothing needed a centring rule**: a `<button>` and a `<select>`
+  centre their own contents by UA stylesheet. `.nav-link` is an `<a>` and gets
+  nothing of the sort, so it is the one family told how to hold what is in it.
+
+**The cost, stated rather than buried, and it wants Aaron's ruling.** The
+phone's header goes **201px → 265px** at 375x812 — from 24.8% of the screen to
+**32.6%** — because ten nav entries wrap onto four rows and each row grew 12px.
+It furls on the first scroll (`useCanopyScroll`), so the cost is bounded, and
+the file's own comment already called 201px "a quarter of the phone spent on
+chrome nobody is looking at". If that is too much the answer is **fewer nav
+entries on a phone, not smaller targets** — an affordance is not traded for a
+look.
+
+**The lore carousel stops for somebody who asked it to.** Two component
+timers in `routes/Coliseum.tsx` — a slide every 24s, the whole room every 90s
+— walked the Coliseum regardless of `prefers-reduced-motion`, and no
+stylesheet guard could ever have reached them because there is no animation
+in the sheet to find. They are guarded now, and the lore is **not** removed
+with them: the room holds its first slide, the counter still reads "1 of 13",
+and Back and Next page it by hand. Proven twice — by two tests in
+`Coliseum.test.tsx` that count the clocks rather than restating 24 and 90
+(mutation-verified), and live on the real page, where stubbing `matchMedia`
+and clicking Next re-ran both effects and laid **no** clocks while the slides
+still moved 1 → 2 → 1 under the hand.
+
+**And the sweep that could not see any of it learned to.**
+`reducedmotion_test.go` called a rule covered when any class in its selector
+appeared in a reduced-motion block — so an animation on `.btn::before` read as
+covered by a guard several hundred lines away that turns off `.btn`'s
+*transitions*. Proven green under that mutation this morning; it now fails by
+name. The key is the pair, `class::pseudo`, with `display: none` still
+covering both pseudo-elements because an element that is not rendered draws
+none.
+
+- **It found a real one immediately.** `.entombing::after` — the black wash
+  that closes over a card being sent to the graveyard — animated its full
+  340ms under reduced motion, because the guard beside it only ever named
+  `.entombing`. It is the one frame of that effect that is actually *over a
+  painting*. Both boxes now, and both at `1ms` rather than `none`: `forwards`
+  is what holds the sunken frame until the refreshed list arrives, so removing
+  the animation would spring the row back to full brightness and leave it
+  looking untouched.
+- **Two traps inside the fix, and the first nearly ate it.** A lookbehind
+  written as "not preceded by a word character" matched **nothing** —
+  `.btn:before` has an `n` before the colon — and a class name cannot contain
+  a colon, so the guard was never needed. And `:not(.arena-gate)` leaked
+  `arena-gate` into the class list; `.arena-gate::before` *is* separately
+  guarded, so the negation excused the very rule that excludes it. Selectors
+  are now split on top-level commas and negations stripped.
+
 
 ## Colorless — The Artifacts
 

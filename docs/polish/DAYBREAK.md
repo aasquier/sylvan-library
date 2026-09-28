@@ -57,29 +57,45 @@ any deck → the folded Wheel at the foot → unfold → **Spin the wheel** wear
 the ember, at **6s** a lap, the loudest in the app. Both themes. Ledger: Red,
 2026-09-26 (rainbow).
 
-**Red: `reducedmotion_test.go` cannot see an animation added to a `.btn`
-pseudo-element, and that gap is general.** Its rule is "covered when any class
-in the selector appears inside a reduced-motion block", and `.btn` appears in
-one that only kills *transitions* — so the gleam's orbit read as guarded with
-its guard deleted (proven: rule removed, bundle rebuilt, test green).
-`buttongleam_test.go` pins this one animation by name, which is a patch rather
-than a fix. · *Cost of leaving it:* the next animation on a widely-guarded
-class ships unarrested and the sweep says nothing. · **Recommendation:** a
-Colorless or Red slice teaches the sweep to require the guard to name a
-property the animating rule actually sets, or to record `.btn`-family
-pseudo-elements as their own cover. Ledger: Red, 2026-09-26 (rainbow).
+**Red: `reducedmotion_test.go` could not see an animation added to a `.btn`
+pseudo-element — CLOSED, and it found a live one on its way out.** The rule is
+now `class::pseudo` rather than `class`, with `display: none` still covering
+both pseudo-elements; the mutation that stayed green this morning (guard
+deleted, bundle rebuilt) now fails by name. The first thing it caught was real:
+`.entombing::after`, the black wash that closes over a card being entombed,
+ran its full 340ms under reduced motion because the guard beside it only named
+`.entombing`. · *Cost of leaving it:* none now. · **Recommendation:** nothing
+to rule on; it rides `the-second-ball`. Ledger: Green, 2026-09-26 (rainbow).
 
-**Green: `.btn` is 36px tall and the house's own floor is 44px on a phone.**
-Measured at a 375px viewport on the library: `.btn-primary` renders 145×36
-(38 with its border), and `.btn-sm`/`.btn-xs` are smaller again; the gleam
-changed nothing about it either way. · *Cost of leaving it:* every primary
-action in the app is under the touch floor this skill and `categories.md` both
-name, on the hand most newcomers arrive with. · **Recommendation:** not a
-style pass — it is a padding change in one named place with a layout
-consequence on every toolbar, so it wants its own branch and its own walk.
-Raise `.btn`'s block padding to `0.6rem` behind a `@media (pointer: coarse)`
-so the desk keeps its density, and measure three toolbars before and after.
-Ledger: Red, 2026-09-26 (rainbow).
+**Green: the phone's 44px floor is BUILT and wants a walk — and one number in
+it is Aaron's to rule on.** PR `the-second-ball` (stacked on
+`the-gleaming-edge`) puts every control family behind `@media (pointer:
+coarse)` with a `min-height: 44px`, and gives the wordmark a pseudo-element
+halo instead because a signature may not be resized. Measured on the committed
+bundle at 375×812: `/import` went from **23 of 25 controls under the floor to
+3**, `/` from 20 of 21. The shape was settled by the stylesheet rather than by
+taste — `.btn` is `overflow: hidden`, so a halo on it is a halo that is not
+there. · *The number to rule on:* the phone's header goes **201px → 265px**
+(24.8% → **32.6%** of a 375×812 screen), because ten nav entries wrap onto four
+rows and every row grew 12px. It furls on the first scroll, so the cost is
+bounded. · **Recommendation:** walk it and merge. If 265px is too much, the
+answer is **fewer nav entries on a phone, not smaller targets** — say the word
+and that becomes its own slice. `mtglab-ui` on 8765, phone width, `/` and
+`/import`: the nav rows, the filter selects and *Import a decklist* are all
+44 tall; the wordmark is unchanged to the eye and 44 to the thumb. Ledger:
+Green, 2026-09-26 (rainbow).
+
+**Green: the 404 is a room now, and the way out of it wants a sweep behind
+it.** `the-second-ball` gives the wrong-turn page *Misleading Signpost* (Wilds
+of Eldraine Commander #47, the extended-art printing, art by Julian Kok Joon
+Wen), hotlinked and credited in the same room, in the empty library's own
+three-layer treatment. Its link left `--series-1` for a new `.prose-link` in
+`index.css`. · *Cost of leaving the rest:* `grep -rn "color: 'var(--series-1)'"
+web/src` counts **12** inline on 2026-09-26 — a chart's series colour inking
+doors and emphasis across five files, where a `:hover` can never reach it. ·
+**Recommendation:** a Red slice points the eleven survivors at `.prose-link`
+and records any it deliberately leaves, with the reason. Ledger: Red,
+2026-09-26 (rainbow).
 
 ## Open — a few clicks in the repository settings
 
@@ -116,19 +132,17 @@ Tier 1 cache discarded. · **Recommendation:** read §3 and §4 of #506 and
 answer **"union"** (merge it) or **"MDFC only"** (and no golden moves at all).
 Ledger: Green, 2026-09-26.
 
-**Green: nothing reported how old the card pool is, and this is the fourth run
-to say so — BUILT, and open as PR #515.** Taken at the recommendation once #502
-landed: `pool_age_days` sits beside `disk_free_mb` in the `/api/health` body,
-off Scryfall's own stamp on the bulk files rather than off the pool file's
-mtime, because a rebuild moves the mtime and does not make month-old rows
-younger. Two readings had to be chosen and both are argued in the code: for a
-shelf holding both kinds it is the **older** of the two (a run that loaded only
-the oracle half leaves prices exactly as behind as they were), and an
-unanswerable question — no shelf, an undated file, a clock that has not
-synchronised — is `null` rather than a small reassuring number, which is
-`disk_free_mb`'s own rule one key across. · **Nothing left to rule**; the line
-stays here only until #515 merges. Ledger: Green, 2026-09-26 (the entry at the
-end of the section).
+**Green: nothing reports how old the card pool is, and this is the fourth run
+to say so.** `pool_stale` asks whether the pool predates the *columns* the app
+reads, so it answers `false` for a pool of any age; the only age signal in the
+product is a date inside a bulk filename that a person has to go and read.
+Today: 13 days old, `pool_stale: false`. · *Cost of leaving it:* legality and
+prices answer out of date silently, and the one number that would have said so
+is the one nothing reports. · **Recommendation:** "yes" — add `pool_age_days`
+to the health body beside the `disk_free_mb` that #502 adds, as a small
+follow-on once #502 lands. Deliberately not built today: two lanes editing
+`health.go` on one afternoon is a merge conflict for nothing. Ledger: Green,
+2026-09-26.
 
 **Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
 existed nowhere else, and it is deleted now.** It survives in git history
@@ -220,24 +234,6 @@ to five questions" against a cap of six, and the theme's replace-versus-union
 rule — put to you rather than guessed. Queued rather than landed because it is
 all model-facing text and the dossier's instructions are hash-frozen in a
 corpus. Ledger: Black, 2026-09-26.
-
-**White: a faulty *pool* still needs a one-field seam in the app, and four
-packages are waiting on it.** `pooltest.OpenFaulty` now hands back a DuckDB
-handle that refuses past a budget, which is what closed `internal/pool`'s
-own half-answer branches — but `internal/cards`, `internal/deckread`,
-`internal/api` and `internal/library` all reach the pool through a
-`*pool.Pool`, and a Pool opens its own file inside `acquire` (`pool.Open` on
-`p.path`). So they are still stuck with the schemaless fixture, which fails at
-the *first* statement. The seam is one field and one exported constructor —
-`open func(context.Context, string) (*sql.DB, error)`, defaulting to `Open`,
-which is the tree's own documented idiom (`tier3.Settings.Java`,
-`api.Config.BulkIndex`). · *Cost of leaving it:* COVERAGE.md's own entry for
-`deckread/commander.go`'s seven statements says it wants "a pool that breaks
-mid-flight, which no fixture yet is" — the fixture now exists and cannot be
-plugged in. · **Recommendation:** "go" — a test-only field on a production
-struct is what this tree already does everywhere else, and the alternative is
-four copies of a test-only `Conn` door. Ledger: White, 2026-09-26 (rainbow,
-leg three).
 
 **Colorless: this file's own rule says "one line per item" and not one item has
 obeyed it for a month — is the rule wrong, or is the file?** Every item here is

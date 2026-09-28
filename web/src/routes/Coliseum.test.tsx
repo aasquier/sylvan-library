@@ -1033,3 +1033,93 @@ describe('a bout that falls over', () => {
     expect(screen.getByText(/of 20 max/)).toBeTruthy()
   })
 })
+
+/**
+ * The lore carousel, and the person who asked the room to hold still.
+ *
+ * Two clocks walk this room on their own — one slide at a time through a
+ * house's facts, and then the room itself on to the next arena. They are
+ * component timers rather than CSS, which is why the bundle sweep in
+ * `go/cmd/mtglab/reducedmotion_test.go` never had anything to find here: it
+ * reads animations out of the stylesheet, and there is no animation to read.
+ *
+ * `prefers-reduced-motion: reduce` has to stop both, and it may not take the
+ * lore with them — the slides are what this room *is*, and the answer to
+ * information is never absence. So: no clocks, first slide held, and **Back**
+ * and **Next** still page it by hand.
+ *
+ * Asserted by counting the clocks rather than by advancing them. Advancing
+ * would mean naming 24 seconds and 90 seconds in this file, which is the
+ * source of truth restated — `SLIDE_MS` and `ARENA_MS` are argued in the
+ * route and a second copy here would be free to drift. What the room promises
+ * is that it does not schedule itself, and that is what a spy can see.
+ */
+describe('the lore carousel under reduced motion', () => {
+  const ROOM = () => room({
+    arenas: [
+      arena({ key: 'a', name: 'The Grand Coliseum',
+        facts: [
+          { kind: 'roman', rome: 'First of the Coliseum.' },
+          { kind: 'roman', rome: 'Second of the Coliseum.' },
+        ] }),
+      arena({ key: 'b', name: 'The Cephalid Coliseum', motion: 'water',
+        facts: [{ kind: 'roman', rome: 'First of the drowned one.' }] }),
+    ],
+  })
+
+  /** Every repeating clock this room set while it was coming up.
+   *
+   *  Anything under a second is not the room's: `waitFor` polls the DOM on a
+   *  50ms interval of its own, and counting the harness's heartbeat as the
+   *  page's ambience would make this measure nothing. Both of the room's are
+   *  tens of seconds long, so the line is nowhere near either of them. */
+  function clocks() {
+    const laid: number[] = []
+    vi.spyOn(window, 'setInterval').mockImplementation(
+      ((_fn: TimerHandler, ms?: number) => {
+        if ((ms ?? 0) >= 1000) laid.push(ms ?? 0)
+        return 0 as unknown as ReturnType<typeof setInterval>
+      }) as typeof window.setInterval)
+    return laid
+  }
+
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('walks itself when nobody has asked it not to', async () => {
+    vi.stubGlobal('matchMedia', (media: string) => ({ matches: false, media }))
+    vi.mocked(api.coliseum).mockResolvedValue(ROOM())
+    const laid = clocks()
+    show()
+    await screen.findByText('First of the Coliseum.')
+    // Two: the slide's and the room's. This half is the anti-vacuity — a spy
+    // that saw nothing would make the test below pass for the wrong reason.
+    expect(laid.length).toBeGreaterThanOrEqual(2)
+    vi.unstubAllGlobals()
+  })
+
+  it('sets no clock at all, and still pages by hand, for somebody who asked '
+     + 'for no motion', async () => {
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: media.includes('reduced-motion'), media,
+    }))
+    vi.mocked(api.coliseum).mockResolvedValue(ROOM())
+    const laid = clocks()
+    show()
+    await screen.findByText('First of the Coliseum.')
+
+    expect(laid).toEqual([])
+
+    // The words are all still here, and the hand still moves them: ambience
+    // removed, lore kept, controls answering.
+    expect(screen.getByText('1 of 2')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Second of the Coliseum.')
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await screen.findByText('First of the Coliseum.')
+
+    // And a person may still walk to another house themselves.
+    fireEvent.click(screen.getByRole('tab', { name: 'The Cephalid Coliseum' }))
+    await screen.findByText('First of the drowned one.')
+    vi.unstubAllGlobals()
+  })
+})
