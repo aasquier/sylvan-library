@@ -11,7 +11,7 @@
 
 import { expect, it } from 'vitest'
 
-import { HINT_EDGE, HINT_GAP, HINT_W, placeHint } from './hint'
+import { HINT_EDGE, HINT_GAP, HINT_W, TIP_W, placeHint, placeTip } from './hint'
 
 /** A rectangle, without the twenty fields a real `DOMRect` carries and none of
  *  which this function reads. */
@@ -82,4 +82,49 @@ it('keeps the first line on screen when neither side fits', () => {
   const at = placeHint(rect(100, 10), 640, 90, PANEL)
   expect(at.top).toBeGreaterThanOrEqual(HINT_EDGE)
   expect(at.top).toBeLessThanOrEqual(90 - HINT_EDGE - PANEL.h)
+})
+
+/* --------------------------------------------- the glossary's panel, below */
+
+const TIP = { w: TIP_W, h: 76 }
+
+it('drops the glossary panel under the word it explains', () => {
+  // The other way up from a board mark, and for the opposite reason: this one
+  // sits in a line of prose or beside a label, and a panel that rises covers
+  // the sentence the reader was in the middle of.
+  const at = placeTip(rect(400, 300, 22, 20), 1280, 800, TIP)
+  expect(at.under).toBe(true)
+  expect(at.top).toBe(320 + HINT_GAP)
+})
+
+it('raises the glossary panel when there is no room under the word', () => {
+  const at = placeTip(rect(400, 700, 22, 20), 1280, 800, TIP)
+  expect(at.under).toBe(false)
+  expect(at.top).toBe(700 - HINT_GAP - TIP.h)
+})
+
+it('keeps the glossary panel inside a phone, which is the bug it was written for', () => {
+  // **The measurement this exists for.** A category's help mark sits about 153
+  // pixels across a 375-pixel window; the panel it used to raise was
+  // `left: 0; width: 16rem` inside the mark, so it ran to 409 and the document
+  // scrolled sideways. Centred and clamped, it cannot.
+  const at = placeTip(rect(153, 400, 22, 20), 375, 812, TIP)
+  expect(at.left).toBeGreaterThanOrEqual(HINT_EDGE)
+  expect(at.left + at.width).toBeLessThanOrEqual(375 - HINT_EDGE)
+  // Against the old behaviour, spelled out so the regression is named rather
+  // than implied: the mark's own left edge plus a full panel is off the screen.
+  expect(153 + TIP_W).toBeGreaterThan(375)
+})
+
+it('narrows the glossary panel rather than hanging it off a narrow window', () => {
+  const at = placeTip(rect(90, 400, 22, 20), 200, 812, TIP)
+  expect(at.width).toBe(200 - 2 * HINT_EDGE)
+  expect(at.left).toBe(HINT_EDGE)
+})
+
+it('never comes out inside out in a hidden tab either', () => {
+  const at = placeTip(rect(0, 0, 22, 20), 0, 0, TIP)
+  expect(at.width).toBe(TIP_W)
+  expect(at.top).toBeGreaterThanOrEqual(0)
+  expect(at.left).toBeGreaterThanOrEqual(0)
 })

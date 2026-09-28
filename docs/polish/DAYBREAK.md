@@ -155,6 +155,39 @@ knows the covered list is kept by walking JSX, not by waiting for a violation.
 Worth one Colorless slice asking which *other* rooms render card art with no
 entry. Ledger: Green, 2026-09-26 (rainbow).
 
+**Red: the card a hover holds up wears its own colours now, the row it came
+out of answers a hand, and the 99's thirteen shelves finally say what they
+mean — all three want your eye.** PR (the fifth ball) is green and parked
+against `main`. Door **8765** (`mtglab-ui`, the committed bundle), any deck →
+**The 99**, unfold a group. Hover a card's name: the preview is framed in that
+card's **colour identity** — a mono-red card rimmed in ember, a two-colour card
+in gold, an artifact in steel — and the light walks the frame in **3.4s** a lap
+(measured 3.41). Hover anywhere else on the row: it washes faintly green and a
+quiet vine light runs its rim, **4.5s** a lap (measured 4.52). Then **Tab**
+into the list — a keyboard could not land on a single card in a deck before
+this branch — and press **Enter** to hold one up. Both themes, and narrow to a
+phone: hover does not exist there, the shelf marks open on a tap. · *Cost of
+leaving it:* commandment 16 — merging deploys, and all of this is a user
+surface. · **Recommendation:** walk it, then merge. The one taste call that is
+yours is the wash: 7% of the vine over the surface, which is near the floor of
+what is visible, because "subtly" was the word in the ask. Ledger: Red and
+Blue, 2026-09-26 (rainbow).
+
+**Red: a card thumbnail is reachable by a keyboard in exactly one of the
+twenty-odd places `CardHover` is used, and the other nineteen are a sweep.**
+`CardHover` grew an opt-in `reachable` on the fifth ball — a tab stop, a focus
+ring and Enter to hold the card up — and it is set on the deck page's 99 only.
+The rest were left alone deliberately and the reason is on the prop: four pass
+`tapOpens={false}` because the child is already a control, and at least one
+wraps a `display: contents` tile with no box for a ring to be drawn around, so
+each site is a judgement rather than a find-and-replace. · *Cost of leaving
+it:* card search, the swap board, the combo panel and the token shelf still
+answer a mouse and a thumb and not a keyboard — the same gap the 99 had, on
+smaller surfaces. · **Recommendation:** one Green slice, by surface, recording
+which sites were examined and deliberately left inline **with the reason** —
+that last part is what stops it being rediscovered every cycle. Ledger: Red,
+2026-09-26 (rainbow).
+
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and

@@ -151,7 +151,27 @@ const (
 	// "twelve" as the number that is true now; dated, it reads it as the
 	// number somebody measured, which is what it is. The `--lantern-brass`
 	// token's own note dates the sweep in prose this guard does not count.
-	webDatedCommentCeiling = 261
+	//
+	// 261 → 265 on the branch that framed the card a hover holds up, lit the
+	// row it came out of, and gave the 99's shelves their words. Four lines,
+	// and they are the two kinds this comment has already argued for twice:
+	//
+	//   - **three quotations of one ask**, in the three places that answer it
+	//     (`lib/mtg.ts`'s category table, `components/term.tsx`'s mark,
+	//     `index.css`'s two new voices) — *"it would be nice if there was help
+	//     text for the genres, like interaction"* and *"I would like card
+	//     hover previews to also have a border effect"*. A future session
+	//     weighing whether to take the ring off a preview, or to drop the help
+	//     marks as clutter, is arguing with a request rather than with a taste
+	//     call, and whose request and when is the fact;
+	//   - **one measurement**, in `CardHover`'s `reachable`: a row in the 99
+	//     held no link, no button, no input and no `tabindex` on that day.
+	//     That is a count, and a count in this repository is explicitly a
+	//     claim to re-check rather than a fact to inherit — dated, the next
+	//     session reads it as the number somebody measured, which is what it
+	//     is. Undated it would read as a standing claim about a component that
+	//     has since been changed by this very branch.
+	webDatedCommentCeiling = 265
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a

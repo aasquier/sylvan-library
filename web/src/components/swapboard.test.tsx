@@ -29,6 +29,13 @@ vi.mock('../lib/api', async () => ({
     // types. Nothing here opens that form, but a mock missing a method the
     // tree can call fails as an unrelated TypeError later.
     suggestCards: vi.fn(),
+    // The bench's shelf headings carry the glossary mark that explains what
+    // "ramp" or "interaction" means, and the mark asks for the table on
+    // mount. Resolved with nothing rather than left off: an empty glossary is
+    // a mark that renders as nothing at all, which is the degradation
+    // `components/term.tsx` is built around, and it keeps this file about the
+    // swap board.
+    glossary: vi.fn().mockResolvedValue({ sections: [], terms: [] }),
   },
 }))
 
