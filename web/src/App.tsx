@@ -240,6 +240,100 @@ function SiteHeader({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Misleading Signpost, Julian Kok Joon Wen, Wilds of Eldraine Commander (2023),
+ * collector number 47 — the **extended-art** printing.
+ *
+ * Hotlinked rather than committed, for `Library.tsx`'s reason and under the
+ * same terms: rule 5 and ADR 6 say never redistribute Scryfall's data, and a
+ * card image checked into a public repo is exactly that. The cache-buster
+ * Scryfall appends to the URL is dropped — the bare URL serves the same bytes
+ * and does not rot when they re-stamp it.
+ *
+ * **Naming the printing is the point.** Two printings of this card were made
+ * in the same set and they are the same painting cropped differently: #11 is
+ * the ordinary frame and crops to 626x457, #47 runs the art to the card's
+ * edges and crops to **745x460**. The wider one keeps the mist on both sides
+ * of the post, which is the whole reason to use it on a band. The pool cannot
+ * make this choice — `art_crop` hangs off the oracle card, so the pool knows
+ * one default printing and picks the earliest — so the URL is a constant, and
+ * the constant is where the decision is recorded.
+ *
+ * **And it was chosen by looking.** The obvious card for a wrong turn is *Lost
+ * in the Woods*, and its painting is two frightened people under a torch
+ * looking up at something. A newcomer who mistyped a URL is not to be met with
+ * a horror card (commandment 2). A signpost that points eleven ways at once in
+ * a quiet mist is the same joke told kindly.
+ */
+const SIGNPOST_ART =
+  'https://cards.scryfall.io/art_crop/front/9/5/958b247d-83d3-4dd6-9a1a-654ba3adf078.jpg'
+
+/**
+ * The wrong-turn room.
+ *
+ * It was a grey sentence in a box: *"Nothing shelved at this address."* That is
+ * a stub, and it is the surface a beginner is most likely to meet by accident —
+ * a mistyped address, a stale bookmark, a link somebody pasted into a message
+ * with a bracket stuck to the end of it. The Pack is the category: a 404 in the
+ * house's own voice, rather than a bare word.
+ *
+ * Three things it now does that the sentence did not. It is a **place** — the
+ * app's materials, a real painting, a caption in the game's words. It **names
+ * the painter and the printing** in the same room as the picture, which is
+ * commandment 19's half of this and not a nicety. And the way out is still one
+ * `<Link>`, still underlined, because this one really does go somewhere
+ * (commandment 20) — it has simply stopped being drawn in `--series-1`, which
+ * is *series one of a line chart* and had no business inking the only door out
+ * of the only room a lost person is standing in. It wears `.prose-link` now:
+ * the house's vine, an underline that thickens under the hand, and a focus
+ * ring — the named place the other eleven inline `--series-1`s in `web/src`
+ * are meant to come to, put here because this room was being rewritten anyway.
+ *
+ * The painting is the empty library's three-layer treatment, wholesale: the
+ * art, then `.art-lift` over it, then `.hero-scrim` over that. The order is the
+ * rule — the lift is a screened sheet of light *above* the painting and *below*
+ * the scrim — and the reason the two themes get opposite treatment is written
+ * out beside `.hero-art` in `index.css`. `.lost-art` is one declaration on top
+ * of it: this painting's subject is the post, which sits high and centre, where
+ * the library's is a canyon floor.
+ */
+function WrongTurn() {
+  return (
+    <section className="card-surface relative overflow-hidden rounded-xl">
+      <img src={SIGNPOST_ART} alt="" aria-hidden
+           className="hero-art lost-art" />
+      <div className="art-lift hero-lift" aria-hidden />
+      <div className="hero-scrim" />
+      <div className="relative px-6 py-14 sm:px-10 sm:py-20">
+        <h2 className="max-w-lg text-2xl font-semibold tracking-tight">
+          Nothing shelved at this address.
+        </h2>
+        <p className="mt-2 max-w-md text-sm leading-relaxed"
+           style={{ color: 'var(--text-secondary)' }}>
+          Every signpost in the wood points somewhere. This one pointed here,
+          and here is a gap on the shelf. No harm done — turn around and the
+          library is one step back.
+        </p>
+        <p className="mt-6 text-sm">
+          <Link to="/" className="prose-link">
+            Back to the library
+          </Link>
+        </p>
+        {/* The credit, in the same room as the picture: commandment 19, and
+            ADR 6's terms for hot-linking somebody else's painting. Muted, at
+            the foot, in the collector line's own position on a card — and
+            word for word in `FirstRun`'s form, down to the size, because this
+            room is that room's sibling and two houses' worth of credit
+            grammar is one house too many. */}
+        <p className="mt-8 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          Art: <em>Misleading Signpost</em> by Julian Kok Joon Wen, Wilds of
+          Eldraine Commander.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/**
  * The app, with a gate in front of it that only exists on an instance that
  * asked for one.
  *
@@ -541,22 +635,7 @@ export default function App() {
               page's own 403 from the API rather than the catch-all's "nothing
               here", which is the more honest of the two answers. */}
           <Route path="/admin" element={<Admin />} />
-          <Route path="*" element={
-            <div className="card-surface rounded-xl px-6 py-10 text-center">
-              {/* The wrong-turn room names its way out AND opens it — a
-                  sentence that points at the library without a link leaves
-                  the lost visitor to go find the door themselves. A real
-                  `<Link>` for a real destination (commandment 20, the other
-                  half). */}
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Nothing shelved at this address. Try{' '}
-                <Link to="/" className="underline"
-                      style={{ color: 'var(--series-1)' }}>
-                  the library
-                </Link>.
-              </p>
-            </div>
-          } />
+          <Route path="*" element={<WrongTurn />} />
         </Routes>
         </Suspense>
         </RouteErrorBoundary>

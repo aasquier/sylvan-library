@@ -131,7 +131,27 @@ const (
 	// Aaron's rulings, whose argument is the sentence and not the day, so all
 	// of them went and no ceiling was raised beside them. This is what the
 	// fall side is for -- the test failed on the sweep before this line moved.
-	webDatedCommentCeiling = 259
+	//
+	// 259 → 260 on the branch that put a travelling gleam on the button
+	// family. The one added line is the ask itself, attributed and dated the
+	// way `.btn-accent-vine`'s "(Aaron, 2026-09-07: ...)" three hundred lines
+	// above it already is: a quotation whose speaker and day are the fact,
+	// because the whole shape of that block -- blood, fire, per-surface
+	// materials -- is an answer to it, and a future session weighing whether
+	// to change the materials needs to know whose request it is arguing with.
+	// The same branch's `.btn-accent-brass` note dates its own walk in prose
+	// this guard does not count; it is left as written for the same reason.
+	//
+	// 260 → 261 on the branch that named the house's lantern brass. The one
+	// added line is `.prose-link`'s, and the date is doing the same work a
+	// ruling's does: it carries a **count** — twelve inline `--series-1`s in
+	// `web/src` on that day — and a count is the one kind of fact in this
+	// repo that is explicitly a claim to re-check rather than a fact to
+	// inherit (CLAUDE.md says so by name). Undated, the next session reads
+	// "twelve" as the number that is true now; dated, it reads it as the
+	// number somebody measured, which is what it is. The `--lantern-brass`
+	// token's own note dates the sweep in prose this guard does not count.
+	webDatedCommentCeiling = 261
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a

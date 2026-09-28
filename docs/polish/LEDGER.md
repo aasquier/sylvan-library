@@ -7698,6 +7698,164 @@ morning — the volume restore drill (Answered 6), `tools` as a required check
 inserting this section's 2026-09-19 (rainbow) entry at its head at the same
 hour. Read that entry beside #481's.*
 
+### 2026-09-26 (rainbow) — the gleaming edge, on the whole `.btn` family
+
+*The Queen's ball, run beside three Go lanes. One PR: the branch
+`the-gleaming-edge`. Walked in Aaron's own Chrome at 1440x900 in both themes,
+and in the app pane at 375.*
+
+**What landed.** A light that walks the rim of a control, faintly and forever,
+and flares when a hand arrives. Aaron's ask, verbatim, was *"Buttons still are
+basic, like I want a gleaming edge that circles around the button, blood, fire,
+whatever is appropriate."* One block in `web/src/index.css`, sitting between
+`.btn-felt` and the hut's copper, dresses every plate in the app:
+
+- **The mechanism is the board's, not a new one.** `.field-card.is-commander`
+  walks a crown around a commander and `.field-quad.is-on-turn` walks one
+  around a seat; this is that device at a button's scale — a short arc of a
+  conic gradient, two masks subtracting the content box out of the border box,
+  and the *gradient* turning rather than the element, driven by a registered
+  `@property --btn-gleam`.
+- **Two selectors carry the whole family** (`.btn:not(.arena-gate)::before` and
+  `.wheel-spin-btn::before`) and a voice opts in by declaring a hot centre in
+  the material table. A voice that declares nothing has an inert transparent
+  pseudo-element and a paused lap, which costs no frames.
+- **Two tiers.** A *plate* voice (the one action a surface is for) orbits at a
+  low light before anybody arrives; a *quiet* voice is dark until the hand
+  comes and the lap **starts** then. Thirty rims orbiting at once is a page
+  that fidgets, not one that breathes.
+- **`.btn-accent-brass`**, and the chop that earned it: the fortune-teller's
+  *Turn them over* and *Begin the reading* were `btn-accent-1` — a chart blue —
+  on a candlelit table, two feet from three `.btn-felt` controls that warm to
+  brass. `components/tarot.tsx:1029,1040`. This is the séance-primary
+  suggestion left unruled in #450 and #461, taken live rather than inherited.
+
+**Numbers, measured rather than declared.**
+
+- Plate lap **7.49s** against a declared 7.5s (`--gleam-cycle`), read off the
+  animated angle over 1614ms on the real page. Lit lap **2.6s**; the Wheel's
+  own **6s / 2.2s**, the shortest in the app because it stays the loud one.
+- Rest opacity 0.5–0.7 by voice, 1.0 lit, `calc(--gleam-lit * 0.42)` pressed.
+  Ring 1.5px at rest, 2px lit — `padding` on the pseudo, so it contributes
+  nothing to layout: a `.btn-primary` measures 145×36 at a 375px viewport with
+  the ring on, exactly as it did without it.
+- `:focus-visible` gets every word of the hover reply (opacity 1, 2px, 2.6s)
+  **and** keeps `.btn`'s vine outline, which sits outside the gleam at
+  `outline-offset: 2px`. Verified on the page with the Tab key.
+- 13 voices in the material table; `.btn-ghost` deliberately not among them and
+  the reason is written beside it.
+
+**The guard, and why it needed writing.** `go/cmd/mtglab/buttongleam_test.go`
+pins three promises against the **committed bundle**: the lap is arrested under
+`prefers-reduced-motion`, a disabled control does not gleam, and the angle is
+registered with a `var()` fallback behind an `@supports` for `mask-composite`.
+All four mutants fail it (guard removed, disabled left gleaming, `@property`
+deleted, `@supports` loosened) and the tree is green with it.
+
+It exists because **`reducedmotion_test.go` cannot see this case**, proven
+rather than assumed: the reduced-motion rule was deleted, the bundle rebuilt,
+and `TestEveryAnimationInTheBundleCanBeArrested` stayed **green**. Its rule is
+"a rule is covered when any class in its selector appears inside a
+reduced-motion block", and `.btn` appears in one several hundred lines away
+where it turns off *transitions*. That is the sweep behaving exactly as its own
+doc comment says ("a tripwire, not a rendering engine") — but it means any
+future `animation` on a `.btn` pseudo-element reads as covered by a guard that
+never touches it. **Queued for Red or Colorless: that gap is general.**
+
+`webDatedCommentCeiling` 259 → 260, argued in the const block: the added line
+is Aaron's ask, attributed and dated the way `.btn-accent-vine`'s
+"(Aaron, 2026-09-07: …)" already is.
+
+**Two rig traps bought this session**, both worth the next lane's time:
+
+- **`/tarot` on the dev door (5173) is not the reading room.** `vite.config.ts`
+  proxies `/tarot` to 8765 for the deck's art, so the route renders an empty
+  `#root` and reads as a broken page. The reading room is the fortune-teller
+  tile inside `/new`; there is no `/tarot` route in `App.tsx` at all.
+- **`claude-in-chrome`'s `resize_window` reports success and does nothing on a
+  maximised window** — `innerWidth` stayed 1440 through a resize to 430 and a
+  reload. The phone pass ran in the app pane's mobile preset instead. This
+  extends the trap already recorded in `the-grand-ball-pr`.
+
+**Corrected in passing.** The `.ink-word` comment claimed "@property
+registration is off the table on this site's Safari floor". It is not:
+registered properties arrived in Safari 16.4 and 16.4 *is* the floor
+(`web/README.md`), which is why the board's crown, the pod's turn rim and now
+the buttons' gleam all animate one. A comment that would have talked the next
+session out of the right mechanism.
+
+**Read live and left as suggestions in the PR body** (not built): `.btn`'s
+36px height against the house's own 44px touch floor, site-wide and
+structural; the Coliseum lore carousel still not stopping under reduced motion
+(re-seen, unchanged since #450); `#c9a227` written as a literal in eight places
+where every other material in this file is a named token.
+
+
+### 2026-09-26 (rainbow) — the second ball: the brass gets its name, and a room gets a painting
+
+*The Queen's second ball of the day, stacked on `the-gleaming-edge`. One PR:
+the branch `the-second-ball`, opened against that one. Walked on the committed
+bundle at 8765 in both themes, at 1280 and at 375x812 with a coarse pointer.*
+
+**`--lantern-brass`, and the sweep that follows it.** `#c9a227` was written out
+by hand in **fourteen** places in `index.css`, with another **eight** spellings
+of the same colour as `rgba(201, 162, 39, a)` — while the felt beside them said
+`var(--felt-base)` and the anvil said `var(--anvil-brass)`. It had even grown
+*two* local aliases independently (`--recall-rule` on the Recall panel,
+`--field-brass` on the board), which is a material telling you twice that it
+wants a name. It has one now, on `:root`, with its argument beside it, and
+twenty-one sites point at it. Zero pixel change, proven at the pixel: the
+fortune-teller's *Turn them over* still computes `rgb(201, 162, 39)`.
+
+- **Three sites keep the literal and that is the interesting part.** An alpha
+  of a token is `color-mix(in srgb, var(--lantern-brass) 28%, transparent)`,
+  which is *exactly* `rgba(201, 162, 39, 0.28)`. At **zero** it stops being
+  exact — `color-mix(… 0%, transparent)` is `transparent`, which is transparent
+  **black** — so the three zero-alpha far stops in the board's plate rules
+  would have faded brass through grey. Not sites the sweep missed; sites where
+  the conversion is wrong, and the token's comment says so.
+- The `.card-flip` comment that argued *for* the literal — "`--field-brass` is
+  scoped to the board, and an undefined custom property inherits rather than
+  falls back" — was **answered rather than overruled**: a `:root` token is
+  defined everywhere, and `--field-brass` now points at it.
+- Classified `wash` in `palettecontrast_test.go`, which refused the token until
+  it carried a decision in writing. 3.66:1 on paper; never a sentence's ink.
+
+**The 404 stopped being a stub.** It was one grey sentence in a box, and it is
+the surface a beginner is most likely to meet by accident. It is a room now:
+*Misleading Signpost*, Wilds of Eldraine Commander **#47** — the extended-art
+printing, whose crop is 745x460 against the ordinary frame's 626x457, so the
+mist survives on both sides of the post — hotlinked, painter and printing
+credited in words in the same room, in `FirstRun`'s credit grammar exactly.
+Object-position measured rather than guessed: 22% at 1230x368, because 34% took
+the post's finial off the top and 12% cost three boards at the bottom. The way
+out is still one `<Link>` and still underlined, because it really does go
+somewhere — it has stopped being drawn in `--series-1`.
+
+- **The art was chosen by looking, and the obvious card lost.** *Lost in the
+  Woods* is the name anybody would reach for; the painting is two frightened
+  people under a torch looking up at something. A newcomer who mistyped a URL
+  is not met with a horror card (commandment 2).
+- **`.prose-link`** is the new named place for the other half of commandment
+  20 — a real `<a>` in prose, in the house's vine, with an underline that
+  thickens under the hand and a focus ring. `grep -rn "color: 'var(--series-1)'"
+  web/src` counted **12** inline on 2026-09-26; this room is the first tenant
+  and the remaining eleven are the sweep to follow.
+
+**Item five was already built, and it is a ten.** The colours tour's build
+button (`routes/ColorPage.tsx:292`) is `.btn-sigil` with `--sigil-a` and
+`--sigil-b` handed in from the room's own colours: Azorius renders white into
+blue, Rakdos black into red, without forking the class. That is the
+`--btn-accent` / `--btn-ink` idea worn in thirty-two colours. Nothing to build.
+
+**Left as suggestions**, not built: the eleven remaining inline `--series-1`
+links; the eight `rgba(201, 162, 39, a)` spellings of the brass (an alpha
+conversion with a different failure mode — a dropped declaration rather than a
+wrong colour — and it wants its own walk of the board); the `verdict-gild`
+keyframe's literal, inside a filter list whose own comment warns against
+casual rearrangement.
+
+
 ## Green — Growth & Resilience
 
 *Browser, mobile & accessibility · cloud resource watch · scalability &
@@ -9297,6 +9455,205 @@ test failure reads exactly like a successful kill", one layer out.
 Still open after this: the volume's pool is stale until the refresh actually
 runs, so three decks show a set name with no painter. That is #195's designed
 degradation, not a new fault.
+
+### 2026-09-26 (rainbow) — the phone's hand: the 44px floor, and two clocks stopped
+
+*The Queen's second ball; the same PR as the Red entry above
+(`the-second-ball`, stacked on `the-gleaming-edge`). Measured in a real
+browser at 375x812 with `(pointer: coarse)` true, on the committed bundle.*
+
+**The floor, and the numbers it was built on.** This item had been
+re-measured four runs running and never built. Before:
+
+| route | controls | under 44px |
+| --- | --- | --- |
+| `/` | 21 | **20** |
+| `/import` | 25 | **23** |
+| `/coliseum` | 14 | **13** |
+
+Ten `.nav-link`s at **32** tall on every route. `.btn` at **38**; `.btn-sm` at
+42 by **28** — the Back and Next that walk an arena's thirteen slides. Five
+`.field-shell` fields at **36**. After: `/import` is **3 of 25**, and two of
+those three are the wordmark (halo, below) and an inline link inside a
+sentence. A thumb's contact patch is about nine millimetres; a 28-pixel
+control is under three.
+
+Two things the house already knew and nobody had joined up: `.whisper-sprout`
+is **44x44** and `.chip-toggle` is **197x44**. The number was never in doubt,
+only the reach.
+
+- **The shape was settled by the stylesheet, not by taste.** The alternative
+  was a pseudo-element halo with a negative `inset` — `.card-flip::before {
+  inset: -6px }` does exactly that for a 13px mark on a 64px painting. It
+  cannot work on `.btn`, which is `overflow: hidden` on purpose so the glint
+  and the gleam's ring stay on the plate. A halo on a clipping box is a halo
+  that is not there. So the plates **grow**, and the halo went to the one
+  control that may not move a pixel: `.wordmark`, a signature, 153x26 to the
+  eye and **153x44** to the thumb (verified with `elementFromPoint` 7px above
+  and below the visible box). Tighter at the sides than the top, because the
+  row's `gap-x-6` is all that separates it from the nav and a halo that
+  reaches into a neighbour steals its taps.
+- **`(pointer: coarse)` rather than a width**, so a tablet gets the floor and
+  a narrow window on a desk does not — and the desktop composition is
+  untouched by construction: `.btn-sigil` still measures 169x38 and
+  `min-height: auto` at 1280.
+- **`min-height` rather than padding**, because these families do not own
+  their padding — the routes write it as utilities at the same specificity,
+  settled by source order. Nothing competes for `min-height`, and it beats
+  `.field-shell`'s `h-9` outright.
+- **Almost nothing needed a centring rule**: a `<button>` and a `<select>`
+  centre their own contents by UA stylesheet. `.nav-link` is an `<a>` and gets
+  nothing of the sort, so it is the one family told how to hold what is in it.
+
+**The cost, stated rather than buried, and it wants Aaron's ruling.** The
+phone's header goes **201px → 265px** at 375x812 — from 24.8% of the screen to
+**32.6%** — because ten nav entries wrap onto four rows and each row grew 12px.
+It furls on the first scroll (`useCanopyScroll`), so the cost is bounded, and
+the file's own comment already called 201px "a quarter of the phone spent on
+chrome nobody is looking at". If that is too much the answer is **fewer nav
+entries on a phone, not smaller targets** — an affordance is not traded for a
+look.
+
+**The lore carousel stops for somebody who asked it to.** Two component
+timers in `routes/Coliseum.tsx` — a slide every 24s, the whole room every 90s
+— walked the Coliseum regardless of `prefers-reduced-motion`, and no
+stylesheet guard could ever have reached them because there is no animation
+in the sheet to find. They are guarded now, and the lore is **not** removed
+with them: the room holds its first slide, the counter still reads "1 of 13",
+and Back and Next page it by hand. Proven twice — by two tests in
+`Coliseum.test.tsx` that count the clocks rather than restating 24 and 90
+(mutation-verified), and live on the real page, where stubbing `matchMedia`
+and clicking Next re-ran both effects and laid **no** clocks while the slides
+still moved 1 → 2 → 1 under the hand.
+
+**And the sweep that could not see any of it learned to.**
+`reducedmotion_test.go` called a rule covered when any class in its selector
+appeared in a reduced-motion block — so an animation on `.btn::before` read as
+covered by a guard several hundred lines away that turns off `.btn`'s
+*transitions*. Proven green under that mutation this morning; it now fails by
+name. The key is the pair, `class::pseudo`, with `display: none` still
+covering both pseudo-elements because an element that is not rendered draws
+none.
+
+- **It found a real one immediately.** `.entombing::after` — the black wash
+  that closes over a card being sent to the graveyard — animated its full
+  340ms under reduced motion, because the guard beside it only ever named
+  `.entombing`. It is the one frame of that effect that is actually *over a
+  painting*. Both boxes now, and both at `1ms` rather than `none`: `forwards`
+  is what holds the sunken frame until the refreshed list arrives, so removing
+  the animation would spring the row back to full brightness and leave it
+  looking untouched.
+- **Two traps inside the fix, and the first nearly ate it.** A lookbehind
+  written as "not preceded by a word character" matched **nothing** —
+  `.btn:before` has an `n` before the colon — and a class name cannot contain
+  a colon, so the guard was never needed. And `:not(.arena-gate)` leaked
+  `arena-gate` into the class list; `.arena-gate::before` *is* separately
+  guarded, so the negation excused the very rule that excludes it. Selectors
+  are now split on top-level commas and negations stripped.
+
+
+### 2026-09-26 (rainbow) — the third ball: the reading room takes the room's light
+
+*The Queen's third ball (`the-third-ball`, stacked on `the-second-ball`).
+Commandment 15 at full strength: the fortune-teller's table inside `/new` →
+Help me decide, walked on 8765 (the committed bundle, before) and 5173 (after),
+dark then light, at 1280×900 and at the 375×812 mobile preset, mouse and then
+real Tab keys.*
+
+**The read that started it.** The table is a photograph of a real one: forty
+candles in banks to the left, the right and the back, and the cards lying at
+the near edge, which is the furthest point from every one of them. Every object
+in that picture obeyed one light except the three that matter — the cards were
+flat scans lit from nowhere, and were therefore the **brightest things in a
+candlelit room**. Not a card lying on a table; a card pasted onto a photograph
+of one.
+
+**The lamp, and it is a layer.** `.tarot-face::after` carries two gradients —
+the candles over the far edge, the table's own shade at the near one — with the
+middle of the card left alone, which is the rule the ageing block below it
+already keeps in its own words: *shadow yes, colour casts no*. It is a
+pseudo-element because **half the cards in this deck are Scryfall paintings**: a
+Magic crossover wears the drawn 1909 frame with `<img class="tarot-rws-art"
+src={card.image}>` inside it, and `card.image` is a `cards.scryfall.io/art_crop`
+URL. Commandment 19's whole shape is light *on* a card, never a `filter`
+through it.
+
+- **And the room was not covered.** `cardimagery_test.go`'s `artBearing` named
+  `seance-vision` — the card surfacing in the crystal ball, which is the
+  *reflection* — and nothing else in the reading room. Seven classes added
+  (`tarot-rws-art`, `tarot-rws-canvas`, `tarot-rws`, `tarot-face-front`,
+  `tarot-face`, `tarot-card`, `tarot-hinge`), and index.css's own ageing
+  comment records that the first cut of this surface put *"a desaturating
+  filter, a cream screen and a honey wash"* over exactly that element. It came
+  off for being ugly rather than for being forbidden, and nothing would have
+  said so. Mutation-verified: `filter: sepia(.5)` on `.tarot-rws-art` now
+  fails by name.
+- **On hover and on focus the shade eases to 0.4** — a card lifted toward the
+  ball is lifted toward the candles. Light added, never removed.
+
+**The turn is cardstock now, not a rotate.** `.tarot-face::before` is the
+specular a piece of card throws as it passes the candles, riding the flip's own
+**760ms** — a 16%-wide band at `#fff7e4` / 0.42, entering and leaving off-frame
+and clipped to the card's 9px corner. Its ancestor is foil, which is the game's
+own answer: a sheen that is not there until the card *moves*. Both faces run it
+together, so the band crosses the back through the first half of the turn and
+the face through the second — one light travelling across one card, seen from
+whichever side is toward you. Under reduced motion it is **removed**, not
+parked: a band halfway across a picture is a smudge. The lamp under it stays,
+because "this object is lying on that table" is information about the room.
+
+**The table names its places again, and the stylesheet had been claiming it
+since 2026-08-18.** Two correct changes composed into a hole: the printed frame
+gave up its own name because the caption under the card already said it, and
+then the caption moved onto hover. Between them, a pointer-device table with
+three cards face down on it named **nothing at all** — measured live, all three
+legends at `opacity: 0`. The slip is now gated on `.tarot-slot:has(.is-face-up)`,
+so a place with no picture in it keeps its printed name in flow — one line,
+which is the cloth's printing, not the twelve-line sprawl Aaron cut in August
+(those three extra lines only render for a card that is face **up**). It costs
+no reflow until the last card turns: `align-items: flex-start` makes the felt as
+tall as its tallest slot, and a slot with a name in flow is the tall one.
+
+- **The specificity trap inside that fix, and it computed to zero.** Adding
+  `:has(.is-face-up)` to the base slip rule gave it six classes; the
+  `:hover` / `:focus-within` reveal beside it had five, because the base also
+  carries `:not(.is-small)` and a negation's argument counts. The reveal lost
+  to its own base rule and the slip could not be shown at all. Both carry the
+  negation now.
+
+**The chop: a turned card could not be reached by a keyboard at all.** The
+`:focus-visible` rules index.css carries for this element were **dead code**.
+They are gated on `:has(.is-face-up)`; the only focusable hinge is the
+`<button>`; and that button exists only while the card is face **down**. Three
+things were lost with them, on desktop, for anyone not holding a mouse: the
+1.35× zoom that is the only way to actually look at a 136px plate, the slip
+carrying the card's name, and — on a Magic crossover — the line crediting the
+painting's artist, which Scryfall's guidelines ask be findable *"somehow"*. A
+phone was always fine: `(hover: hover)` is false there and every line stands in
+flow, so the loss was desktop-and-keyboard exactly. `tabIndex={0}` on the
+turned card (it stays `role="img"` — it is a picture, and a button here would
+be a control that does nothing), plus the house vine ring on
+`.tarot-hinge:focus-visible`, outside the card because nothing is drawn on top
+of a painting. Verified with real Tab presses: ring, zoom, lamp lift and the
+full slip, credit included.
+
+**What is proved.** `go/cmd/mtglab/tarotlamp_test.go`, four tests against the
+committed bundle, six mutations run and six failures seen: the lamp deleted,
+the glint's reduced-motion arrest deleted, the lamp put out *inside* that same
+block, the slip rule un-gated, the tab stop removed, and a sepia on the
+crossover's art. The third test is written as the invariant rather than as a
+list — *every* rule that lifts `.tarot-legend` out of flow must ask whether
+there is a picture in that place — so a fourth slip rule cannot quietly opt out.
+
+**Also on this branch, and it closes the last one.** `verdict-gild`'s
+`rgb(201 162 39 / 0.34)` is `color-mix(in srgb, var(--lantern-brass) 34%,
+transparent)` — pixel-equal, because the token is declared once and never
+re-declared per theme. The eight `rgba(201, 162, 39, α)` spellings this ball
+was handed as an open item were **already converted** by the second ball; the
+three that remain are the zero-alpha gradient stops, where `color-mix(… 0%,
+transparent)` is transparent *black* and the conversion is wrong. A claim
+re-checked rather than inherited.
+
 
 ## Colorless — The Artifacts
 

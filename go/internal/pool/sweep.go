@@ -115,18 +115,30 @@ func SweepBulk(dir string, kept map[string]string) (SweepCounts, error) {
 // file for one of kinds under: the kind, a hyphen, a date, and one of the
 // suffixes it uses. Everything else on the shelf is somebody else's.
 func parkedBulk(name string, kinds []string) bool {
-	for _, kind := range kinds {
-		rest, ok := strings.CutPrefix(name, kind+"-")
+	kind, _ := parkedBulkDay(name, kinds)
+	return kind != ""
+}
+
+// parkedBulkDay is [parkedBulk]'s reading rather than its verdict: the kind and
+// the day stamped on name, or two empty strings for a name that is not ours.
+//
+// One parser for both readers, and that is the point of the split. The suffix
+// list and the date rule are each a single list in one place (see
+// [bulkSuffixes]), and the failure mode of a second copy is a file this code
+// downloads and never sweeps -- or, now, a file it sweeps and cannot date.
+func parkedBulkDay(name string, kinds []string) (kind, day string) {
+	for _, k := range kinds {
+		rest, ok := strings.CutPrefix(name, k+"-")
 		if !ok {
 			continue
 		}
 		for _, suffix := range bulkSuffixes {
 			if stamp, cut := strings.CutSuffix(rest, suffix); cut && datedDay(stamp) {
-				return true
+				return k, stamp
 			}
 		}
 	}
-	return false
+	return "", ""
 }
 
 // datedDay is Scryfall's `updated_at` cut to its day — `2026-08-24`, exactly

@@ -68,6 +68,93 @@ once merged, the cheapest place to see it working on the deployed site is the
 about ten seconds. The interview is the richer read and costs six questions to
 get through. Ledger: Black, 2026-09-26 (rainbow, prompts).
 
+**Red: PR (the Queen's ball) is green and parked — every plate in the app now
+carries a light that walks its rim.** Aaron asked for "a gleaming edge that
+circles around the button, blood, fire, whatever is appropriate"; one block in
+`index.css` gives the whole `.btn` family a masked conic arc driven by a
+registered `@property`, with a material per voice, and the fortune-teller's
+primary finally leaves the chart blue for the table's brass. · *Cost of
+leaving it:* the controls stay the thing Aaron called basic, and the séance
+blue keeps outliving two PRs' worth of suggestions. · **Recommendation:** walk
+and merge. `mtglab-ui` on 8765 (no dev server needed — the bundle is in the
+diff): `/` — watch the green *Import a decklist* for one **7.5s** lap, hover
+it (the light brightens and the lap drops to **2.6s**), press it (it settles);
+Tab to it and the vine ring sits outside the gleam. Then `/new` → **Help me
+decide** → the fortune-teller → the table: *Turn them over* is brass now, not
+blue, and *Shuffle again* beside it lights only when you reach for it. Then
+any deck → the folded Wheel at the foot → unfold → **Spin the wheel** wears
+the ember, at **6s** a lap, the loudest in the app. Both themes. Ledger: Red,
+2026-09-26 (rainbow).
+
+**Red: `reducedmotion_test.go` could not see an animation added to a `.btn`
+pseudo-element — CLOSED, and it found a live one on its way out.** The rule is
+now `class::pseudo` rather than `class`, with `display: none` still covering
+both pseudo-elements; the mutation that stayed green this morning (guard
+deleted, bundle rebuilt) now fails by name. The first thing it caught was real:
+`.entombing::after`, the black wash that closes over a card being entombed,
+ran its full 340ms under reduced motion because the guard beside it only named
+`.entombing`. · *Cost of leaving it:* none now. · **Recommendation:** nothing
+to rule on; it rides `the-second-ball`. Ledger: Green, 2026-09-26 (rainbow).
+
+**Green: the phone's 44px floor is BUILT and wants a walk — and one number in
+it is Aaron's to rule on.** PR `the-second-ball` (stacked on
+`the-gleaming-edge`) puts every control family behind `@media (pointer:
+coarse)` with a `min-height: 44px`, and gives the wordmark a pseudo-element
+halo instead because a signature may not be resized. Measured on the committed
+bundle at 375×812: `/import` went from **23 of 25 controls under the floor to
+3**, `/` from 20 of 21. The shape was settled by the stylesheet rather than by
+taste — `.btn` is `overflow: hidden`, so a halo on it is a halo that is not
+there. · *The number to rule on:* the phone's header goes **201px → 265px**
+(24.8% → **32.6%** of a 375×812 screen), because ten nav entries wrap onto four
+rows and every row grew 12px. It furls on the first scroll, so the cost is
+bounded. · **Recommendation:** walk it and merge. If 265px is too much, the
+answer is **fewer nav entries on a phone, not smaller targets** — say the word
+and that becomes its own slice. `mtglab-ui` on 8765, phone width, `/` and
+`/import`: the nav rows, the filter selects and *Import a decklist* are all
+44 tall; the wordmark is unchanged to the eye and 44 to the thumb. Ledger:
+Green, 2026-09-26 (rainbow).
+
+**Green: the 404 is a room now, and the way out of it wants a sweep behind
+it.** `the-second-ball` gives the wrong-turn page *Misleading Signpost* (Wilds
+of Eldraine Commander #47, the extended-art printing, art by Julian Kok Joon
+Wen), hotlinked and credited in the same room, in the empty library's own
+three-layer treatment. Its link left `--series-1` for a new `.prose-link` in
+`index.css`. · *Cost of leaving the rest:* `grep -rn "color: 'var(--series-1)'"
+web/src` counts **12** inline on 2026-09-26 — a chart's series colour inking
+doors and emphasis across five files, where a `:hover` can never reach it. ·
+**Recommendation:** a Red slice points the eleven survivors at `.prose-link`
+and records any it deliberately leaves, with the reason. Ledger: Red,
+2026-09-26 (rainbow).
+
+**Green: the reading room takes the room's light, and a keyboard can finally
+reach a turned card.** `the-third-ball` (stacked on `the-second-ball`) lays the
+candlelight on the cards as a layer of its own — commandment 19's shape, never
+a filter — gives the flip the specular a piece of cardstock throws as it turns,
+puts the three position names back on the cloth under the face-down cards (the
+stylesheet had been claiming that since 2026-08-18 and the page stopped doing
+it), and gives the turned card a tab stop so the `:focus-visible` rules it has
+always carried stop being dead code. · *Cost of leaving it:* those rules could
+never fire, so a keyboard at a desk lost the zoom, the card's name and the
+**artist credit** on a Magic crossover — which Scryfall's guidelines ask be
+findable "somehow". · **Recommendation:** walk it and merge; it is the room
+commandment 15 rations last. `mtglab-ui` on 8765, `/new` → Help me decide → the
+table. Turn one card at a time and watch the light cross it (**760ms**, the
+flip's own); the other two keep their printed names until their own card turns.
+Then Tab to a turned card. Ledger: Green, 2026-09-26 (rainbow).
+
+**Green: the reading room's Magic crossovers were outside commandment 19's
+gate, and are inside it now.** `cardimagery_test.go`'s `artBearing` knew only
+`seance-vision` — the card *reflected* in the crystal ball — while the cards on
+the table themselves render `cards.scryfall.io/art_crop` URLs through
+`.tarot-rws-art`. Seven classes added on `the-third-ball`, mutation-verified. ·
+*Cost of leaving it:* index.css records that the first cut of that surface put
+"a desaturating filter, a cream screen and a honey wash" over exactly that
+element; it came off for being ugly, and nothing would have said it was
+forbidden. · **Recommendation:** nothing to decide — noted so the next sweep
+knows the covered list is kept by walking JSX, not by waiting for a violation.
+Worth one Colorless slice asking which *other* rooms render card art with no
+entry. Ledger: Green, 2026-09-26 (rainbow).
+
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and

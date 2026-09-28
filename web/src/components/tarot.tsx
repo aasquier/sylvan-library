@@ -343,7 +343,24 @@ function TarotCard({ card, faceUp, onTurn, index, small }: {
               {inner}
             </button>
             )
-          : <div className="tarot-hinge" role="img" aria-label={label}>{inner}</div>}
+          : (
+            /* A turned card is a picture rather than a control, and it is
+               still something to be *reached* — so it takes a tab stop.
+               Without one the `:focus-visible` rules index.css already
+               carries for this element could never fire: the only focusable
+               hinge is the button, the button only exists while the card is
+               face DOWN, and every one of those rules is gated on
+               `:has(.is-face-up)`. Dead CSS, and three things lost with it
+               for anyone on a keyboard at a desk — the zoom that is the only
+               way to actually look at a 136px plate, the slip carrying the
+               card's name, and (on a Magic crossover) the line crediting the
+               painting's artist, which Scryfall's guidelines ask be findable
+               "somehow" and which a phone gets in flow.
+               `role="img"` stays: it is a picture, it is not a button, and a
+               button here would be a control that does nothing. */
+            <div className="tarot-hinge" role="img" tabIndex={0}
+                 aria-label={label}>{inner}</div>
+            )}
       </div>
       <div className="tarot-legend">
       <p className="tarot-caption mt-2 text-center text-[11px] uppercase tracking-wide">
@@ -1026,7 +1043,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {!allTurned && (
                   <>
                     <button onClick={turnAll}
-                            className="btn btn-primary btn-accent-1">
+                            className="btn btn-primary btn-accent-brass">
                       Turn them over
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
@@ -1037,7 +1054,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
                 {lingering && (
                   <>
                     <button onClick={takeReading}
-                            className="btn btn-primary btn-accent-1">
+                            className="btn btn-primary btn-accent-brass">
                       Begin the reading
                     </button>
                     <span className="text-xs" style={{ color: 'var(--tarot-felt-text)' }}>
