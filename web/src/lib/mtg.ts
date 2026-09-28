@@ -270,6 +270,36 @@ export function categoryLabel(key: string): string {
   return CATEGORY_LABELS[key] ?? key
 }
 
+/**
+ * The glossary entry that explains a shelf of the 99.
+ *
+ * Aaron, 2026-09-27: *"it would be nice if there was help text for the genres,
+ * like interaction"*. The words on those headers are the deck model's own
+ * vocabulary — thirteen of them — and every one is a term a person who has
+ * played six games has never been told. So each shelf has an entry keyed after
+ * itself, and this is the one place a category's key becomes a glossary key.
+ *
+ * The table holds only what does *not* follow that rule, which today is one
+ * line. The win condition's entry was written long before the category
+ * vocabulary existed and is keyed `wincon`; a second entry under `win-con`
+ * would be the same word explained in two places, which is exactly what
+ * `components/term.tsx` says this arrangement exists to prevent.
+ *
+ * `commander` is not a category — it is the UI's own fourteenth label — and it
+ * has had an entry since the glossary's first day, so it needs no line here.
+ *
+ * `go/cmd/mtglab/categorywords_test.go` holds every category the server names
+ * to an entry the server serves, through this table, so a shelf added to the
+ * model with no word to go with it fails rather than quietly losing its help.
+ */
+export const CATEGORY_TERMS: Record<string, string> = {
+  'win-con': 'wincon',
+}
+
+export function categoryTerm(key: string): string {
+  return CATEGORY_TERMS[key] ?? key
+}
+
 export function money(usd?: number | null): string {
   if (usd === null || usd === undefined) return '—'
   return usd < 1 ? `$${usd.toFixed(2)}` : `$${usd.toFixed(2)}`

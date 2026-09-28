@@ -6800,7 +6800,9 @@ button:hover .tarot-fan-card {
      spends its own `::before` on the shut gate's portcullis wash. Masking that
      down to a 2px ring would put a hairline where a gate should be. */
   .btn:not(.arena-gate)::before,
-  .wheel-spin-btn::before {
+  .wheel-spin-btn::before,
+  .deck-card-row::before,
+  .card-peek::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -6962,16 +6964,184 @@ button:hover .tarot-fan-card {
     --gleam-dim: color-mix(in srgb, #e0952f 66%, transparent);
   }
 
+  /* ---- two subjects that are not controls, and answer for different reasons.
+     Aaron, 2026-09-27: *"I would like card hover previews to also have a
+     border effect along the lines of what we have been doing. When a 99 is
+     hovered over besides the card art preview it would be nice if the box for
+     the card was highlighted subtly and also had a border with an effect."*
+
+     **A row in the 99** is a quiet voice with `:focus-within` in place of
+     `:focus-visible`. The row itself takes no focus — the card's name, its
+     checkbox and its buttons do — so the rule has to ask whether the focus is
+     anywhere *inside* it, which is the same question the mouse's `:hover`
+     asks of a box with children. Both hands, one reply.
+
+     The vine, because this is the Library's own list and the vine is the
+     Library's mark. **4.5s a lap, not 2.6.** A row is 1232 by 65 at a desk, so
+     more than nine tenths of the conic's sweep points at the two long edges —
+     the light crosses the whole top edge and then the whole bottom one, and at
+     the buttons' rate it covers 1232px in a second and a quarter, which reads
+     as a flicker rather than as a light travelling.
+
+     It goes quiet in two states, on purpose. In **pick mode** the row is
+     already a control (`.action-pick`) with its own louder answer — a nudge
+     right and a coloured edge — and two lights saying two things about one box
+     is worse than one. A row **on its way to the graveyard** is being put out,
+     not lit.
+
+     **The preview** is a plate voice that is lit from birth, because it only
+     exists while a hand is already on the card: there is no hover state to
+     wait for, and `pointer-events: none` means it could never hear one. Its
+     ring sits **outside** the card rather than on it — `inset: -3px` against a
+     2px band, so a pixel of night stands between the light and the printing
+     and nothing is drawn over Wizards' painting or over the cardstock's own
+     black border (commandment 19; a layer above a card is still a layer *over*
+     a card, and the honest answer is not to reach the card at all).
+
+     **The voice is the card's colour identity**, which is the one place this
+     file is allowed to use `--mtg-*` — the comment on those tokens says they
+     follow the entity by definition, and a mono-red card is red because it
+     *is* red. Two or more colours take gold, and nothing takes the artifact
+     frame's grey, because that is how the game itself frames a card. The
+     tokens are the pips' own values and are already pale, so they are lifted a
+     fifth of the way to white rather than most of it: a rim light wants to be
+     light, and `--mtg-w` at the buttons' 16% would have been a white ring on
+     every card in the format.
+
+     **3.4s a lap**, which is the rate the arena's seat rim walks a card-sized
+     box at — measured there, borrowed here rather than guessed at again. */
+  .deck-card-row:not(.action-pick):not(.entombing):is(:hover, :focus-within)::before {
+    --gleam-width: 2px;
+    opacity: var(--gleam-lit, 0);
+    animation-duration: var(--gleam-cycle-lit, 4.5s);
+    animation-play-state: running;
+  }
+  /* **The vine itself, unwhitened, and that is the theme answer.** Every voice
+     above is its accent pushed most of the way to white, because every voice
+     above is painted on a dark plate in both themes. A row in the 99 is not: it
+     is `--surface-1`, which is paper in the light theme and night in the dark
+     one, and a whitened green on paper is nothing at all — walked at 1440, it
+     read as a hairline that had been rubbed out. `--vine` is already the token
+     that answers this, and its comment says so in as many words: darker than
+     `--mtg-g` in light and lighter in dark, foliage against paper versus
+     foliage against night. Taking it whole gets both themes from one line. */
+  .deck-card-row {
+    --gleam-lit: 0.85;
+    --gleam-cycle-lit: 4.5s;
+    --gleam-hot: var(--vine);
+  }
+
+  .card-peek::before {
+    /* Outside the card, not on it. The radius is the art's 12px plus the
+       distance the ring stands off, so the light keeps the card's corner. */
+    inset: -3px;
+    border-radius: 15px;
+  }
+  .card-peek {
+    --gleam-lit: 1;
+    --gleam-rest: 0.92;
+    --gleam-play: running;
+    --gleam-width: 2px;
+    --gleam-cycle: 3.4s;
+    /* **One formula, seven materials.** A voice below names only its identity
+       token; the mix is written once. `--peek-ink` unset is the vine, for the
+       callers that hand this component a `{ name, image }` with no colours in
+       it.
+
+       `--peek-lift` is what that ink is carried toward, and it is the only
+       thing the two themes disagree about — which is the whole reason it is a
+       variable rather than a literal `#fff` like every voice above. Those are
+       painted on a dark plate in both themes; this one floats over the page.
+       On night the identity has to become a **light** or it is a dark line on
+       a dark room; on paper it has to become an **ink** or it is a pale line
+       on a pale room. The first build did the white in both and the black and
+       white identities were invisible on the light theme — `.btn-sigil` says
+       the same thing one screen up about gold on a pale wash. */
+    --peek-lift: #2c241e;
+    --gleam-hot: color-mix(in srgb, var(--peek-ink, var(--vine)) 78%, var(--peek-lift));
+  }
+  :root:not([data-theme="light"]) .card-peek {
+    @media (prefers-color-scheme: dark) { --peek-lift: #fff; }
+  }
+  :root[data-theme="dark"] .card-peek { --peek-lift: #fff; }
+
+  .card-peek.is-w { --peek-ink: var(--mtg-w); }
+  .card-peek.is-u { --peek-ink: var(--mtg-u); }
+  .card-peek.is-b { --peek-ink: var(--mtg-b); }
+  .card-peek.is-r { --peek-ink: var(--mtg-r); }
+  .card-peek.is-g { --peek-ink: var(--mtg-g); }
+  /* No colours at all takes the artifact frame's own grey, which is exactly
+     what `--mtg-c` is. */
+  .card-peek.is-c { --peek-ink: var(--mtg-c); }
+  /* Gold, because that is the frame a card of two colours or more is printed
+     in. The house's own brass is that gold, named once. */
+  .card-peek.is-m { --peek-ink: var(--lantern-brass); }
+
   @media (prefers-reduced-motion: reduce) {
     /* `animation-name` alone, so that neither the hover rule's duration and
        play state nor the shorthand above can put the lap back — a longhand
        nobody else writes cannot lose a specificity argument. */
     .btn:not(.arena-gate)::before,
-    .wheel-spin-btn::before {
+    .wheel-spin-btn::before,
+    .deck-card-row::before,
+    .card-peek::before {
       animation-name: none;
       transition: none;
     }
   }
+}
+
+/* ------------------------------------------- the row, and the card held up
+ *
+ * The halves of the two subjects above that must not wait on
+ * `mask-composite`. A browser without it gets no ring, and still has to get
+ * the wash, the warmed hairline, the box the ring would have been drawn
+ * around, and a drop shadow the card can be read against.
+ *
+ * **The wash is the surface's own material, not a new colour.** `--surface-1`
+ * mixed a few per cent toward the vine: the paper of the list, lit. Seven per
+ * cent is deliberately near the floor of what is visible — Aaron asked for
+ * *subtly*, and the loud half of this reply is the light going round the edge.
+ *
+ * **`position: relative` is the whole reason the ring lands.** `.card-surface`
+ * is a background and a hairline and nothing else, so a row was `static` and
+ * an `inset: 0` pseudo-element would have escaped to the nearest positioned
+ * ancestor — which on this page is the page.
+ *
+ * **The preview's shadow was `shadow-2xl`, which is `rgb(0 0 0 / 0.25)`.** A
+ * black shadow on a near-black room is nothing at all, and the card it was
+ * meant to lift is itself black-bordered: measured on the deck page in the
+ * dark theme, the bottom edge of a held-up card and the row behind it were the
+ * same colour. So the drop is doubled and a breath of the card's own voice is
+ * laid under it — a card held toward a lamp throws warmth onto the table, and
+ * the page finally says which of the two planes is nearer. */
+.deck-card-row {
+  position: relative;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.deck-card-row:not(.action-pick):not(.entombing):is(:hover, :focus-within) {
+  background: color-mix(in srgb, var(--vine) 7%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--vine) 40%, var(--hairline));
+}
+
+.card-peek {
+  border-radius: 12px;
+  box-shadow:
+    0 18px 38px rgb(0 0 0 / 0.55),
+    0 2px 10px rgb(0 0 0 / 0.45),
+    0 0 26px color-mix(in srgb, var(--gleam-hot, var(--vine)) 22%, transparent);
+}
+
+/* The card's name, now that a keyboard can land on it. The house ring — the
+ * same two pixels of vine at the same offset the buttons wear — because a stop
+ * that is not visible is not a stop (the Card Back, and it is the state the
+ * person writing the CSS never sees, having a mouse in their hand). */
+.card-reach {
+  border-radius: 4px;
+}
+.card-reach:focus-visible {
+  outline: 2px solid var(--vine);
+  outline-offset: 2px;
 }
 
 /* ------------------------------------------------------------ the phone's hand

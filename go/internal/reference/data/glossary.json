@@ -264,6 +264,116 @@
       ]
     },
     {
+      "key": "land",
+      "term": "Lands",
+      "short": "The cards that make the mana everything else is paid for, one of which you may play each turn.",
+      "long": "A land is the only card you get to put onto the battlefield without paying for it, and you get one a turn — so the shape of a game is largely the shape of your land drops. Most Commander decks run somewhere in the mid-thirties; too few and you sit with a hand you cannot cast, too many and you draw fields instead of spells. Some do more than make mana: Command Tower taps for any colour your commander can use, and plenty of others come with a small job attached.",
+      "section": "building",
+      "see_also": [
+        "mana-base",
+        "ramp"
+      ]
+    },
+    {
+      "key": "card-advantage",
+      "term": "Card advantage",
+      "short": "Cards that leave you holding more than you started with.",
+      "long": "You draw one card a turn, and in a game with three opponents that is not many. Card advantage is anything that changes the rate — a draw spell, an enchantment that draws off what other people do like Rhystic Study, a creature that replaces itself the moment it lands. It is the quietest way a deck wins: nobody loses to the player drawing an extra card a turn until, several turns later, everybody does.",
+      "section": "building",
+      "see_also": [
+        "engine",
+        "ramp"
+      ]
+    },
+    {
+      "key": "interaction",
+      "term": "Interaction",
+      "short": "The cards that answer what somebody else did — removal, counterspells, a way to say no.",
+      "long": "Swords to Plowshares takes a creature off the table for one mana; Counterspell stops a spell before it ever resolves; Beast Within answers absolutely anything and hands back a 3/3. A deck with none of this is playing solitaire at a table with three other people, and the first player to do something genuinely frightening decides how the game ends. Interaction is also the most commonly cut thing in a new deck, because every one of these slots could have been another card that does your own plan instead.",
+      "section": "building",
+      "see_also": [
+        "protection",
+        "threat"
+      ]
+    },
+    {
+      "key": "protection",
+      "term": "Protection",
+      "short": "Cards that keep your own things safe — a shield for the commander, an answer to somebody else's answer.",
+      "long": "Lightning Greaves gets a creature moving and makes it untargetable the same turn; Heroic Intervention saves an entire board from a single sweeper. Commander leans on this more than other formats do, because a deck usually has one card it truly needs and everybody can see which one it is. Note that Magic also uses the word as a keyword ability — \"protection from red\" printed on a card is a specific rule about what may touch it — and this shelf is the job rather than the keyword.",
+      "section": "building",
+      "see_also": [
+        "interaction",
+        "commander-tax"
+      ]
+    },
+    {
+      "key": "threat",
+      "term": "Threats",
+      "short": "The cards that actually threaten to end somebody, and so demand an answer.",
+      "long": "Ramp and card advantage are how a deck gets rich; a threat is what it spends the money on. In Commander that means getting through forty life three times over, so a threat here is usually something that grows, multiplies, or hits much harder than its cost suggests. A useful test at the table: if you cast it and nobody at all reaches for a removal spell, it was not a threat, it was a permanent.",
+      "section": "building",
+      "see_also": [
+        "wincon",
+        "payoff"
+      ]
+    },
+    {
+      "key": "engine",
+      "term": "Engines",
+      "short": "A card that keeps producing every turn it is left alone.",
+      "long": "The difference between a card and a machine. An engine does its work again and again — each upkeep, each time a creature dies, each time you cast something — and it turns a long game from a problem into the reason you are playing. Commander games are long, which is why an engine that would be too slow anywhere else is a house here. It is also why the table will point removal at it before they point removal at anything bigger.",
+      "section": "building",
+      "see_also": [
+        "card-advantage",
+        "payoff"
+      ]
+    },
+    {
+      "key": "sac-outlet",
+      "term": "Sacrifice outlets",
+      "short": "A permanent that lets you sacrifice your own things whenever you like — ideally for free, and as often as you want.",
+      "long": "Viscera Seer takes a creature and gives you a look at the top of your library; Ashnod's Altar turns one into two colourless mana. What makes an outlet good is not what it gives back but that it costs nothing and can be used repeatedly: it means a creature about to be exiled dies on your terms instead, and it means every token you make is a trigger waiting to happen. A deck built on things dying needs at least a couple, or the rest of it is a plan with no button.",
+      "section": "building",
+      "see_also": [
+        "payoff",
+        "engine"
+      ]
+    },
+    {
+      "key": "payoff",
+      "term": "Payoffs",
+      "short": "The card that pays you for what the rest of the deck was already doing.",
+      "long": "Half of a pair, and the half that does nothing on its own. A deck making treasure wants a card that cares about treasure; a deck where creatures keep dying wants a card that notices. Judge one by how often the deck can actually turn it on — a spectacular payoff for something the deck does twice a game is a card you will mostly be holding, and an ordinary payoff for something it does every single turn is the one that wins.",
+      "section": "building",
+      "see_also": [
+        "engine",
+        "wincon"
+      ]
+    },
+    {
+      "key": "recursion",
+      "term": "Recursion",
+      "short": "Cards that bring things back out of the graveyard.",
+      "long": "There is exactly one of each card in a Commander deck, so the graveyard is where your best one goes to stay dead — unless something fetches it. Eternal Witness returns any card at all and leaves a body behind. Recursion is how a deck gets a second use out of a card an opponent has already answered, which quietly makes their removal spell worse and your own best card count as two.",
+      "section": "building",
+      "see_also": [
+        "card-advantage",
+        "singleton"
+      ]
+    },
+    {
+      "key": "utility",
+      "term": "Utility",
+      "short": "The odd jobs — cards that fix a particular problem this deck has and do not sit on any other shelf.",
+      "long": "A graveyard hate piece for a table full of graveyards, a way to shuffle, a card that untaps something. Worth being honest about: this is also the shelf a card lands on when nobody has decided what it is for. If it keeps growing, the answer is usually not a bigger shelf — it is that some of those cards want a better home, or a cut.",
+      "section": "building",
+      "see_also": [
+        "why",
+        "interaction"
+      ]
+    },
+    {
       "key": "sim.games",
       "term": "Games",
       "short": "How many games to shuffle and play. More games, less noise.",

@@ -174,6 +174,23 @@ var artBearing = map[string]string{
 	"seance-vision": "components/tarot.tsx: <img className='seance-vision' " +
 		"src={vision.image}> in the crystal ball -- commandment 15's room",
 
+	// --- the card held up on a hover, 2026-09-27 ---------------------------
+	//
+	// `card-sheet-art` above is the centred sheet a tap or a keyboard opens;
+	// this is the other one -- the 230px card that follows a cursor, in
+	// `CardHover`, which is the single most-used card image in the app (the
+	// deck page alone draws one per row). It went uncovered because its
+	// wrapper had no class at all until the frame was put on it, and an
+	// element with no class is an element no sweep of this kind can name.
+	//
+	// Listed now because the frame is precisely the change that invites the
+	// reach: the ring is a layer that stands three pixels off the printing
+	// (`cardpeek_test.go` holds that offset), and the obvious wrong version of
+	// the same idea -- "lift the card off the dark page a bit" -- is a
+	// `brightness()` on this element.
+	"card-peek": "components/ui.tsx: the span CardHover's cursor preview " +
+		"draws, holding <img src={card.image}> -- a whole card face at 230px",
+
 	// --- the cards on the reading table, 2026-09-26 ------------------------
 	//
 	// `seance-vision` was the only entry the reading room had, and the ball is

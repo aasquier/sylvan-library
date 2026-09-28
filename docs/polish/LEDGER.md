@@ -4011,6 +4011,65 @@ two of them documented as such, in writing, by the tree itself.
   calls with hand-ins, so the *trend line* in this section is not measuring one
   thing; the two-number form is the replacement.
 
+### 2026-09-26 (rainbow) — the 99's shelves get their words
+
+*(The third leg of the fifth ball. Aaron: "it would be nice if there was help
+text for the genres, like interaction.")*
+
+**Ten of the thirteen shelves had no entry at all.** The deck model names
+thirteen jobs a card can be doing and the deck page prints those words as
+section headers over somebody's first Commander deck; the served glossary held
+`ramp`, `tutor` and — under a different key — the win condition. *Interaction*,
+*payoff*, *sac-outlet*, *recursion*, *engine* and five more were bare words at
+the front of the funnel.
+
+- **Ten entries written into `go/internal/reference/data/glossary.json`**, in
+  the deck model's own order at the end of the `building` section: land,
+  card-advantage, interaction, protection, threat, engine, sac-outlet, payoff,
+  recursion, utility. Reference prose is checked-in, not generated. Every card
+  named in them was looked up in the pool first — Swords to Plowshares,
+  Counterspell, Cultivate, Command Tower, Rhystic Study, Eternal Witness,
+  Viscera Seer, Ashnod's Altar, Lightning Greaves, Heroic Intervention — and
+  **`protection` names its own collision**, because Magic also uses that word
+  as a keyword ability and a newcomer who reads the shelf must not be taught
+  the wrong thing. Round-tripped through `json.dumps(indent=2,
+  ensure_ascii=False)` first and proved byte-identical, so the diff is **110
+  insertions and zero deletions**.
+- **`CATEGORY_TERMS` in `lib/mtg.ts` is the one place a category's key becomes
+  a glossary key**, and it holds exactly the one line that does not follow the
+  rule: `win-con → wincon`, whose entry predates the shelf vocabulary. A second
+  entry saying the same thing is the thing `components/term.tsx` exists to
+  prevent.
+- **`CategoryHelp`** renders the house's existing `HelpTip` beside the shelf's
+  name — **outside** the fold, because a group header is already a `<button>`
+  and a control inside a control is not markup a browser will honour. The fold
+  gives up the empty span of row to its right; `.disclosure-toggle` keeps its
+  44px on a phone from its own floor, measured **125×44** at 375.
+- **`categorywords_test.go`** holds *every* category the server names to an
+  entry the server serves, through that table — so a fourteenth shelf with no
+  word fails rather than losing its help silently. Its sibling refuses a stale
+  or identity line in the table. `glossarykeys_test.go`'s exemption list gained
+  `components/term.tsx` with the argument written out: this is the stronger
+  cover, not the weaker one. Three mutations, three caught.
+
+**And the marks found a live bug on the way in.** With one shelf's help open at
+375px, **the document was 34 pixels wider than the window** and the deck page
+scrolled sideways — the panel was `absolute; left: 0; w-64` inside its trigger,
+which is fine on the left of a wide screen and is 256px starting past the
+middle of a phone. Pre-existing and general (the simulator's marks have the
+same shape), surfaced by putting twelve of them mid-row. `lib/hint.ts` already
+held the arithmetic that does not do that, for exactly this reason — it is the
+file that exists because a suite cannot see layout — so the panel is portalled
+and placed by a new **`placeTip`**: below-first (a glossary mark sits in prose;
+a panel that rises covers the sentence being read), sharing `placeHint`'s
+horizontal clamp. Five unit tests, one of them naming the 34px measurement.
+
+**Numbers.** Glossary **55 → 65** terms. Twelve marks on one deck page. The
+pip's real target measured by `elementFromPoint`: **40 × 32** (`.help-pip
+::after` at `inset: -6px -9px`) — past WCAG 2.5.8's 24×24, under the house's
+44, **left alone deliberately** because that asymmetry was argued when the pip
+was built and re-opening it here would trade one bad tap for another.
+
 ## Black — Ruthless Efficiency
 
 *Claude API spend · static assets · performance*
@@ -7856,6 +7915,86 @@ keyframe's literal, inside a filter list whose own comment warns against
 casual rearrangement.
 
 
+### 2026-09-26 (rainbow) — the fifth ball: the card held up, its row, and the 99's words
+
+*(YAS QUEEN, walked at 1440 and at 375 on `mtglab-ui` 8765 and `web-dev` 5173,
+both themes, mouse and keyboard, reduced motion forced. Aaron's ask, verbatim:
+"I would like card hover previews to also have a border effect along the lines
+of what we have been doing. When a 99 is hovered over besides the card art
+preview it would be nice if the box for the card was highlighted subtly and
+also had a border with an effect. Also it would be nice if there was help text
+for the genres, like interaction.")*
+
+**The read, before.** The card a hover holds up — the single most-used card
+image in the app, one per row on a deck page — wore `rounded-xl shadow-2xl`
+and nothing else. `shadow-2xl` is `rgb(0 0 0 / 0.25)`: a **black shadow on a
+near-black page**, under a card whose own border is black. Measured in the dark
+theme on the deck page, the bottom edge of a held-up card and the row behind it
+were the same colour, so the one thing on screen that answers *what is this
+card* was floating on nothing. And the row it came out of said **nothing at
+all** to a hand: hovered, `background`, `border-color`, `transform` and
+`box-shadow` all read exactly what they read at rest. `.card-surface` is a
+background and a hairline, which is the Queen's own standing read of it.
+
+**Built.**
+
+- **`.card-peek`** — the preview wears the gleam family's ring, as a **plate
+  voice lit from birth** (it only exists while a hand is already on the card,
+  and `pointer-events: none` means it could never hear a hover of its own).
+  **3.4s a lap, measured 3.41** on the real page; the arena's seat rim walks a
+  card-sized box at the same rate and the number was borrowed rather than
+  guessed at again.
+- **The ring stands `inset: -3px` against a 2px band**, so a pixel of night
+  sits between the light and the printing and **nothing is drawn on Wizards'
+  card at all** — not the painting, not the cardstock's own black border. That
+  is commandment 19 answered by not reaching rather than by reaching carefully.
+  `cardpeek_test.go` holds the offset; `card-peek` joined `artBearing` in
+  `cardimagery_test.go` so a `filter` on it is now named too (mutation-proved
+  both ways).
+- **The voice is the card's colour identity, and it is the game's own rule**:
+  one colour framed in that colour, two or more in **gold**, none at all in the
+  artifact frame's grey. Seven materials, one formula
+  (`--peek-ink` × `--peek-lift`), `--mtg-*` used as identity exactly as those
+  tokens' own comment licenses. `color_identity` was already on the prop's
+  object at every call site that hands over a whole card.
+- **`--peek-lift` is the only thing the two themes disagree about**, and it had
+  to be found by looking: the first build carried every identity toward `#fff`
+  like the buttons do, and **black and white were invisible on the light
+  theme** — a pale line on a pale room. Buttons are painted on a dark plate in
+  both themes; a card floats over the page. Light carries the identity toward
+  an ink (`#2c241e`), dark toward a light.
+- **`.deck-card-row`** — a wash of the surface's own material (`--surface-1`
+  mixed **7%** toward the vine) plus the gleam at the **quiet** tier: dark at
+  rest, appearing when the hand comes. **4.5s a lap, measured 4.52** — not the
+  buttons' 2.6, because a row is 1232×65 and more than nine tenths of the
+  conic's sweep points at the two long edges; at 2.6 the light crosses 1232px
+  in a second and a quarter and reads as a flicker.
+- **`:focus-within`, not `:focus-visible`**, because the row takes no focus —
+  its children do. And the vine, taken **whole and unwhitened**, because that
+  token already inverts per theme by design and its own comment says so.
+- **It stands down in two states**: `.action-pick` (the row is already a
+  control with a louder answer) and `.entombing` (a row being put out is not a
+  row being lit). Both negations are on the wash *and* on the ring, and
+  `cardpeek_test.go` fails if either rule forgets either one.
+
+**The chop this walk found on its way past, and fixed.** A row in the 99 held
+**no link, no button, no input and no `tabindex`** — counted live. The mouse
+had the preview, a thumb had the sheet, and a keyboard could not land on a
+single card in a deck, let alone see the painting. `CardHover` takes
+`reachable` now: a real tab stop, `role="button"`, the house vine ring, and
+**Enter opens the centred sheet** (not the cursor preview — there is no cursor
+to sit beside). Opt-in, set at the 99's call site only; the other twenty-odd
+sites are a queued sweep with the reason written on the prop.
+
+**Numbers.** Peek lap **3.41s** against 3.4 declared; row lap **4.52s** against
+4.5. Resting angle **exactly 34deg** at birth, which is the registered initial
+value doing its job. Under the arrest both park at 34deg and stay lit at
+**0.85** — the ring holds, it does not go out. Row 1232×65 at a desk, **327×103
+at 375**. Rings: 2px lit, 1.5px at rest. Wash 7%, hairline 40% vine.
+**Eleven mutants, eleven caught, all restored.**
+
+**A trap for the next lane, and it cost three files.** `git checkout <file>` to
+undo a mutation **destroys uncommitted work**. Save to `/tmp` and `cp` back.
 ### 2026-09-26 (rainbow) — the fourth ball: the seat on fire, and the blessing
 
 **The ask, verbatim** (Aaron, 2026-09-27, awake and walking): *"I want the

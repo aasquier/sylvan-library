@@ -17,7 +17,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Glossary } from '../lib/api'
 import { resetGlossaryCache } from '../lib/glossary'
-import { HelpTip, Term } from './term'
+import { CategoryHelp, HelpTip, Term } from './term'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
@@ -141,4 +141,47 @@ it('gives the help pip a target and a hand, not an inline colour', async () => {
 
   // The open state is the trigger's own, so CSS can show it filled.
   expect(pip.getAttribute('aria-expanded')).toBe('false')
+})
+
+/* ------------------------------------------------------- the 99's shelves */
+
+it('a shelf of the 99 opens its own entry', async () => {
+  resetGlossaryCache()
+  vi.mocked(api.glossary).mockResolvedValue({
+    sections: GLOSSARY.sections,
+    terms: [...GLOSSARY.terms, {
+      key: 'interaction', term: 'Interaction',
+      short: 'The cards that answer what somebody else did.',
+      long: 'At length.', section: 'building', see_also: [],
+    }],
+  })
+  render(<CategoryHelp category="interaction" />)
+  const pip = await screen.findByRole('button', { name: 'What is Interaction?' })
+  fireEvent.mouseEnter(pip)
+  expect(screen.getByRole('tooltip').textContent).toContain('answer what somebody else did')
+})
+
+it('the win condition reaches the entry it already had', async () => {
+  // The one line in `CATEGORY_TERMS`: the category is `win-con` and the entry
+  // has been keyed `wincon` since long before the shelves were named. Without
+  // the mapping this mark renders nothing at all — silently, which is the
+  // whole failure mode `glossarykeys_test.go` exists for.
+  resetGlossaryCache()
+  vi.mocked(api.glossary).mockResolvedValue({
+    sections: GLOSSARY.sections,
+    terms: [{
+      key: 'wincon', term: 'Win condition',
+      short: 'The specific way the deck expects to end the game.',
+      long: 'At length.', section: 'building', see_also: [],
+    }],
+  })
+  render(<CategoryHelp category="win-con" />)
+  expect(await screen.findByRole('button', { name: 'What is Win condition?' }))
+    .toBeTruthy()
+})
+
+it('a shelf with no entry shows no mark at all', async () => {
+  const { container } = render(<CategoryHelp category="utility" />)
+  await Promise.resolve()
+  expect(container.textContent).toBe('')
 })
