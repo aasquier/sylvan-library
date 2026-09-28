@@ -905,6 +905,29 @@ function Chevron({ back = false }: { back?: boolean }) {
 }
 
 /**
+ * Which material the held-up card's frame is made of, off its colour identity.
+ *
+ * The game's own answer, not a new one: one colour is framed in that colour,
+ * two or more are framed in **gold**, and a card with no colours at all wears
+ * the artifact frame's grey. That is how every card in the format has been
+ * printed, and a player who has seen ten of them reads it without being told —
+ * which is what makes it worth saying in light rather than in words
+ * (commandment 3).
+ *
+ * The class picks a material out of `index.css`; no colour is decided here.
+ * An identity that is absent — several callers build a `{ name, image }` by
+ * hand — falls through to the vine, and a class is the only way a stylesheet
+ * could ever reach this, which an inline colour would not be.
+ */
+function peekVoice(identity?: string[]): string {
+  if (!identity) return ''
+  if (identity.length === 0) return 'is-c'
+  if (identity.length > 1) return 'is-m'
+  const one = identity[0]?.toLowerCase() ?? ''
+  return one !== '' && 'wubrg'.includes(one) ? `is-${one}` : 'is-c'
+}
+
+/**
  * Full card image on hover, positioned near the cursor — and on a tap,
  * centred, for the half of the audience that has no cursor at all.
  *
@@ -932,16 +955,47 @@ function Chevron({ back = false }: { back?: boolean }) {
  * newcomer's most important decision to show them a picture they did not ask
  * for. Those four pass `false`; everywhere the tile is inert, the tile
  * answers.
+ *
+ * **The held-up card is framed in its own colours** (Aaron, 2026-09-27: *"I
+ * would like card hover previews to also have a border effect along the lines
+ * of what we have been doing"*). The frame is `.card-peek` in `index.css` —
+ * the buttons' gleam at the scale of a card, standing three pixels clear of
+ * the printing so nothing is drawn on it (commandment 19) — and the voice is
+ * the card's own colour identity, which arrives free at every call site that
+ * hands this component a whole card. `color_identity` is optional on the prop
+ * because several callers build a `{ name, image }` by hand; those get the
+ * vine, which is the Library's own mark and the right answer for a card whose
+ * colours are not to hand.
  */
 export function CardHover({
-  card, children, className = '', tapOpens = true,
+  card, children, className = '', tapOpens = true, reachable = false,
 }: {
-  card: { name: string; image?: string | null }
+  card: { name: string; image?: string | null; color_identity?: string[] }
   children: React.ReactNode
   className?: string
   /** False where the child is itself a control and the tap is already spoken
    *  for. See the note above. */
   tapOpens?: boolean
+  /**
+   * Whether a keyboard can reach this card at all.
+   *
+   * **It could not, anywhere, until now.** Counted live on a deck's 99 on
+   * 2026-09-27: a row contains no link, no button, no input and no
+   * `tabindex` — nothing. A mouse gets the preview, a thumb gets the sheet,
+   * and a person on a keyboard cannot so much as land on a card, let alone
+   * see the painting, which is the one thing that answers *what is this
+   * card* (commandment 2). The reading room bought exactly this lesson the
+   * day before and the fix is the same one: a card you may look at takes a
+   * tab stop, and Enter opens it.
+   *
+   * Opt-in rather than on by default, because it is also 99 new stops on one
+   * page and the twenty-odd other call sites want looking at one at a time —
+   * a grid tile whose wrapper is `display: contents` has no box for a focus
+   * ring to be drawn around, and four sites pass `tapOpens={false}` because
+   * the child is already a control, where a second stop would be a stop on
+   * nothing. The sweep is a queued item, named in the pull request.
+   */
+  reachable?: boolean
 }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [held, setHeld] = useState(false)
@@ -965,10 +1019,26 @@ export function CardHover({
     return () => window.removeEventListener('scroll', clear, true)
   }, [showing])
 
+  // A keyboard opens the *sheet*, not the cursor preview: the preview is
+  // positioned at a pointer, and there is no pointer. It is the same card,
+  // centred, and Escape closes it — which is the path a thumb already takes.
+  const keyed = reachable && !!card.image
   return (
     <span
       ref={ref}
-      className={className}
+      className={className + (keyed ? ' card-reach' : '')}
+      {...(keyed
+        ? {
+            role: 'button' as const,
+            tabIndex: 0,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault()
+              setPos(null)
+              setHeld(true)
+            },
+          }
+        : {})}
       onPointerDown={(e) => { coarse.current = e.pointerType !== 'mouse' }}
       onPointerUp={(e) => {
         if (e.pointerType === 'mouse' || !tapOpens || !card.image) return
@@ -988,14 +1058,17 @@ export function CardHover({
       )}
       {pos && card.image && (
         <span
-          className="pointer-events-none fixed z-50 block"
+          className={`card-peek pointer-events-none fixed z-50 block ${peekVoice(card.color_identity)}`}
           style={{
             left: Math.min(pos.x + 18, window.innerWidth - 250),
             top: Math.min(pos.y + 12, window.innerHeight - 350),
           }}
         >
+          {/* The radius and the drop live on `.card-peek` now: the shadow the
+              utility gave this was `rgb(0 0 0 / 0.25)`, which on a near-black
+              page lifted a black-bordered card off nothing. */}
           <img src={card.image} alt={card.name} width={230}
-               className="rounded-xl shadow-2xl" />
+               className="block rounded-xl" />
         </span>
       )}
     </span>
