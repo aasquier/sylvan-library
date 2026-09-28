@@ -68,19 +68,14 @@ var ceilings = map[string]int{
 }
 
 const (
-	// 114 → 115 on the branch that landed the pool rebuild. The one added
-	// comment dates the measurement that argues for the whole change ("On
-	// 2026-09-13 the served pool was 261,894,144 bytes"), and a reader who
-	// cannot see when that was measured cannot tell a live number from a
-	// rotted one -- which is the doc comment's own test for keeping a date.
-	// This is what raising the ceiling is supposed to look like: one line, in
-	// the diff, with the reason beside it.
-	// 114 → 117 over 2026-09-13/14, one at a time across three branches: the
-	// pool-bloat measurement, the two-days-seventeen-days-apart measurement,
-	// and the count of `transform` cards the analyzer was mis-reading. All
-	// three are counts taken against a pool that keeps growing, so a reader
-	// who cannot see when they were taken cannot tell a live number from a
-	// rotted one — which is this file's own test for keeping a date.
+	// 114 → 117 over 2026-09-13/14, one argued line at a time across three
+	// branches: the pool-bloat measurement, the two-days-seventeen-days-apart
+	// measurement, and the count of `transform` cards the analyzer was
+	// mis-reading. All three are counts taken against a pool that keeps
+	// growing, so a reader who cannot see when they were taken cannot tell a
+	// live number from a rotted one — which is this file's own test for
+	// keeping a date. That is what raising the ceiling is supposed to look
+	// like: one line, in the diff, with the reason beside it.
 	//
 	// **Worth saying plainly, though: that day added three and retired none.**
 	// The ratchet is doing its job — every one of those was a visible, argued
@@ -88,13 +83,75 @@ const (
 	// sweep's arithmetic problem in a new costume. The next Colorless run
 	// should spend its slice retiring dated comments rather than counting
 	// them, and lower this by more than it raises.
-	goDatedCommentCeiling = 117
+	//
+	// 117 → 118 on 2026-09-26, for the pooled compressor in
+	// `internal/door/gzip.go`. The date is the fact twice over there: the
+	// comment carries the allocation figures the pool exists for (836,848 B
+	// per compressed response before, 23,435 after) and the machine they were
+	// taken on, and a reader who cannot see when they were measured cannot
+	// tell whether the pool still earns its hazard. That file already dates
+	// its other measurement — the 2026-08-14 comparison against the edge's
+	// own gzip — so the two read as one record rather than as residue. Still
+	// the fourth rise with no fall; the note above stands and Colorless owes
+	// the sweep.
+	//
+	// The rise above landed first (#502) and the fall below landed on top of
+	// it, so the ceiling is the fall's count plus that one argued rise.
+	// **118 → 94: the first fall on this side, and the rule it establishes.**
+	// Four rises with no fall is the sweep's arithmetic problem in a new
+	// costume, and this const block asked the next Colorless run to retire
+	// rather than count. It did: `internal/sim/tier3` -- the Coliseum's
+	// reader, deliberately *not* one of the five fingerprinted packages, so no
+	// cache key moves -- carried 29 dated lines and 24 of them were a date on
+	// one of Aaron's rulings. The sweep's whole rule, now that it has run
+	// twice on each side, is one question and three answers:
+	//
+	//   *Would a fresh session act differently for knowing the day?*
+	//
+	//   - A **ruling** keeps its argument and loses its date: "(Aaron,
+	//     2026-08-26: …)" → "(Aaron: …)". The sentence is the ruling; the day
+	//     he said it changes nothing anyone does, and `git blame` has it.
+	//   - A **when-it-happened** clause keeps the fact that it happened and
+	//     loses the day: "it was live: on 2026-08-31 a game ran fifteen
+	//     minutes past its clock" → "it was live: a game ran …". That it was
+	//     observed rather than reasoned about is the whole point; the date is
+	//     the diary.
+	//   - A **validation measurement** keeps the date, because the date is
+	//     how a reader chooses between trusting the number and re-measuring
+	//     it: five survived here, each a count taken against Forge or the
+	//     card pool, both of which move. Strip those dates and the sentences
+	//     quietly claim to be current forever.
+	//
+	// A family re-accumulates: tier3 was swept once on 2026-08-24 and the
+	// Coliseum's own fortnight refilled it, which is why the sweep is a
+	// standing job rather than a finished one.
+	goDatedCommentCeiling = 94
 	// 292 → 259 on the branch that swept the Coliseum board family
 	// (`web/src/components/board.tsx`): every date there sat on one of
 	// Aaron's rulings, whose argument is the sentence and not the day, so all
 	// of them went and no ceiling was raised beside them. This is what the
 	// fall side is for -- the test failed on the sweep before this line moved.
-	webDatedCommentCeiling = 259
+	//
+	// 259 → 260 on the branch that put a travelling gleam on the button
+	// family. The one added line is the ask itself, attributed and dated the
+	// way `.btn-accent-vine`'s "(Aaron, 2026-09-07: ...)" three hundred lines
+	// above it already is: a quotation whose speaker and day are the fact,
+	// because the whole shape of that block -- blood, fire, per-surface
+	// materials -- is an answer to it, and a future session weighing whether
+	// to change the materials needs to know whose request it is arguing with.
+	// The same branch's `.btn-accent-brass` note dates its own walk in prose
+	// this guard does not count; it is left as written for the same reason.
+	//
+	// 260 → 261 on the branch that named the house's lantern brass. The one
+	// added line is `.prose-link`'s, and the date is doing the same work a
+	// ruling's does: it carries a **count** — twelve inline `--series-1`s in
+	// `web/src` on that day — and a count is the one kind of fact in this
+	// repo that is explicitly a claim to re-check rather than a fact to
+	// inherit (CLAUDE.md says so by name). Undated, the next session reads
+	// "twelve" as the number that is true now; dated, it reads it as the
+	// number somebody measured, which is what it is. The `--lantern-brass`
+	// token's own note dates the sweep in prose this guard does not count.
+	webDatedCommentCeiling = 261
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a

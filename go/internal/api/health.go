@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -21,9 +22,36 @@ import (
 // regardless of who asks, deliberately: this route is on
 // `door.PublicPaths`, so the platform's anonymous probe and a signed-in
 // browser read the same number.
+//
+// **Four of the facts here are about sickness rather than liveness, and the
+// status stays 200 for all of them.** `app_db`, `disk_free_mb`,
+// `pool_age_days` and `schema_version` answer the faults that used to leave
+// this route green while the site was wrong: a corrupt auth database (every
+// login fails, the card pool is fine), a full volume (every write fails,
+// likewise), and a library weeks behind (every card answers, with last month's
+// legality and last month's prices — `pool_stale` cannot see it, because it
+// asks about columns rather than about age). They are reported in the body and
+// never in the status, because the platform stops routing to a machine whose
+// check fails and there is one machine — so a failing status turns "logins are
+// broken" into "the site is down". Whoever is watching from outside decides
+// what is worth waking somebody for; this route's job is to make the decision
+// possible.
 func (a *API) health(w http.ResponseWriter, r *http.Request) {
 	var oracle, printings int64
 	var stale bool
+
+	// Read off the box before the pool is touched, so the degraded answer
+	// carries these too: an instance with no card pool still has an auth
+	// database and a volume, and nothing watching from outside should have to
+	// branch on the pool's state to find out whether they are well.
+	opens, applied := a.appDBReading()
+	sickness := wire.OrderedMap{
+		{Key: "app_db", Value: opens},
+		{Key: "disk_free_mb", Value: diskFreeMB(a.dataDir)},
+		{Key: "pool_age_days", Value: poolAgeDays(a.scryfallDir, time.Now())},
+		{Key: "schema_version", Value: applied},
+	}
+
 	// **A probe, not a visitor.** This route is what Fly polls from outside the
 	// container and what the image's own `HEALTHCHECK` polls from inside, both
 	// every thirty seconds and neither aware of the other — and an ordinary
@@ -45,12 +73,14 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		return countErr
 	})
 	if errors.Is(err, pool.ErrNoPool) {
-		wire.JSON(w, http.StatusOK, wire.OrderedMap{
+		body := wire.OrderedMap{
 			{Key: "pool", Value: false},
 			{Key: "oracle_cards", Value: 0},
 			{Key: "printings", Value: 0},
-			{Key: "message", Value: noPoolMessage},
-		})
+		}
+		body = append(body, sickness...)
+		wire.JSON(w, http.StatusOK, append(body,
+			wire.KV{Key: "message", Value: noPoolMessage}))
 		return
 	}
 	if a.refuse(w, "health", err) {
@@ -83,10 +113,62 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 		{Key: "decks", Value: len(slugs)},
 		{Key: "pool_stale", Value: stale},
 	}
+	body = append(body, sickness...)
 	if stale {
 		body = append(body, wire.KV{Key: "message",
 			Value: "pool predates the printed stats or the painters -- " +
 				"run `mtglab data refresh`"})
 	}
 	wire.JSON(w, http.StatusOK, body)
+}
+
+// diskFreeMB is the data directory's headroom in whole megabytes, or nil when
+// there is nothing to ask — no data directory configured, or a statfs that
+// answered nothing.
+//
+// **Never 0 for the unanswered case**, which is the only interesting line in
+// this function. [diskUsage] reports a failure as three zeros, and a monitor
+// reading `disk_free_mb: 0` would page somebody at four in the morning for a
+// full volume that is really a question nobody asked. A total of zero is how
+// that failure is told apart from a real reading: no volume this app runs on
+// has a zero-byte total.
+func diskFreeMB(dataDir string) any {
+	if dataDir == "" {
+		return nil
+	}
+	total, _, free := diskUsage(dataDir)
+	if total <= 0 {
+		return nil
+	}
+	return free / (1 << 20)
+}
+
+// poolAgeDays is how many whole days ago the rows this library was built from
+// were published, or nil when nothing on the shelf can say.
+//
+// **`diskFreeMB`'s rule, applied to the other number that would be read as
+// reassurance.** A small age means "the library is current", so the one thing
+// this may never do is answer a small number for a question nobody could
+// answer — an absent shelf, an undated file, a stamp that is ten characters of
+// digits and still not a day. Each of those is nil.
+//
+// A stamp in the *future* is nil for the same reason and it is not a
+// hypothetical: a container whose clock has not synchronised yet would compute
+// a negative age, and clamping that to zero would print the most reassuring
+// possible number at exactly the moment the machine cannot be trusted about
+// time at all.
+//
+// Whole days, floored, off `time.Time.Sub` — a pool published yesterday
+// afternoon and read this morning is nought days old rather than one, which is
+// the reading a person would give it.
+func poolAgeDays(scryfallDir string, now time.Time) any {
+	day, ok := pool.BulkDataDay(scryfallDir)
+	if !ok {
+		return nil
+	}
+	age := now.UTC().Sub(day)
+	if age < 0 {
+		return nil
+	}
+	return int64(age.Hours() / 24)
 }

@@ -361,11 +361,39 @@ fly machine list
 ```
 
 Two health paths, and the difference is the point: **`/api/health`** is the
-instance's own — pool present, tables counted, deck count, `pool_stale` —
-and is what Fly's checks, the image's `HEALTHCHECK` (`mtglab probe`) and
-the deploy's smoke test ask. **`/door/health`** answers `{"ok": true}`
-whenever the process is up at all: liveness with no opinion about the
-stores behind it.
+instance's own — pool present, tables counted, deck count, `pool_stale`, plus
+the four sickness readings below — and is what Fly's checks, the image's
+`HEALTHCHECK` (`mtglab probe`) and the deploy's smoke test ask.
+**`/door/health`** answers `{"ok": true}` whenever the process is up at all:
+liveness with no opinion about the stores behind it.
+
+**Four of `/api/health`'s keys are about sickness rather than liveness, and
+the status stays 200 for all of them** — because Fly stops routing to a
+machine whose check fails, and with one machine that turns a broken login into
+a dark site. Whatever is watching from outside decides what is worth waking
+somebody for:
+
+- **`app_db`** — `true` it opened and answered, `false` there is a file and it
+  will not (half a restore, a corrupt header: every login on the instance is
+  failing while the card pool looks perfect), `null` this instance has no auth
+  database at all, which is not a fault.
+- **`disk_free_mb`** — the volume's headroom, or `null` when the read could
+  not be made. Never `0` for an unanswered read: a monitor cannot tell a full
+  volume from a question nobody asked.
+- **`pool_age_days`** — how many whole days ago the rows the library was built
+  from were **published**, off Scryfall's own stamp on the bulk files in
+  `/data/scryfall`. Not the pool file's age: a rebuild rewrites `mtg.duckdb` and
+  does not make month-old rows younger. For a shelf holding both kinds it is the
+  **older** of the two, because a run that loaded only the oracle half leaves
+  prices and printings exactly as behind as they were. `null` when nothing can
+  say — no shelf, no dated file, or a clock that has not synchronised and makes
+  the arithmetic negative; never a small number for a question nobody could
+  answer. This is the reading `pool_stale` cannot give you: that flag asks
+  whether the pool predates the *columns* this binary reads, so it says `false`
+  for a library of any age at all. The fix is `mtglab data refresh`.
+- **`schema_version`** — the rung `app.db` is actually on, to compare against
+  the ladder's height. The ladder applies on boot and is forward-only, so a
+  number below it after a deploy is the migration that did not run.
 
 Most of what the three commands answer is on **`/admin`**, signed in as an
 admin, no terminal needed: the box's account of itself (process and machine
