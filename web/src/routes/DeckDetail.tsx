@@ -40,6 +40,7 @@ import {
 import { DeckNameHeading } from '../components/deckname'
 import { ArtPicker, CardArtPicker } from '../components/artpicker'
 import { CategoryGlyph } from '../components/categoryglyphs'
+import { CategoryHelp } from '../components/term'
 import { CrossedSwordsGlyph, GoldfishGlyph } from '../components/glyphs'
 import { DeckArtifactsPanel } from '../components/artifacts'
 import { CardFacePlate } from '../components/cardface'
@@ -1430,11 +1431,23 @@ export default function DeckDetail() {
               {/* The header is the fold. A rolled-up group unmounts its rows
                   entirely — with two hover targets and a dozen-odd elements
                   per row, folding is also where the busy page gets quiet. */}
-              <h3 className="text-sm font-semibold">
+              {/* **The shelf's name, and a hand offered beside it.** These
+                  words — interaction, ramp, payoffs — are the deck model's
+                  vocabulary, and a newcomer's first deck page shows them a
+                  dozen of them with nothing offered (Aaron, 2026-09-27:
+                  *"it would be nice if there was help text for the genres,
+                  like interaction"*). The mark sits **outside** the fold
+                  rather than inside it: the header is already a `<button>`,
+                  and a control nested in a control is not markup a browser
+                  will honour. The fold gives up the empty span of row to its
+                  right to make room — nothing was ever drawn out there for a
+                  hand to aim at, and `.disclosure-toggle` keeps its 44px on a
+                  phone from its own floor rather than from that width. */}
+              <h3 className="flex items-center gap-1 text-sm font-semibold">
                 <button type="button"
                         onClick={() => toggleFold(key)}
                         aria-expanded={!folded.has(key)}
-                        className="disclosure-toggle flex w-full items-center gap-2 text-left">
+                        className="disclosure-toggle flex min-w-0 items-center gap-2 text-left">
                   <span aria-hidden className="text-[10px]"
                         style={{
                           display: 'inline-block',
@@ -1450,12 +1463,20 @@ export default function DeckDetail() {
                     {cards.reduce((n, c) => n + c.qty, 0)}
                   </span>
                 </button>
+                {groupBy === 'category' && <CategoryHelp category={key} />}
               </h3>
+              {/* `deck-card-row` on each row below is where its reply to a
+                  hand lives (Aaron, 2026-09-27: *"it would be nice if the box
+                  for the card was highlighted subtly and also had a border
+                  with an effect"*). A class rather than a utility string,
+                  because the reply is three states over two themes — and
+                  because `.card-surface`, which these rows have always worn,
+                  is a background and a hairline and nothing else. */}
               {folded.has(key) ? null : (
               <ul className="space-y-1">
                 {cards.map((card) => (
                   <li key={card.name}
-                      className={'card-surface rounded-lg p-2'
+                      className={'card-surface deck-card-row rounded-lg p-2'
                                  + (leaving.has(card.name) ? ' entombing' : '')
                                  + (action && deck.writable ? ' action-pick' : '')
                                  + (pendingEntomb === card.name ? ' is-pending-entomb' : '')}>
@@ -1503,7 +1524,15 @@ export default function DeckDetail() {
                     <CardFacePlate card={card} />
                     <div className="min-w-0 flex-1 basis-52">
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <CardHover card={card}>
+                        {/* `reachable`: before this, a keyboard could not land
+                            on a single card in a deck — counted live, a row
+                            held no link, button, input or `tabindex` at all.
+                            The mouse had the preview and the thumb had the
+                            sheet; the third hand had nothing, on the surface
+                            where "what is this card?" is the whole question.
+                            Enter opens the card centred, Escape puts it down,
+                            and the row it is in lights with it. */}
+                        <CardHover card={card} reachable>
                           <span className="cursor-help text-sm font-medium">
                             {card.qty > 1 && <span className="tabular mr-1">{card.qty}×</span>}
                             {card.name}

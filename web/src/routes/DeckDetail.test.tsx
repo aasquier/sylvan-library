@@ -38,6 +38,12 @@ vi.mock('../lib/api', async () => ({
     // The straight-swap composer's finder asks this the moment somebody
     // types a replacement's name.
     suggestCards: vi.fn(),
+    // Every shelf heading in the 99 carries the mark that explains its word,
+    // and the mark asks for the glossary on mount. Resolved with nothing
+    // rather than left off: an empty table renders no mark at all, which is
+    // the degradation `components/term.tsx` is built around and which keeps
+    // this file about the deck page.
+    glossary: vi.fn().mockResolvedValue({ sections: [], terms: [] }),
     swapCard: vi.fn(), addCard: vi.fn(), entombCard: vi.fn(),
     entombCards: vi.fn(), returnCard: vi.fn(), exileCard: vi.fn(),
     setCardField: vi.fn(), setNote: vi.fn(), setDeckField: vi.fn(),

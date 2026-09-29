@@ -63,12 +63,28 @@ var glossaryHelper = regexp.MustCompile(`\bhelp\(['"]([a-z0-9._-]+)['"]\)`)
 var glossaryIndirect = regexp.MustCompile(`<(?:Term|HelpTip)\s+name=\{`)
 
 // glossaryHelperFiles are the files allowed to pass a key indirectly, each
-// because it defines exactly the one-line helper `glossaryHelper` reads. A
-// file added here without that shape fails the third assertion; a file that
-// grows a second indirection fails it too.
+// against the one line that makes it readable some other way. A file added
+// here without that shape fails the third assertion; a file that grows a
+// second indirection fails it too.
+//
+// There are two kinds of exemption here and it is worth saying which is
+// which, because the arguments are not the same one:
+//
+//   - the two routes define exactly the one-line helper `glossaryHelper`
+//     reads, so their keys are still literals this sweep walks;
+//   - `components/term.tsx` passes a key that is *computed* — a card
+//     category's own key through `categoryTerm` — and no sweep of this file
+//     could follow it. What covers it instead is
+//     `categorywords_test.go`, which takes the whole list that indirection
+//     can produce (the deck model's thirteen categories, read from the
+//     server) and holds every one of them to the served table. That is
+//     stronger than reading the call site, not weaker: it fails when a
+//     *fourteenth* category is added with no word to go with it, which no
+//     amount of reading `term.tsx` ever would.
 var glossaryHelperFiles = map[string]string{
 	"routes/Simulator.tsx": "const help = (key: string) => <HelpTip name={key} />",
 	"routes/Coliseum.tsx":  "const help = (key: string) => <HelpTip name={key} />",
+	"components/term.tsx":  "return <HelpTip name={categoryTerm(category)} />",
 }
 
 // glossaryMark is one key as it was written, with where to look when it is

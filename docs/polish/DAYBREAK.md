@@ -155,6 +155,77 @@ knows the covered list is kept by walking JSX, not by waiting for a violation.
 Worth one Colorless slice asking which *other* rooms render card art with no
 entry. Ledger: Green, 2026-09-26 (rainbow).
 
+**Red: the card a hover holds up wears its own colours now, the row it came
+out of answers a hand, and the 99's thirteen shelves finally say what they
+mean — all three want your eye.** PR (the fifth ball) is green and parked
+against `main`. Door **8765** (`mtglab-ui`, the committed bundle), any deck →
+**The 99**, unfold a group. Hover a card's name: the preview is framed in that
+card's **colour identity** — a mono-red card rimmed in ember, a two-colour card
+in gold, an artifact in steel — and the light walks the frame in **3.4s** a lap
+(measured 3.41). Hover anywhere else on the row: it washes faintly green and a
+quiet vine light runs its rim, **4.5s** a lap (measured 4.52). Then **Tab**
+into the list — a keyboard could not land on a single card in a deck before
+this branch — and press **Enter** to hold one up. Both themes, and narrow to a
+phone: hover does not exist there, the shelf marks open on a tap. · *Cost of
+leaving it:* commandment 16 — merging deploys, and all of this is a user
+surface. · **Recommendation:** walk it, then merge. The one taste call that is
+yours is the wash: 7% of the vine over the surface, which is near the floor of
+what is visible, because "subtly" was the word in the ask. Ledger: Red and
+Blue, 2026-09-26 (rainbow).
+
+**Red: a card thumbnail is reachable by a keyboard in exactly one of the
+twenty-odd places `CardHover` is used, and the other nineteen are a sweep.**
+`CardHover` grew an opt-in `reachable` on the fifth ball — a tab stop, a focus
+ring and Enter to hold the card up — and it is set on the deck page's 99 only.
+The rest were left alone deliberately and the reason is on the prop: four pass
+`tapOpens={false}` because the child is already a control, and at least one
+wraps a `display: contents` tile with no box for a ring to be drawn around, so
+each site is a judgement rather than a find-and-replace. · *Cost of leaving
+it:* card search, the swap board, the combo panel and the token shelf still
+answer a mouse and a thumb and not a keyboard — the same gap the 99 had, on
+smaller surfaces. · **Recommendation:** one Green slice, by surface, recording
+which sites were examined and deliberately left inline **with the reason** —
+that last part is what stops it being rediscovered every cycle. Ledger: Red,
+**Red: the seat on turn is on fire and lifegain has a blessing — both want
+your eye.** PR (the fourth ball) is green and parked: `/coliseum`, a match with
+a board. The square belonging to the seat whose turn it is — their half of the
+sand in a duel, their quadrant at four — is ringed in fire the whole way round
+with flame standing along its top edge: **9s** a lap for the ring (the
+quadrant's own measured rate, which the duel's half now shares),
+**1.7s/1.15s** for the two flame layers (they come back into phase every
+**78.2s**, so the fire never visibly repeats) — and that seat's name on the
+trench warms to the fire's gold. **The first build of this put the fire on the
+commander's card and Aaron corrected it the same evening** (*"I meant on their
+square part of the arena"*); the card is back to its plain crown and a test
+holds it there. A life total going *up* now sends three motes
+of green-gold light off the **upper** rim of its dial, the blood drip's sibling
+with every axis reversed; **1.9s**, same window as the blood. Walked on a real
+recorded match in both themes, at 1440 and at 375, with the flame's still
+reduced-motion state forced and looked at. · *Cost of leaving it:* it is the
+board's busiest surface and the two effects sit next to each other on the same
+plate — a newcomer reading a gain as a hit is commandment 2 failing, and only a
+person can say whether *up is up* actually lands. · **Recommendation:** walk
+`/coliseum` with a match on screen and say whether the fire is the right
+loudness and whether the name's warmth reads or shouts; I made it the quiet
+half deliberately and that is the one taste call with two defensible answers.
+Second taste call, smaller: a seat flush with the top of the arena shows the
+flame's **roots** (the rail alight) rather than whole tongues, because there is
+one pixel of sky above it — the seats with room show the tongues. I chose the
+room that exists over a flame sized for the smallest clearance on the page.
+Ledger: Red, 2026-09-26 (rainbow).
+
+**Red: the reduced-motion sweep was excusing one box with another box's guard,
+and the fix is in this branch.** `boxesIn` in `reducedmotion_test.go` stapled a
+selector's pseudo-element to *every* class in it, so the crown's guard on
+`.field-card.is-commander .field-card-turn::before` read as guarding
+`field-card::before` too — proven by mutation, with the flame's own guard
+deleted and the sweep still green. The pseudo belongs to the subject now. ·
+*Cost of leaving it:* nothing, it is closed — recorded because this is the
+**second** hole of exactly this shape in two days (2026-09-26 was the bare-class
+version) and a third is worth expecting. · **Recommendation:** no decision.
+Worth one Blue or Colorless slice asking what *else* in that file
+over-approximates, since both holes were in the same twenty lines. Ledger: Red,
+2026-09-26 (rainbow).
 **Green: the arena's two guardians are BUILT AND GREEN and parked for your
 walk — and they draw from 1344px, not the 1280 the brief named.** The two
 Hercules you chose (Met 247000 left, 247001 right, CC0) stand in the Coliseum's

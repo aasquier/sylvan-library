@@ -5,6 +5,7 @@ import type { Card, CardOffer, DeckRef, EditResult } from '../lib/api'
 import { CATEGORY_LABELS, categoryLabel } from '../lib/mtg'
 import { CardFinder } from './cardfinder'
 import { FieldHint } from './hint'
+import { CategoryHelp } from './term'
 import { CardArt, CardHover, ErrorNote, ManaCost, ManaText, Select } from './ui'
 
 /**
@@ -520,9 +521,13 @@ function PromoteComposer({ deckRef, card, cards, onDone, onCancel }: {
       )}
       {groups.map(([key, list]) => (
         <div key={key} className="space-y-1">
-          <p className="text-[10px] uppercase tracking-wide"
+          {/* The bench is filed on the same thirteen shelves the 99 is, so the
+              word gets the same hand offered beside it. Nothing here is a
+              control, so the mark simply sits in the line. */}
+          <p className="flex items-center text-[10px] uppercase tracking-wide"
              style={{ color: 'var(--text-muted)' }}>
             {categoryLabel(key)}
+            <CategoryHelp category={key} />
           </p>
           <div className="flex flex-wrap gap-1.5">
             {list.map((c) => (

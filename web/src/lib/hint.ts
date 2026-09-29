@@ -69,3 +69,50 @@ export function placeHint(at: DOMRect, wide: number, tall: number,
     under: true,
   }
 }
+
+/**
+ * How wide the glossary's panel wants to be. Wider than a board mark's,
+ * because these hold a whole definition rather than a keyword's sentence, and
+ * it is the width the panel has always had (`w-64`).
+ */
+export const TIP_W = 256
+
+/**
+ * The same arithmetic, the other way up: **below** the word by preference,
+ * above it when there is no room below.
+ *
+ * Below first because a glossary mark sits in a line of prose or beside a
+ * label, and a panel that rises covers the sentence the reader was in the
+ * middle of. A board mark is the opposite case and `placeHint` is its answer;
+ * the two share the horizontal clamp because falling off the side of a window
+ * is not a matter of taste.
+ *
+ * **The clamp is why this function exists at all.** The panel was
+ * `absolute; left: 0; width: 16rem` inside the trigger, which is fine for a
+ * mark on the left of a wide screen and is a document 34 pixels wider than the
+ * window for a mark halfway across a phone — measured on the deck page at
+ * 375, with one category's help open.
+ */
+export function placeTip(at: DOMRect, wide: number, tall: number,
+  panel: { w: number; h: number }): HintPlace {
+  // The hidden-tab guard `placeHint` carries, for the same reason.
+  const w = wide > 0 ? wide : panel.w + 2 * HINT_EDGE
+  const h = tall > 0 ? tall : panel.h + 2 * HINT_EDGE
+  const width = Math.max(1, Math.min(panel.w, w - 2 * HINT_EDGE))
+  const want = at.left + at.width / 2 - width / 2
+  const left = Math.min(Math.max(want, HINT_EDGE),
+    Math.max(HINT_EDGE, w - HINT_EDGE - width))
+  const below = at.bottom + HINT_GAP
+  if (below + panel.h <= h - HINT_EDGE) {
+    return { left, top: below, width, under: true }
+  }
+  const above = at.top - HINT_GAP - panel.h
+  // Neither side fits: keep the first line — the word itself — on the screen,
+  // which is `placeHint`'s ruling and holds here for the same reason.
+  return {
+    left,
+    top: Math.max(HINT_EDGE, Math.min(above, h - HINT_EDGE - panel.h)),
+    width,
+    under: false,
+  }
+}
