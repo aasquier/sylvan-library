@@ -7426,6 +7426,38 @@ button:hover .tarot-fan-card {
      invent a slightly different green. */
   --arena-verdigris: #3f7a52;
   --arena-glisten: #8fe053;
+  /* **The fire, for the seat whose turn it is.** The board's brass says *this
+     card is the commander*; it had nothing left to say with when the question
+     became *and it is their turn* (Aaron, 2026-09-27: *"I want the border
+     around the active commander in the coliseum to pop more like our buttons,
+     it should look like a flame on top, and the whole border should be lit
+     up"* — and then, correcting the first build of it: *"I didn't mean a fire
+     effect on the commander card itself, I meant on their square part of the
+     arena."* The subject is the **seat**: a player's own square of sand in a
+     duel, their quadrant at four. A card is one permanent among a dozen; the
+     square is the thing a watcher finds from across a room, and it is the
+     thing the sentence was always about.) Brass lit harder is brass; fire is
+     a different material, and
+     Three steps because that is what a flame is made of and one hex is not —
+     a near-white heart, the orange body, and the deep root where it leaves the
+     metal. Named here beside the blood for the blood's own reason: a material
+     the arena is allowed to use, said once, so a second surface cannot invent
+     a slightly different orange. */
+  --arena-fire-lit: #ffd489;
+  --arena-fire: #e8842a;
+  --arena-fire-deep: #a03a0c;
+  /* **And the light that arrives on somebody, for the other half of the ask**
+     (Aaron, same sitting: *"I would also like an effect for lifegain similar
+     to the blood dripping for damage"*). Green-gold rather than the white a
+     first draft reached for: the figure inside the ring has flashed `#9fe0a4`
+     on a rise since the dial was built, so the board already had an opinion
+     about what a gain looks like and the motes take it rather than starting a
+     second one. It is also, not by accident, the one colour on this plate that
+     could never be mistaken for the blood beside it — which is the whole job
+     (commandment 2: up is up, and a newcomer may not have to learn that). */
+  --arena-grace-lit: #d9f7c0;
+  --arena-grace: #8fdc8e;
+  --arena-grace-deep: #2f7a4a;
 }
 
 .btn-arena {
@@ -12314,6 +12346,47 @@ button:hover .tarot-fan-card {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 420ms ease, text-shadow 420ms ease;
+}
+/* **And the name of the player whose turn it is** — the last clause of the
+ * same ask (Aaron, 2026-09-27: *"Maybe their name too"*), answered quietly
+ * because the loud half is already on the sand and on their commander's
+ * border. What changes is one step of warmth toward the fire and a low ember
+ * behind the letters, plus the plate's own brass rule catching the same light.
+ * Not a second announcement; the light falling on the name that is already
+ * there.
+ *
+ * **A state, never an entrance**, which is `.field-side-lit`'s settled ruling
+ * for this exact signal: a match is about a hundred and thirty beats and the
+ * turn changes constantly, so anything that *arrived* here would be a strobe
+ * by turn six. It transitions, at the sand's own unhurried rate, and holds.
+ *
+ * **It yields to a blow and to a gain**, both of which animate this element:
+ * an animation outranks a declaration whatever the specificity, so a player
+ * struck on their own turn still reads as struck. That is the right order —
+ * whose turn it is will still be true in two seconds.
+ *
+ * One selector for both tables. `.field-plate.is-on-turn` is set by
+ * `FieldPlate` itself (`components/board.tsx`), because a duel's plate lives
+ * in the trench outside any half and a pod's lives inside the quadrant, and
+ * no ancestor class can reach both. */
+.field-plate.is-on-turn .field-plate-name {
+  color: color-mix(in srgb, var(--arena-fire-lit) 62%, #fff6e2);
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--arena-fire) 46%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.85);
+}
+.field-plate.is-on-turn .field-plate-rule {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--arena-fire-lit) 88%, transparent) 0%,
+    color-mix(in srgb, var(--arena-fire) 46%, transparent) 70%,
+    transparent 100%);
+}
+.field-plate-near.is-on-turn .field-plate-rule {
+  background: linear-gradient(270deg,
+    color-mix(in srgb, var(--arena-fire-lit) 88%, transparent) 0%,
+    color-mix(in srgb, var(--arena-fire) 46%, transparent) 70%,
+    transparent 100%);
 }
 /* **The figures, and the room kept for the one that is not here yet.**
  *
@@ -12782,6 +12855,10 @@ button:hover .tarot-fan-card {
   .field-life-arc { transition: none; }
   .field-life.is-down .field-life-n,
   .field-life.is-up .field-life-n { animation: none; }
+  /* The turn's warmth arrives at once instead of easing in. The step stays —
+     whose turn it is, is information — and only the fade between goes, which
+     is `.field-quad::after`'s own ruling in the pod. */
+  .field-plate-name { transition: none; }
 }
 
 /* ---- the wound
@@ -12791,7 +12868,7 @@ button:hover .tarot-fan-card {
  * in silence. Aaron: *"when a commander takes damage lets put a
  * red highlight on their main or commander damage health, and it would be
  * cool if we had some stylized dripping blood too and maybe red effect on
- * their name too."* `useWounds` in `components/board.tsx` reads the blow off
+ * their name too."* `useLifeMarks` in `components/board.tsx` reads the blow off
  * the fold and hands it down as three states, which is what these rules
  * dress: the plate as a whole (`.is-bleeding` on `.field-plate`, and the
  * name reddens), and the dial that took the blow (`.is-bleeding` on
@@ -12979,6 +13056,190 @@ button:hover .tarot-fan-card {
   .field-bead.is-bleeding::before { animation: none; opacity: 0.55; }
   .field-blood-drip { animation: none; height: var(--drip-len); opacity: 0.9; }
   .field-blood-drip::after { animation: none; transform: rotate(45deg) scale(1); }
+}
+
+/* ---- the blessing
+ *
+ * **The blood's sibling, and everything about it points the other way.**
+ *
+ * Aaron, 2026-09-27: *"I would also like an effect for lifegain similar to the
+ * blood dripping for damage (which is really good by the way)."* So this is
+ * the drip's own construction at the same tier of craft — one reader, one
+ * serial, three unequal things, the same nineteen hundred milliseconds — with
+ * every axis of it reversed, because the one thing it may never be is
+ * mistaken for a hit.
+ *
+ * | | the blow | the blessing |
+ * | --- | --- | --- |
+ * | leaves the dial | at the **lower** rim | at the **upper** rim |
+ * | travels | down, with gravity's easing | up, slowing as it goes |
+ * | colour | the arena's reds | `--arena-grace-*`, green-gold |
+ * | the figure's own flash | `life-hit-down`, `--arena-blood` | `life-hit-up`, `#9fe0a4` |
+ *
+ * That last row is why the green was not a choice: the number inside the ring
+ * has swelled green on a rise since the dial was built, so the board already
+ * had an opinion about what a gain looks like and this agrees with it rather
+ * than opening a second argument. **Commandment 2 is the whole specification
+ * here** — a person at their first game must read *up* off the picture alone,
+ * with no legend and nothing learned, and "the other way, in the other colour"
+ * is the only version of that which costs a newcomer nothing.
+ *
+ * **Its ancestor is white and green's lifegain**, which in thirty years of
+ * Magic's art direction is never a number going up — it is always light
+ * *arriving on somebody*: *Healing Salve* ("Target player gains 3 life"),
+ * *Congregate* ("Target player gains 2 life for each creature on the
+ * battlefield"), *Essence Warden* ("Whenever another creature enters, you gain
+ * 1 life"). So what rises off the rim is light: a mote with a bloom round it,
+ * brightest as it leaves and spent by the time it clears the plate.
+ *
+ * **Drawn, for the blood's reason**, which is commandment 5 read carefully
+ * rather than skirted: a rising mote is a *shape under light*, and the
+ * stylesheet can draw that out of the same gradients the brass and the felt
+ * are made of. A sparkle PNG is the clip art the commandment bans. */
+.field-plate.is-blessed:not(.is-bleeding) .field-plate-name {
+  animation: name-grace 1900ms ease-out both;
+}
+@keyframes name-grace {
+  0% {
+    color: var(--arena-grace-lit);
+    text-shadow: 0 0 10px var(--arena-grace), 0 0 22px var(--arena-grace-deep),
+      0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  34% {
+    color: color-mix(in srgb, var(--arena-grace-lit) 70%, #fff);
+    text-shadow: 0 0 7px color-mix(in srgb, var(--arena-grace) 70%, transparent),
+      0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+  100% {
+    /* The resting colour, restated, for `name-bleed`'s reason: `both` keeps
+       the last frame, so the last frame has to be the name as it was. */
+    color: color-mix(in srgb, var(--field-brass) 88%, #fff);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  }
+}
+/* The bloom under the mended dial — `dial-bleed`'s sheet in the other colour,
+   laid in the same place beneath the ring and above the plate. It is a touch
+   softer and a touch slower off than the blood's: being hit is a shock and
+   being mended is a relief, and the two should not arrive at the same
+   volume. */
+.field-life.is-blessed::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--arena-grace) 52%, transparent) 0%,
+    color-mix(in srgb, var(--arena-grace-deep) 34%, transparent) 44%,
+    transparent 72%);
+  animation: dial-grace 1900ms ease-out both;
+}
+@keyframes dial-grace {
+  0%   { opacity: 0;   transform: scale(0.72); }
+  18%  { opacity: 1;   transform: scale(1.04); }
+  62%  { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1); }
+}
+/* And the arc goes to the healing light for the gain's own length — over the
+   gradient it is already on, so a player climbing from four and a player
+   climbing from thirty-six both read *mended* rather than one of them reading
+   merely *higher*. The blood's rule one block up is the same sentence. */
+.field-life.is-blessed .field-life-arc {
+  stroke: var(--arena-grace);
+  filter: drop-shadow(0 0 8px var(--arena-grace-lit));
+}
+/* The motes leave the ring's **upper** rim and climb past the plate's box,
+   which is why this wrapper is `inset: 0` with `overflow` left visible — the
+   drips' own arrangement, read upside down. Their places on the rim are where
+   a chord crosses it, the same arithmetic the blood uses: the ring is r=20 in
+   a 48 box, so at 52% of the width the rim is at 8.4% of the height, and a
+   little lower either side. Above the figure, because light passes in front of
+   what it is lighting. */
+.field-grace {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+/* A mote: a small round light with its own bloom, drawn as two stacked
+   gradients rather than one, so it has a heart and a halo the way a real spark
+   over a lamp does. Flat colour at this size is a dot, and a dot is a sticker
+   (commandment 5). */
+.field-grace-mote {
+  position: absolute;
+  top: var(--mote-top);
+  left: var(--mote-x);
+  width: var(--mote, 7px);
+  height: var(--mote, 7px);
+  margin-left: calc(var(--mote, 7px) / -2);
+  margin-top: calc(var(--mote, 7px) / -2);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 44%,
+      #ffffff 0%,
+      var(--arena-grace-lit) 32%,
+      color-mix(in srgb, var(--arena-grace) 72%, transparent) 62%,
+      transparent 100%);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--arena-grace-lit) 70%, transparent),
+    0 0 14px color-mix(in srgb, var(--arena-grace) 52%, transparent);
+  opacity: 0;
+  animation: grace-rise var(--mote-ms) cubic-bezier(0.2, 0.6, 0.35, 1)
+    var(--mote-wait) both;
+}
+/* Three motes, three tempos and three sizes, unequal for the drips' reason:
+   three of anything on one clock is a pattern, and a pattern reads as a
+   graphic rather than as something that happened.
+
+   **The rise is short, and it is short because it was measured.** The first
+   cut sent them 19 to 34 pixels up, and on a real board that is straight out
+   of the trench: the far seat's plate is anchored to the *top* of the band,
+   so there are about six pixels of dark above its dial and then golden sand —
+   and a pale green light on golden sand is nothing at all. Cut to 11–18, the
+   motes stay over the plate and over the dial's own green bloom, which is the
+   half of this that carries across a room. (The blood has the same asymmetry
+   the other way up, and its own note says the same thing about pixels.) */
+.field-grace-mote:nth-child(1) {
+  --mote-x: 40%; --mote-top: 10.4%; --rise: -14px;
+  --mote: 8px; --mote-ms: 1500ms; --mote-wait: 90ms;
+}
+.field-grace-mote:nth-child(2) {
+  --mote-x: 52%; --mote-top: 8.4%; --rise: -18px;
+  --mote: 10px; --mote-ms: 1750ms; --mote-wait: 0ms;
+}
+.field-grace-mote:nth-child(3) {
+  --mote-x: 64%; --mote-top: 11%; --rise: -11px;
+  --mote: 7px; --mote-ms: 1350ms; --mote-wait: 260ms;
+}
+/* Brightest as it leaves and spent before it clears the plate — light rising
+   off warm metal cools as it goes, and a mote still at full strength at the
+   top of its travel would read as a thing being thrown rather than a thing
+   being given. It drifts a little sideways on the way up, because nothing
+   rising through air goes straight. */
+@keyframes grace-rise {
+  0%   { transform: translate(0, 0) scale(0.45); opacity: 0; }
+  16%  { transform: translate(0, calc(var(--rise) * 0.16)) scale(1);
+         opacity: 1; }
+  62%  { transform: translate(2px, calc(var(--rise) * 0.68)) scale(0.86);
+         opacity: 0.78; }
+  100% { transform: translate(-1px, var(--rise)) scale(0.5); opacity: 0; }
+}
+/* Reduced motion keeps the fact and stills the rising, which is the blood's
+   own ruling one block up and for the same reason: *that a player was mended*
+   is information, and the climb is only the picture of it. The motes stand
+   where they left the rim, lit. */
+@media (prefers-reduced-motion: reduce) {
+  /* `:not(.is-bleeding)` here as well as on the animation above: with motion
+     off both rules are plain declarations, and a plate that was hit *and*
+     mended on one beat would otherwise take whichever colour is later in this
+     file. A blow outranks a gain, and it outranks it in both modes. */
+  .field-plate.is-blessed:not(.is-bleeding) .field-plate-name {
+    animation: none;
+    color: var(--arena-grace-lit);
+  }
+  .field-life.is-blessed::before { animation: none; opacity: 0.5; }
+  .field-grace-mote { animation: none; opacity: 0.9; }
 }
 
 .field-pile {
@@ -14513,6 +14774,7 @@ button:hover .tarot-fan-card {
      bloom and the crown are untouched: none of them ever moved. */
   .field-card.is-commander .field-card-turn::before { animation: none; }
 }
+
 .field-card.is-companion .field-card-turn {
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.45),
@@ -16338,6 +16600,301 @@ button:hover .tarot-fan-card {
   .field-seam-on { animation: none; }
   .field-side { transition: none; }
   .field-side-lit { transition: none; }
+}
+
+/* --------------------------------------------- the seat whose turn it is is
+ * ON FIRE
+ *
+ * **The light on the sand was the answer, and it was not loud enough to be
+ * the answer.** Everything above this line says *whose turn it is* in the
+ * arena's own brass — a wash on the half, a gold rim on a quadrant, a lip on
+ * the trench — and brass on brass is a thing you find once you know it is
+ * there. Aaron, 2026-09-27: *"I want the border around the active seat in the
+ * coliseum to pop more like our buttons, it should look like a flame on top,
+ * and the whole border should be lit up."* Then, correcting the first build,
+ * which put all of this on the active commander's card: *"I didn't mean a
+ * fire effect on the commander card itself, I meant on their square part of
+ * the arena."*
+ *
+ * **So the subject is the square, and that is the whole correction.** A card
+ * is one permanent among a dozen and it moves; a seat's square is a fixed
+ * place a watcher can find from the other side of a room, and it is the only
+ * box on this board whose meaning is exactly *this player, now*. Brass turned
+ * up is still brass, so the square goes to a different material —
+ * `--arena-fire-*`, declared beside the blood — and says the thing once,
+ * enormously.
+ *
+ * **Two layouts, one square, one voice.** A duel's square is the player's
+ * half of the sand (`.field-side.is-active`); a pod's is the whole quadrant
+ * (`.field-quad.is-on-turn`), which already wears this exact mechanism in
+ * gold and simply changes metal. Each selector below carries both, and the
+ * two never meet: a board is `.field.is-pod` or it is not.
+ *
+ * **Nothing reaches through a painting** (commandment 19). The ring paints
+ * the border and nothing else — the same two masks the quadrant's rim and the
+ * crown already use — and the flame is a layer standing over the top edge.
+ * No `filter` appears anywhere in this block, and the one that would be
+ * reached for here (*"dim the other seats"*) is already answered two hundred
+ * lines up by a sheet laid over them, for this reason.
+ *
+ * ---- the whole border, lit --------------------------------------------- */
+
+/* The bloom, so a lit square reads as lit from the far side of the table and
+   not merely outlined. The inset that cancels the waiting seat's shade has to
+   be restated: it is the same property, and a `box-shadow` does not merge. */
+.field:not(.is-pod) .field-side.is-active {
+  box-shadow:
+    inset 0 0 0 999px rgba(8, 5, 2, 0),
+    0 0 0 1px color-mix(in srgb, var(--arena-fire) 44%, transparent),
+    0 0 34px -6px color-mix(in srgb, var(--arena-fire) 58%, transparent);
+}
+.field-quad.is-on-turn {
+  box-shadow:
+    inset 0 0 0 3px rgba(24, 14, 4, 0.42),
+    0 0 0 1px color-mix(in srgb, var(--arena-fire) 46%, transparent),
+    0 0 26px -4px color-mix(in srgb, var(--arena-fire) 64%, transparent);
+}
+/* The ring itself. The duel's half had none — this is the quadrant's rim
+   built a second time at the scale of a half, with the same two masks
+   (`xor`/`exclude` between the content box and the border box) leaving the
+   padding ring and nothing else. `--field-turn-sweep` and `field-turn-walk`
+   are the quadrant's own, reused rather than re-invented: one registered
+   angle, one keyframe, two boxes. */
+.field:not(.is-pod) .field-side.is-active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Above the sand and the cards, below nothing that matters: it paints the
+     rim alone, so no painting under it is touched. The quadrant's own rim
+     argues this at 3 and is the model. */
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 8px;
+  /* Three, not the crown's two. A perimeter of this order needs the width to
+     read at all — the quadrant's rim was measured to exactly this conclusion
+     on a real pod and a half's perimeter is larger still. */
+  padding: 3px;
+  background: conic-gradient(from var(--field-turn-sweep) at 50% 50%,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 0deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 30deg,
+    /* The apex is the Wheel's ember rather than white. A white-hot arc reads
+       as an LED; this room's hottest light is candle and coal, and
+       `.wheel-spin-btn`'s gleam has said so since it was tuned. */
+    #ffe9bb 58deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 86deg,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 116deg 360deg);
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  -webkit-mask-clip: content-box, border-box;
+  mask-clip: content-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: field-turn-walk 9s linear infinite;
+}
+/* **"the whole border should be lit up"**, at the scale it was asked about.
+   The quadrant's gold already refused to go out between passes and says why;
+   this changes its metal and nothing else about it, so the pod keeps the rate
+   that was measured for a perimeter this size — nine seconds, because a light
+   crossing a quadrant at a card's angular rate would be running. The duel's
+   half is the same order of perimeter and takes the same nine. */
+.field-quad.is-on-turn::before {
+  background: conic-gradient(from var(--field-turn-sweep) at 50% 50%,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 0deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 30deg,
+    #ffe9bb 58deg,
+    color-mix(in srgb, var(--arena-fire-lit) 92%, #fff) 86deg,
+    color-mix(in srgb, var(--arena-fire) 74%, transparent) 116deg 360deg);
+}
+
+/* ---- the flame along the top edge ---------------------------------------
+ *
+ * Drawn, never fetched (commandment 5): a flame is a *shape under light*, and
+ * a fire GIF along an eight-hundred-pixel rail is the clip art the
+ * commandment bans. Tapering radial tongues rooted on the square's top edge,
+ * in two layers on two clocks — 1700ms and 1150ms, both `alternate`, so the
+ * cycles are 3.4s and 2.3s and the pair comes back into phase every **78.2
+ * seconds**, which is to say never at the rate anybody watches a board. One
+ * layer on one clock is a lamp blinking; two beating against each other is
+ * the only cheap thing in CSS that reads as combustion.
+ *
+ * **The tongues are irregular and they overlap, and that was measured rather
+ * than chosen.** Eleven evenly spaced tongues of one size along this rail
+ * read as a string of lights — a graphic, not a fire — and the fault survived
+ * two attempts to fix it with height and opacity. What fixed it was uneven
+ * spacing, widths that differ by nearly two to one, and enough overlap that
+ * no plain sand shows between neighbours.
+ *
+ * **It burns up into the room that exists, and on a flush edge that room is
+ * the rail itself.** `.field` clips at its padding box, and a board's top row
+ * is flush with it — the far seat of a duel and both upper quadrants of a
+ * pod. So the band straddles the edge: its roots sit just inside the square
+ * and its tips reach above, and where the arena cuts the tips off, what is
+ * left is the rail alight rather than a gap. The seats with sky above them
+ * (a duel's near half, a pod's lower row) show the tongues whole. Both read
+ * as the same fire and the difference is the room, which is the honest
+ * answer — the alternative is a flame sized for the smallest clearance on the
+ * page, which is one pixel.
+ *
+ * Sized in fractions of `--field-card-full` rather than pixels, so it scales
+ * with the board: about 26 and 36 at a desk, 21 and 29 on a phone, 17 and 24
+ * inside a pod's smaller quadrant. A constant measured against one screen is
+ * a bug this room has already paid for. */
+.field:not(.is-pod) .field-side.is-active::after,
+.field-quad.is-on-turn .field-quad-head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--field-card-full) * -0.45);
+  height: calc(var(--field-card-full) * 0.62);
+  z-index: 3;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 3.4% 120% at 4% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 4.6% 168% at 11% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 96% at 19% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 5.2% 190% at 28% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.6% 124% at 37% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4.2% 150% at 44% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 104% at 53% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 5% 182% at 61% 100%, rgba(255, 248, 230, 1) 0%,
+      var(--arena-fire-lit) 18%, var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 56%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.8% 132% at 70% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4.4% 160% at 79% 100%, rgba(255, 248, 230, 0.95) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 90%, transparent) 18%,
+      var(--arena-fire) 46%,
+      color-mix(in srgb, var(--arena-fire-deep) 53%, transparent) 74%,
+      transparent 100%),
+    radial-gradient(ellipse 3.2% 108% at 88% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 4% 140% at 96% 100%, rgba(255, 248, 230, 0.9) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 85%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 74%, transparent) 46%,
+      transparent 100%),
+    /* The bed: the square's own top rail alight, under all of them, so the
+       tongues rise out of one fire instead of standing in a row. */
+    linear-gradient(to top,
+      color-mix(in srgb, var(--arena-fire) 72%, transparent) 0,
+      color-mix(in srgb, var(--arena-fire-deep) 46%, transparent) 26%,
+      transparent 60%);
+  animation: seat-burn 1700ms ease-in-out infinite alternate;
+}
+/* The second set, on its own clock and standing in the first set's gaps: a
+   fire is not twelve candles. Each layout hangs it on the free pseudo-element
+   it has — a duel on the sand-light it already draws, a pod on the head that
+   sits along the top of the quadrant — because a board has one element per
+   square and two layers to hang. */
+.field:not(.is-pod) .field-side.is-active > .field-side-lit::after,
+.field-quad.is-on-turn .field-quad-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--field-card-full) * -0.45);
+  height: calc(var(--field-card-full) * 0.55);
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 2.6% 110% at 8% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 140% at 24% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.4% 96% at 33% 100%, rgba(255, 248, 230, 0.7) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 66%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 58%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3.2% 150% at 49% 100%, rgba(255, 248, 230, 0.85) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 80%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 70%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.6% 112% at 58% 100%, rgba(255, 248, 230, 0.75) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 70%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 62%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 3% 138% at 75% 100%, rgba(255, 248, 230, 0.8) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 75%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 66%, transparent) 46%,
+      transparent 100%),
+    radial-gradient(ellipse 2.4% 100% at 92% 100%, rgba(255, 248, 230, 0.7) 0%,
+      color-mix(in srgb, var(--arena-fire-lit) 66%, transparent) 18%,
+      color-mix(in srgb, var(--arena-fire) 58%, transparent) 46%,
+      transparent 100%);
+  animation: seat-burn-cross 1150ms ease-in-out infinite alternate;
+}
+/* The tongues stretch and settle. `scaleY` about the foot, so the flame grows
+   out of the rail and never lifts off it — and **no `scaleX` on this one**,
+   which the card's version had: a horizontal scale about the centre of an
+   eight-hundred-pixel rail slides its end tongues twenty pixels sideways, and
+   a fire that pans is a fire that is being dragged. */
+@keyframes seat-burn {
+  from { transform: scaleY(0.82); opacity: 0.82; }
+  to   { transform: scaleY(1.06); opacity: 1; }
+}
+/* The cross-draught: the inner layer leans and dips, which is what makes the
+   whole thing read as blown rather than pumped. The lean is a fraction of a
+   per cent because the box is the width of a seat. */
+@keyframes seat-burn-cross {
+  from { transform: scaleY(1.08) translateX(-0.6%); opacity: 0.85; }
+  to   { transform: scaleY(0.72) translateX(0.6%);  opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* **The fire holds still and does not go out.** Whose turn it is is
+     *information*, and stillness may not answer it with less than everybody
+     else gets — the crown's ruling, the turn rim's, and the sand light's, all
+     three already settled above. A still flame is not frozen weather: weather
+     stilled is a smudge because a firefly holding perfectly still is a spot,
+     and a flame holding still is a flame in a painting, which is a thing
+     people have drawn on purpose for six hundred years. Parked at the middle
+     of each layer's travel rather than at an end, so neither is caught
+     mid-stretch. */
+  .field:not(.is-pod) .field-side.is-active::before { animation: none; }
+  .field:not(.is-pod) .field-side.is-active::after,
+  .field-quad.is-on-turn .field-quad-head::before {
+    animation: none;
+    transform: scaleY(0.94);
+    opacity: 0.92;
+  }
+  .field:not(.is-pod) .field-side.is-active > .field-side-lit::after,
+  .field-quad.is-on-turn .field-quad-head::after {
+    animation: none;
+    transform: scaleY(0.9);
+    opacity: 0.66;
+  }
 }
 
 /* ------------------------------------------------------------------ the

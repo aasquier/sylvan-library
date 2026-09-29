@@ -186,6 +186,45 @@ answer a mouse and a thumb and not a keyboard — the same gap the 99 had, on
 smaller surfaces. · **Recommendation:** one Green slice, by surface, recording
 which sites were examined and deliberately left inline **with the reason** —
 that last part is what stops it being rediscovered every cycle. Ledger: Red,
+**Red: the seat on turn is on fire and lifegain has a blessing — both want
+your eye.** PR (the fourth ball) is green and parked: `/coliseum`, a match with
+a board. The square belonging to the seat whose turn it is — their half of the
+sand in a duel, their quadrant at four — is ringed in fire the whole way round
+with flame standing along its top edge: **9s** a lap for the ring (the
+quadrant's own measured rate, which the duel's half now shares),
+**1.7s/1.15s** for the two flame layers (they come back into phase every
+**78.2s**, so the fire never visibly repeats) — and that seat's name on the
+trench warms to the fire's gold. **The first build of this put the fire on the
+commander's card and Aaron corrected it the same evening** (*"I meant on their
+square part of the arena"*); the card is back to its plain crown and a test
+holds it there. A life total going *up* now sends three motes
+of green-gold light off the **upper** rim of its dial, the blood drip's sibling
+with every axis reversed; **1.9s**, same window as the blood. Walked on a real
+recorded match in both themes, at 1440 and at 375, with the flame's still
+reduced-motion state forced and looked at. · *Cost of leaving it:* it is the
+board's busiest surface and the two effects sit next to each other on the same
+plate — a newcomer reading a gain as a hit is commandment 2 failing, and only a
+person can say whether *up is up* actually lands. · **Recommendation:** walk
+`/coliseum` with a match on screen and say whether the fire is the right
+loudness and whether the name's warmth reads or shouts; I made it the quiet
+half deliberately and that is the one taste call with two defensible answers.
+Second taste call, smaller: a seat flush with the top of the arena shows the
+flame's **roots** (the rail alight) rather than whole tongues, because there is
+one pixel of sky above it — the seats with room show the tongues. I chose the
+room that exists over a flame sized for the smallest clearance on the page.
+Ledger: Red, 2026-09-26 (rainbow).
+
+**Red: the reduced-motion sweep was excusing one box with another box's guard,
+and the fix is in this branch.** `boxesIn` in `reducedmotion_test.go` stapled a
+selector's pseudo-element to *every* class in it, so the crown's guard on
+`.field-card.is-commander .field-card-turn::before` read as guarding
+`field-card::before` too — proven by mutation, with the flame's own guard
+deleted and the sweep still green. The pseudo belongs to the subject now. ·
+*Cost of leaving it:* nothing, it is closed — recorded because this is the
+**second** hole of exactly this shape in two days (2026-09-26 was the bare-class
+version) and a third is worth expecting. · **Recommendation:** no decision.
+Worth one Blue or Colorless slice asking what *else* in that file
+over-approximates, since both holes were in the same twenty lines. Ledger: Red,
 2026-09-26 (rainbow).
 
 ## Open — a few clicks in the repository settings

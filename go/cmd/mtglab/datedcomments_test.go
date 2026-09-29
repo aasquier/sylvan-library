@@ -171,7 +171,18 @@ const (
 	//     session reads it as the number somebody measured, which is what it
 	//     is. Undated it would read as a standing claim about a component that
 	//     has since been changed by this very branch.
-	webDatedCommentCeiling = 265
+	//
+	// 265 → 269 on the branch that set the active commander's border alight
+	// and gave lifegain a blessing. All four added lines are the ask itself,
+	// quoted, attributed and dated, which is the `.btn-accent-vine` /
+	// travelling-gleam precedent two paragraphs up rather than a new habit:
+	// this block is one request answered in four places — the fire tokens,
+	// the ring, the flame and the plate's name — and a session weighing
+	// whether to make the flame quieter, or to drop the warmth on the name,
+	// needs to know that "maybe their name too" is a sentence somebody said
+	// and not a decision a stylesheet drifted into. The date is what makes
+	// the four read as one sitting rather than as four independent tastes.
+	webDatedCommentCeiling = 269
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a
