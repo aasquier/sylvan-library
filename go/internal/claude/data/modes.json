@@ -317,7 +317,7 @@
      },
      "slots": {
       "type": "array",
-      "description": "Everything you now believe about them, including what you already believed -- this replaces the previous set rather than adding to it. One entry per kind at most.",
+      "description": "Everything you have learned about them since your last answer; anything you said before is remembered whether you repeat it or not. One entry per kind at most.",
       "items": {
        "type": "object",
        "properties": {

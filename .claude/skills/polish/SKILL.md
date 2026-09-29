@@ -52,7 +52,7 @@ not a gag order.
 
 **Never block. Ever.** There is no such thing as stopping to wait for an
 answer — a blocked night run is eight idle hours. When a question appears,
-write it to the daybreak queue in one line and **move to the next item**. A
+write it to the daybreak queue as one item and **move to the next item**. A
 run that ends with twelve things done and four questions asked has worked; a
 run that ends with one question and nothing done has slept too.
 
@@ -124,7 +124,7 @@ is the one place night work touches the live instance:
 ledger is three thousand lines and nobody reads that at seven in the morning.
 It is the one file Aaron opens. Rules that keep it worth opening:
 
-- **One line per item, answerable without reading code**, and every item
+- **One item per question — headline first, context after — answerable without reading code**, and every item
   carries a **recommendation** so the whole file can be answered with "yes to
   all". A question with no proposed answer is homework, not a question.
 - **Say what it costs to leave.** "Nothing until the next set" and "the volume
@@ -580,11 +580,18 @@ It is what makes the pass cumulative rather than repetitive.
      Commandment; surgical rather than structural.
    - **Queued for Aaron** — **two places, and they are not duplicates.** The
      full finding goes in the ledger's own color section, with enough context
-     that a fresh session can act on his yes; **one line goes in
+     that a fresh session can act on his yes; **one item goes in
      `DAYBREAK.md`** — the question, what it costs to leave, the
      recommendation, and a pointer to the ledger entry. The ledger is the
      record; daybreak is the queue. Nothing waits in the ledger alone, because
      nobody reads three thousand lines to find out what is waiting.
+     **The ledger record wears a marker while it waits** (Aaron's ruling,
+     2026-09-29): its bold lead opens `**(open) …**`, struck the day he
+     answers. `daybreakrecord_test.go` reads both directions off that token —
+     an `(open)` in a colour section with no queue line pointing at that
+     section is the ledger-only breach caught by name, and a queue line whose
+     section carries no `(open)` is a record nobody marked. A record without
+     the marker is not waiting; a marker without a queue line is the bug.
      **And "it rides the report" is not a third place — it is the ledger-only
      failure wearing a better suit.** A report is read once, over coffee, and
      then it is gone; a question that lives only there is answered by nobody

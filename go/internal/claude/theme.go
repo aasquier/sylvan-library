@@ -330,6 +330,14 @@ func inSlotOrder(kept map[string]Slot) []Slot {
 // Both halves have been through `Ground` against the same transcript, so
 // nothing gets carried that the person did not say: this widens what is
 // remembered, never what counts as evidence.
+//
+// The schema's own description of `slots` in modes.json says the same thing
+// now -- by ruling, "unions": what the model has learned since its last
+// answer, with anything said before remembered whether it repeats it or not.
+// For a while it said the opposite ("replaces the previous set"), so the
+// model re-stated every slot defensively to prove what this function already
+// guaranteed; the two sentences describing one rule are held in agreement by
+// this comment and nothing else, which is why it names the file.
 func Carry(previous, fresh []Slot) []Slot {
 	kept := map[string]Slot{}
 	for _, s := range previous {

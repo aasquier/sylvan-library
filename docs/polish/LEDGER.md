@@ -828,7 +828,7 @@ claim.
     behind the existing Axes guard, and `pool/records.go`'s price filter
     binds its one value. No new `os.Getenv` outside config.
   - **CodeQL: 0 open, 11 dismissed** (the five stale Python alerts are
-    gone since 2026-09-05); today's main analysis green. **Dependabot: 9
+    gone since 2026-09-05); today's main analysis green. **(open) Dependabot: 9
     open, all `pip/torch`, all development-scope** — created 2026-08-24,
     triaged in `pyproject.toml` prose since 08-16. The triage's containment
     premise was made real by fix 1; the alerts themselves stay open because
@@ -952,7 +952,7 @@ claim.
   rather than by reading** — with `SourceFor`'s stranger branch mutated, all
   35 routes leaked, which proves every one of them resolves through the one
   accessor. No live hole was found.
-- **Still open, narrowed: the docs-rot guard outside `.claude/skills/`** (08-24
+- **(open) Still open, narrowed: the docs-rot guard outside `.claude/skills/`** (08-24
   White 2). Its condition was met — #440 built the skills half — so the item
   is no longer waiting on a ruling, only on somebody deciding the wider prose
   is worth a third extractor. Re-worded in `DAYBREAK.md` with that stated.
@@ -2791,7 +2791,7 @@ rather than re-reviewing its logic.
   correction). Zero wrong facts this sample; 08-24's Library of Alexandria
   remains the only error the shelves have ever been caught in.
 - **Queued for Aaron (daybreak 2026-09-05):**
-  1. **The Settings room's "torches are not lit yet" copy is a deployment
+  1. **(open) The Settings room's "torches are not lit yet" copy is a deployment
      fact checked by nothing.** `web/src/routes/Settings.tsx` renders
      "Nothing happens tonight — the torches are not lit yet", true today
      (the deployed instance has no `MTGLAB_NIGHT_WINDOW` set) and false the
@@ -4501,7 +4501,7 @@ will notice it moving.
   take the interview's cap and the theme's union rule as questions for Aaron
   rather than assuming the prompt is the stale side.
 
-- **Queued (new, 2026-09-26): the deck shelf parses the whole library on every
+- **(open) Queued (new, 2026-09-26): the deck shelf parses the whole library on every
   visit, and the only lever that pays on two cores needs an owner for a
   cache.** Numbers above: ~42 ms and 27 MB per visit at 25×100, ~90% of it
   inside goccy. The fix is not to parse a deck whose file has not changed —
@@ -4523,7 +4523,7 @@ will notice it moving.
   would be served from memory). **Recommendation:** yes, as its own PR on a
   morning the deploy can be watched, with the counters in from the start —
   a cache added without them is the finding this facet writes down every run.
-- **Queued (new, 2026-09-26): `CacheReadFraction` is one constant for the whole
+- **(open) Queued (new, 2026-09-26): `CacheReadFraction` is one constant for the whole
   family and the family stopped agreeing.** `prices.go` says so in as many
   words — *"it is the same ratio across the family, and a copy per model would
   be that many chances to mistype a tenth"* — and Claude Fable 5.1 prices cache
@@ -4619,7 +4619,7 @@ reaches a model and thence a newcomer's screen.
   proposal was "Measured at 226 seconds **with four searches**"; its hosted
   search has been bounded at three since #262 and four is the dossier's and
   research's budget, so the clause is gone and the figure stands.
-- **NOT fixed, deliberately: the dossier, and the reason is a hash.**
+- **(open) NOT fixed, deliberately: the dossier, and the reason is a hash.**
   `Fingerprint` (`dossier.go:145`) hashes `DossierVersion`, `mode.Instructions`
   and `dumpJSON(mode.ResponseSchema)`, and `testdata/dossier.json` pins that
   digest (`instructions_sha256`) plus the brief's opening message as bytes. So
@@ -5342,7 +5342,7 @@ unwalked because they never shipped.
      — see the carried item below).
 - **Queued for Aaron (carried from 2026-08-16/19, re-checked against the Go
   tree this run — the code is new, the findings survived it):**
-  1. **Cache-write tokens are still invisible, and still the priciest class.**
+  1. **(open) Cache-write tokens are still invisible, and still the priciest class.**
      Unchanged in substance and now re-verified in Go: `converse.go` adds
      `resp.Usage.InputTokens`, `OutputTokens` and `CacheReadInputTokens`, and
      `cache_creation_input_tokens` appears **nowhere in the tree** — not in
@@ -7093,7 +7093,7 @@ other five. No content below them was changed.)*
   a matrix, and **CodeQL is not required at all**. `codeql.yml`'s own header
   says so and CLAUDE.md's count was right; only the reference had drifted.
 - **Queued for Aaron:**
-  1. **Nothing tells Aaron the site is down, and one specific failure is
+  1. **(open) Nothing tells Aaron the site is down, and one specific failure is
      invisible to everything now watching.** Fly's HTTP check is configured
      and passing, but on Fly a failing service check makes the proxy *stop
      routing* — it does not restart the machine. The machine's restart policy
@@ -7161,7 +7161,7 @@ other five. No content below them was changed.)*
      branch at a time never collides — so this is worth having only if
      concurrent PRs come back. Free for public repos; it changes contributor
      workflow, so queued rather than adopted.
-  6. **A deploy does not take a snapshot, and that is the wrong way round.**
+  6. **(open) A deploy does not take a snapshot, and that is the wrong way round.**
      Four deploys landed this afternoon (machine v61 → v65) and the newest
      volume snapshot still predates all four: Fly snapshots on its own daily
      schedule, which has no relationship to when the volume is at risk. The
@@ -8557,7 +8557,7 @@ for Colorless to carry onto its branch.
      if not, this line is its obituary and the ADR 30 rule held. Either way,
      the mtg-lab skill's trigger list still names "mono-green/Goreclaw" as one
      of your decks, which the instance contradicts — Blue's docs sweep.
-  2. **The next refresh has a date.** Pool is fresh today (six days), but
+  2. **(open) The next refresh has a date.** Pool is fresh today (six days), but
      *Reality Fracture* (`fra`, 249 cards; `frc` commander decks) releases
      **2026-10-02**, and until a refresh runs after that day the shelves
      cannot resolve a released product. Deliberately waiting, nothing to do
@@ -12325,6 +12325,62 @@ the **queue depth before and after**, what Aaron ruled, what was landed, and —
 for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
+
+### 2026-09-29 (cleanup) — the rulings
+
+The morning after the fourth run, Aaron answered the whole *a ruling* group
+of the queue in one line — **ratchet, yes to both, six, unions, obituary,
+close, headline, marker** — and this entry is where each ruling is recorded
+and where each landed, one branch. **Queue depth: 17 before, 10 after**, by
+the file's own recipe; the seven that left are the seven items that group
+held (the two prompt sentences were one item with two words).
+
+- **Ratchet** (White, the coverage floor). `MINIMUM` in `ci.yml` goes
+  **95.0 → 95.5** against merged `main`'s print of 97.0 on 2026-09-28; the
+  step's own comment records the ruling and the next click (96.0 once main
+  prints 97.5 or better, never sooner); `CLAUDE.md`, `COVERAGE.md`'s table
+  and `white.md` say 95.5. Only CI proves a workflow number, so this branch
+  is watched to green before it merges.
+- **Yes to both** (White, the two levers). `ApplyBulk`'s four fold branches
+  and `prompt.secret`'s terminal arm were already argued under
+  `COVERAGE.md`'s *Left deliberately*; the entries now say the ruling made
+  them official rather than "queued for the ruling". Nothing else moves.
+- **Six** (Black, the interview's ask). `interviewOpening` no longer says
+  "three to five": the sentence is built from `MaxQuestions` itself, so the
+  number a person feels and the number the prompt asks for are one constant
+  and cannot drift again. `live_test.go`'s comment follows. No golden pins
+  the opening.
+- **Unions** (Black, the theme schema). The `slots` description in
+  `modes.json` now says "everything you have learned about them since your
+  last answer; anything you said before is remembered whether you repeat it
+  or not", which is what `Carry` has always done; `Carry`'s comment names the
+  file so the two sentences describing one rule are held together by
+  something. `promptdrift_test.go` pins nothing in that sentence.
+- **Obituary** (Green, goreclaw-stompy). "mono-green/Goreclaw" leaves the
+  mtg-lab skill's trigger list; the deck survives in git history at
+  `5515f5f^:decks/goreclaw-stompy/deck.yaml` and nowhere else, and the skill
+  no longer names a deck the instance contradicts.
+- **Close** (Red, the drill residual). HOSTING §Backups' sentence is the
+  rule; no merge-checklist copy. The Red records carried in the 2026-09-19
+  Cleanup entry are answered and this line is the strike.
+- **Headline** (Colorless, the file's own rule). "One line per item" becomes
+  **"one item per question — headline first, context after"** in the skill's
+  daybreak rules, in the queue's own header and in the triage step's
+  wording, which is the shape every good item already had. No gate is added:
+  the rule is now the truth about the file rather than a sentence it fails.
+- **Marker** (Colorless, the guard's missing direction). A waiting ledger
+  record opens its bold lead with the token `(open)` just inside the
+  asterisks, struck when Aaron answers — and this sentence describes the
+  shape rather than writing it, because the guard read the first draft of
+  this entry as an eleventh waiting record. The
+  ten records the ten remaining queue lines point at are marked (White ×2,
+  Blue, Black ×4, Red ×2, Green); `daybreakrecord_test.go` gains
+  `TestTheLedgerAndTheQueueAgreeOnWhatIsOpen`, which fails on an `(open)` in
+  a section no queue line names and on a queue line whose section carries
+  no `(open)`, and refuses to pass on zero markers. A pointer at Cleanup is
+  a carry note, not a record's address, and demands nothing. What the marker
+  cannot see is a record never marked — `references/colorless.md` keeps the
+  grep for those.
 
 ### 2026-09-28 (cleanup) — the fourth run
 

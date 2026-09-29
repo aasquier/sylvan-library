@@ -1,27 +1,28 @@
 # Daybreak
 
 The morning read. The polish pass runs at night (`.claude/skills/polish/`,
-"Nightbound"); anything it could not settle alone lands here as one line with
-a recommendation, so the whole file can be answered with *yes to all*.
+"Nightbound"); anything it could not settle alone lands here as one item —
+headline first, context after — with a recommendation, so the whole file can
+be answered with *yes to all*.
 
 **This is a queue, not a record.** An answered item leaves — its outcome goes
 into `LEDGER.md`'s own section. A file that only grows stops being opened,
-which is exactly how the per-color queues it replaces failed.
+which is exactly how the per-color queues it replaces failed. While an item
+waits, its ledger record wears the marker `**(open) …**` at the head of its
+bold lead, struck when you answer; `daybreakrecord_test.go` holds the two
+files to each other in both directions off that marker.
 
 Each item: what it is · what it costs to leave it · **the recommendation.**
 
-> **2026-09-28, evening: the Cleanup step regrouped the queue after the
-> daylight rainbow.** Every item was re-checked against the tree, the API and
-> the instance rather than inherited. Eighteen headings left the file because
-> the thing they were waiting on has **merged and deployed** — the five balls
-> (#503, #509, #511, #516, #518), the two Hercules (#517), the MDFC land count
-> (#506, "union"), the mode prompts (#513), the pool's age in the health body
-> (#515), the faulty pool handle (#514) — and each is recorded, with where it
-> went, in the ledger's Cleanup section under 2026-09-28. Five more were *work
-> owed rather than a question* and moved to that same entry's "owed work"
-> list, because a line here that needs no answer is furniture. What stays is
-> grouped by what an answer costs you: a few clicks, a word, a dollar, a
-> watched deploy, a migration window — and the last group needs nothing today.
+> **2026-09-29, morning: eight rulings taken, ten items left.** Aaron
+> answered the whole *a ruling* group in one line — ratchet, yes to both, six,
+> unions, obituary, close, headline, marker — and each is landed and recorded
+> in the ledger's Cleanup section under 2026-09-29. The evening before, the
+> Cleanup step had regrouped the queue after the daylight rainbow (35 headings
+> → 17; eighteen retired by merges, five moved to owed work — the 2026-09-28
+> entry says where each went). What stays is grouped by what an answer costs
+> you: a few clicks, a dollar, a watched deploy, a migration window — and the
+> last group needs nothing today.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -51,103 +52,6 @@ spends the hour re-deriving this paragraph. · **Recommendation:** dismiss all
 nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage" (two
 minutes in the Security tab). Ledger: White, 2026-09-12; carried by Cleanup on
 09-12, 09-19 and 09-28 for the same stated reason: the pass cannot click this.
-
-## Open — a ruling, one word each
-
-**White: the coverage floor — the trigger you set has arrived, and the word is
-"ratchet" or "anchor".** You asked on 2026-09-24 for "the tree at 96 and the
-gate at 95"; the tree then climbed 96.6 → 96.9 → and merged `main` printed
-**97.0** in the `Coverage floor` step on 2026-09-28 (read off run 36504824056,
-not off this file). Both readings of your ruling are defensible: hold 95.0 as a
-number, or keep the ~1.5-point gap as the tree climbs. · *Cost of leaving it:*
-nothing this week; at two points of gap a diff can lose a whole point of honest
-coverage without a check going red, which is the one thing the floor exists to
-notice. · **Recommendation:** **"ratchet"** — `MINIMUM` in `ci.yml` goes to
-95.5 and the gap is kept, because what you asked for was slack for refactoring
-and slack does not shrink as a codebase grows. Say **"anchor"** if 95 was a
-floor the tree simply grows away from, and the line closes. Ledger: White,
-2026-09-26 (rainbow, leg two), and the leg-one entry the same day.
-
-**White: two named coverage levers should be closed as argued rather than left
-open — `ApplyBulk`'s four fold branches and `prompt.secret`'s terminal arm.**
-Both were worked on 09-26 and both are honestly unreachable: `PlanBulk`
-refuses the same file through the same lookup, so `ApplyBulk`'s folds are
-defensive depth behind a guard; and the password prompt's terminal branch would
-need its terminal read handed in as a value, which moves the five statements
-into the seam's own default rather than out of the tree. `COVERAGE.md` already
-carries both arguments in place. · *Cost of leaving it:* one hour per future
-coverage leg, spent rediscovering this. · **Recommendation:** "yes to both" —
-they move into `COVERAGE.md`'s *Left deliberately* list, so the map keeps its
-promise of being the thing you read before spending an hour on a branch that
-cannot be entered honestly. Ledger: White, 2026-09-26, queued items 2 and 3.
-
-**Black: the two prompt sentences #513 deliberately left as written — and in
-both, the *code* may be the wrong side.** One word each. **(a)** The interview
-asks for "three to five questions" (`interviewOpening`, `interview.go`) and
-`MaxQuestions = 6` truncates the answer, so a sixth question is kept while a
-seventh vanishes silently. *Recommendation:* **"six"** — the ask becomes "up to
-six", a prompt whose number *is* the cap cannot drift from it; "five" is the
-other consistent answer and brings the constant down. **(b)** The theme
-interview's schema tells the model a re-stated slot set "replaces the previous
-set rather than adding to it", and `Carry` unions — deliberately, because the
-replace rule left a first-timer's reading going 0, 1, 0, 1, 0 and never ready
-(commandment 2's failure exactly). *Recommendation:* **"unions"** — the
-sentence becomes "everything you have learned since your last answer; anything
-you said before is remembered whether you repeat it or not"; both halves still
-pass `Ground` against the same transcript, so nothing is carried the person
-did not say. · *Cost of leaving them:* (a) a seam nobody has tripped; (b) the
-model re-states defensively and spends output tokens proving what the code
-already guarantees. Ledger: Black, 2026-09-26 (rainbow, prompts).
-
-**Green: `goreclaw-stompy` was the one deck in the checkout's `decks/` that
-existed nowhere else, and it is deleted now.** It survives in git history
-(`git show 5515f5f^:decks/goreclaw-stompy/deck.yaml`) plus four theme words in
-the ledger; the mtg-lab skill's trigger list still names "mono-green/Goreclaw"
-and the instance has no such deck (re-read 2026-09-28). · *Cost of leaving
-it:* nothing — nothing served it. · **Recommendation:** if you still want it,
-paste that file through the site's import page and the library owns it; if
-not, say "obituary" and the trigger list drops it on the next Blue run.
-Ledger: Green, 2026-09-19.
-
-**Red: the "drill older than the newest migration" rule cannot be satisfied,
-and the drill that proved it is walked and recorded.** Snapshot retention is
-five days; a snapshot can only ever rehearse a rung landed in the last five
-days, and `docs/HOSTING.md` §Backups already says so. · *Cost of leaving it:*
-nothing — the wording is landed; this is the one residual question. ·
-**Recommendation:** "close" — HOSTING's sentence is the rule, and a second copy
-on a merge checklist is the kind of duplicate this file exists to refuse; say
-"checklist" instead if you want the five-day drill named beside "land schema
-changes when you can watch them" in CLAUDE.md. Ledger: Cleanup, 2026-09-19
-(the drill and the retention finding are Red records carried by Cleanup).
-
-**Colorless: this file's own rule says "one line per item" and not one item
-has obeyed it for a month — is the rule wrong, or is the file?** Every item
-here is a paragraph, and you have answered the file happily in that shape (25
-in one morning on 09-05). A line-count gate would fail the file you blessed,
-and rewording a rule to match drift is the move the pass forbids, so nobody has
-touched either side. · *Cost of leaving it:* nothing today; the risk is the
-file growing into the thing the queue exists to replace, with no rule anyone
-can point at. · **Recommendation:** "headline" — the rule means *one item per
-question, headline first, context after*, which is what the good items already
-do; say the word and the sentence gets rewritten once and then held by the
-shape of every new item. Ledger: Colorless, 2026-09-19, and 2026-09-26 for why
-it arrived late.
-
-**Colorless: the guard on this file reads one direction only, and the missing
-direction is how five items hid for 26 days.** `daybreakrecord_test.go` proves
-every line here names a ledger record; nothing proves every *waiting* ledger
-record has a line, because "queued" in ledger prose carries no marker a test
-can read — and an answered item correctly *leaves* this file, so a naive
-reverse check would demand a line for every historical block ever written.
-The missing piece is one convention, and a convention binds every future
-session, which makes it yours rather than a run's. · *Cost of leaving it:* the
-breach recurs in the only direction nothing watches; it has happened twice
-that we know of. · **Recommendation:** "marker" — queued blocks that are still
-open get a literal `(open)` after the heading, struck when you answer, and the
-next Colorless run extends the guard to read both ways; say "no" and the
-reverse walk stays a `git log -S` recipe in `references/colorless.md`, which is
-honest but only runs when somebody remembers. Ledger: Colorless, 2026-09-19,
-re-filed 2026-09-26.
 
 ## Open — a dollar and an account
 
@@ -243,12 +147,12 @@ read. Ledger: Blue, 2026-09-05.
 
 **Green: the pool is sixteen days old and still fine; the next refresh has a
 date rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the
-`frc` commander decks) releases **2026-10-02** — four days from this
-regrouping — and until a refresh runs after that day the shelves cannot resolve
-a released product. The health body says `pool_age_days: 16` today (bulk files
-still `2026-09-13`). · *Cost of leaving it:* nothing until 10-02, then names
-from a new set fail on import and search. · **Recommendation:** "Gather the
-library again" on the Admin Upkeep tab in the week of 10-05 — a deployed
+`frc` commander decks) releases **2026-10-02** — three days from this
+morning — and until a refresh runs after that day the shelves cannot resolve
+a released product. The health body said `pool_age_days: 16` on 09-28 (bulk
+files still `2026-09-13`). · *Cost of leaving it:* nothing until 10-02, then
+names from a new set fail on import and search. · **Recommendation:** "Gather
+the library again" on the Admin Upkeep tab in the week of 10-05 — a deployed
 button now, no ssh — then read the pool file's size back once; the #472
 rebuild took it 224 MB → 81 MB on 09-13 and it should hold near there. Ledger:
 Green, 2026-09-19.

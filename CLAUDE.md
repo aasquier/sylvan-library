@@ -240,7 +240,7 @@ whole diagnosis. Subtests that share a fixture the parent tears down use
 `t.Cleanup`, never `defer` — a parent's defer runs before its parallel
 subtests finish.
 
-**Coverage gates at 95.0 and the tree measures about 96** (`ci.yml`'s
+**Coverage gates at 95.5 and the tree measures about 97** (`ci.yml`'s
 `Coverage floor` step, arm64 leg; `docs/polish/COVERAGE.md` is the map and
 the list of levers). The floor is a ratchet — raise it when the tree passes
 a higher number, never lower it to make a red check green — and the number
