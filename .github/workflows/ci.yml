@@ -297,6 +297,11 @@ jobs:
           if ! go test -count=1 -coverprofile=coverage.out -coverpkg=./... ./... > coverage-run.log 2>&1; then
             echo "::error::a test failed inside the coverage run -- this is not a coverage failure"
             grep -E '^(--- FAIL|FAIL|panic:)|_test\.go:[0-9]+:' coverage-run.log | head -n 120
+            # A panic's frames sit UNDER its `panic:` line, and the pattern
+            # above keeps the line alone -- which is how a worker's nil
+            # dereference reached this log as a test name with nothing under
+            # it. Print what follows the line as well.
+            grep -n -A 60 -E '^panic:' coverage-run.log | head -n 200
             exit 1
           fi
           TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}' | tr -d '%')
