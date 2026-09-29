@@ -23843,3 +23843,267 @@ select.field-shell option {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--series-1) 35%, transparent);
   outline: none;
 }
+
+/* ----------------------------------------- the arena's two guardians ------
+ *
+ * Critchlow's painting is "crowned by two tall statues" — the room's own alt
+ * text has said so since the hero was built — and the page around it had
+ * nothing. Above 1280px the route's 1024-pixel column leaves a few hundred
+ * pixels of bare page on each side; that margin is the slot, and two Roman
+ * Hercules stand in it (`custodes.recipe.yaml`, Met 247000 and 247001, CC0).
+ *
+ * **The lane is measured off the column, not off the viewport's middle.** The
+ * banner's content box is 62rem wide, so each margin runs
+ * `(100vw − 62rem) / 2` — and 100vw does not know about a scrollbar, which on
+ * this project's own rig is ten pixels and on a Windows browser is seventeen.
+ * Taking 1.5rem back off the width and pushing the lane 0.5rem clear of the
+ * frame keeps the far edge inside the viewport at every scrollbar width there
+ * is; without that slack the left-hand guardian hangs off the page and the
+ * whole document grows a horizontal scrollbar. (Exactness with no slack is a
+ * bug — this file has learned it before.)
+ *
+ * **Height is capped twice and takes the smaller.** 84% of the banner puts a
+ * figure's head below the arena's rim and its feet on the arena's own footing
+ * line. But a plate that is 750×940 needs 1.25 times the lane's width to
+ * stand that tall, so below about 1745px the *lane* is the binding cap and
+ * the figures shrink with the window rather than being clipped by it. Both
+ * lanes read the same expression, so the two are always the same height —
+ * which is most of what makes them a pair rather than two statues.
+ */
+.coliseum-arch {
+  position: relative;
+}
+
+/* Below the floor there is no margin to stand in: at 1024 the column has
+   eaten the page, and a phone would be asked to draw a 940-pixel plate into
+   nothing at all. `display: none` rather than a width of zero, so the browser
+   is never asked to fetch or decode the plates there. */
+.coliseum-custos,
+.coliseum-custos-credit {
+  display: none;
+}
+
+/* **84rem, and the number is arithmetic rather than a device.** The proof
+   sheet this pair was chosen from refuses a lane narrower than 150px — "too
+   narrow to carry a figure" — and the lane here is
+   `(vw − 992) / 2 − 24`, which reaches 150 at 1340. 84rem is the first round
+   number above it. 80rem was tried first because 1280 is where the page's own
+   column stops growing, and at 1280 the lane is 120px: two figures 120 wide
+   and 150 tall beside a banner four times their height, which is not a pair
+   of guardians, it is two ornaments. */
+@media (min-width: 84rem) {
+  .coliseum-custos {
+    --custos-lane: calc((100vw - 62rem) / 2 - 1.5rem);
+    position: absolute;
+    bottom: 0;
+    width: var(--custos-lane);
+    height: min(84%, calc(var(--custos-lane) * 1.25));
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    /* Behind the banner in the stack and deaf to the pointer: they are the
+       room, not a control, and a statue must never take a click meant for
+       the arena beside it. */
+    z-index: 0;
+    pointer-events: none;
+  }
+  .coliseum-custos.is-left  { right: calc(100% + 0.5rem); }
+  .coliseum-custos.is-right { left:  calc(100% + 0.5rem); }
+  /* The guardians' own credit, in the painting's voice and directly under
+     it: same size, same ink, same right edge, a whisker closer than the
+     footnote sits to the frame so the two read as one stack of small print
+     rather than as two separate remarks. */
+  .coliseum-custos-credit {
+    display: block;
+    margin: 0.15rem 0 0;
+    text-align: right;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  /* The figure's box *is* the plate's box — `width: auto` against a definite
+     height — which is what lets the dusk sheet below use `inset: 0` and land
+     exactly on the picture rather than on the lane around it. */
+  .coliseum-custos-figure {
+    position: relative;
+    display: block;
+    height: 100%;
+    max-width: 100%;
+  }
+  .coliseum-custos-art {
+    display: block;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: bottom center;
+  }
+
+  /* **The room's dusk, laid ON the marble as a sheet of its own.**
+     The banner beside these two travels from noon to midnight every
+     twenty-five seconds; a statue lit like a museum catalogue beside it is a
+     cut-out on a page. So a sheet of umber goes over the plate and is masked
+     to the plate's own alpha, which darkens the stone and not the page around
+     it — the shape every light in this app takes, and never a `filter`, which
+     re-renders a picture on its way to the screen instead of lying over it.
+
+     It breathes rather than sitting still, and the two periods are
+     deliberately unequal: two statues dimming on a shared beat read as a page
+     flickering rather than as a day going by. */
+  .coliseum-custos-figure::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+      color-mix(in oklab, #4a3218 40%, transparent),
+      color-mix(in oklab, #1b1008 62%, transparent));
+    mix-blend-mode: multiply;
+    -webkit-mask-image: var(--custos-plate);
+    mask-image: var(--custos-plate);
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    opacity: 0.82;
+    pointer-events: none;
+    animation: custos-dusk 53s ease-in-out infinite;
+  }
+  .coliseum-custos.is-right .coliseum-custos-figure::after {
+    animation-duration: 67s;
+  }
+
+  /* **The margin takes back its own rim**, and this is the one thing the
+     pipeline could not do. The bearded one throws a hard cast shadow across
+     the museum's sweep, and a connectivity matte cannot separate a shadow
+     from the figure it belongs to at any tolerance that leaves him his legs —
+     measured, and the recipe says so. So roughly half his border ring arrives
+     as pale studio ground, and on a black page that is not a shadow, it is a
+     lit rectangle with a hard edge: a sticker, exactly what the grave garden
+     was chopped for.
+
+     What makes it read as a rectangle is the *edge*, not the light. So the
+     page's own colour is laid back over the rim in three inset shadows —
+     left, right and top, feathered — and the residue simply runs out instead
+     of stopping dead. **There is deliberately no fourth one.** The bottom of
+     both plates is the carved plinth, and a wash across that is the figure
+     floating again.
+
+     An inset box-shadow rather than the radial vignette that was here first,
+     for two measured reasons: the radial had to be inset past the lane to
+     reach the plate's corners, which pushed the document 27 pixels wider than
+     the window and laid a page-coloured disc over the right-hand end of the
+     credit line underneath; and a radial fade to a flat near-black bands into
+     visible rings on this page, where a shadow's blur does not. */
+  .coliseum-custos-figure::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    box-shadow:
+      inset  66px 0 44px -34px var(--page),
+      inset -66px 0 44px -34px var(--page),
+      inset 0  66px 44px -34px var(--page);
+    pointer-events: none;
+  }
+
+  /* **One of the two brought his own floor**, and it needs the room taken
+     down around his feet. The bearded plate keeps a lit pool of studio sweep
+     across its lower half — the cast shadow the matte could not separate from
+     him — and on a black page that pool is brighter than the room it is
+     supposed to be lying in, ending in a straight line where the picture
+     stops. So his dusk is weighted hard toward the bottom, which crushes the
+     pool most and his stone least (the plinth was already the darkest thing
+     on the plate), and a shallow feather takes the straight line away.
+
+     Keyed to a plate that *has* a floor rather than to `.is-right`: the class
+     is a fact about the photograph, and if the two ever swapped lanes the
+     shadow would go with the man. */
+  /* **The dusk cannot reach the pool, and the reason is the mask.** The sheet
+     above is masked to the plate's alpha, and the pool's alpha is about a
+     half — the soft ramp is what let the shadow fade rather than be cut — so
+     the umber lands there at half strength over a region already composited
+     at half strength, and a pale ghost survives every value the gradient can
+     take. Measured: three passes at rising strength moved it by nothing worth
+     a screenshot.
+
+     What reaches it is a sheet with no mask at all, over the whole lane. The
+     lane is its own blending group (the `z-index` above makes one), so over
+     the empty three-quarters of it this multiplies onto nothing and paints
+     the page's own colour onto the page — which is a no-op you can measure at
+     zero. Over the pool it is the room getting dark, at full strength,
+     exactly where the room *is* dark.
+
+     **And it is a dark-page fix only.** On paper a pale shadow on white is
+     not a fault, it is a shadow; a rectangle of night laid over it would be. */
+  .coliseum-custos.has-ground::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--page) 16%, transparent) 0%,
+      color-mix(in oklab, var(--page) 48%, transparent) 42%,
+      color-mix(in oklab, var(--page) 82%, transparent) 100%);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+  /* And his own umber comes most of the way off, or he is darkened twice and
+     the pair stops matching — the sheet above is already the room going dark
+     over him, and the masked one is only there for the marble the room does
+     not reach. Two lights on one figure is one light too many.
+     **Written as a weaker gradient rather than a lower `opacity`**, because
+     `opacity` is the property the dusk's own animation drives: a rule that
+     sets it here would be silently outranked by every frame of
+     `custos-dusk`, which is how an animation eats a value nobody can see it
+     eating. */
+  .coliseum-custos.has-ground .coliseum-custos-figure::after {
+    background: linear-gradient(180deg,
+      color-mix(in oklab, #4a3218 14%, transparent),
+      color-mix(in oklab, #1b1008 24%, transparent));
+  }
+  .coliseum-custos.has-ground .coliseum-custos-figure::before {
+    box-shadow:
+      inset  66px 0 44px -34px var(--page),
+      inset -66px 0 44px -34px var(--page),
+      inset 0  66px 44px -34px var(--page),
+      inset 0 -34px 28px -26px var(--page);
+  }
+}
+
+@keyframes custos-dusk {
+  0%, 100% { opacity: 0.62; }
+  50%      { opacity: 1; }
+}
+
+/* Marble is pale and the two grounds it stands on are opposites. On the dark
+   page the umber above is the whole story. On paper a sheet that heavy turns
+   two white statues to mud, so it is pulled most of the way back and the
+   vignette goes with it — on a light page there is no night for a figure to
+   recede into, and a ring of paper around a statue reads as a smudge rather
+   than as distance. */
+:root[data-theme='light'] .coliseum-custos-figure::after {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #6b4a22 16%, transparent),
+    color-mix(in oklab, #2d1d0c 26%, transparent));
+  opacity: 0.7;
+}
+:root[data-theme='light'] .coliseum-custos-figure::before {
+  box-shadow:
+    inset  52px 0 36px -30px var(--page),
+    inset -52px 0 36px -30px var(--page),
+    inset 0  52px 36px -30px var(--page);
+}
+/* The night laid over the bearded one's floor goes with the night. */
+:root[data-theme='light'] .coliseum-custos.has-ground::after {
+  display: none;
+}
+
+/* The light stops travelling; the statues stay. Their *presence* is
+   information about the room, and the slow dusk over them is ceremony —
+   which is what somebody who asked the page to hold still asked to be spared.
+   Arrested rather than removed, so the sheet rests at the opacity the rule
+   above gives it instead of snapping to noon. */
+@media (prefers-reduced-motion: reduce) {
+  .coliseum-custos-figure::after { animation: none; }
+}

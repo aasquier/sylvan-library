@@ -1,0 +1,138 @@
+# The two who stand at the arena's shoulders.
+#
+# Critchlow's painting says it first and the room's own alt text repeats it:
+# the Grand Coliseum is "crowned by two tall statues". The page around the
+# banner has never had them -- above about twelve hundred pixels the route's
+# 1024-pixel column leaves a few hundred pixels of empty ground on each side,
+# and empty is what they have been.
+#
+# **Why these two and not two of anything else.** A flanking pair has to *be*
+# a pair, and almost nothing free is. The Met holds a youthful Hercules
+# (247000, 246.9 cm) and a bearded Hercules (247001, 238.2 cm), both Roman,
+# both cut inside the same thirty years, both photographed on the museum's own
+# grey sweep under the same light -- so they arrive already matched rather than
+# argued into a match. Hercules is also the right figure rather than merely
+# the right shape: he is the gladiator's patron, the one the men on that sand
+# swore by, which makes a pair of him the arena's own iconography instead of
+# two statues that happened to be free.
+#
+# **`matte_backdrop`, not `matte_neutral`, and that was measured.** These are
+# marble on a photographed-neutral sweep, so a chroma key has nothing to key
+# on -- marble is grey and so is the ground, which is the case `matte_neutral`'s
+# own docstring names as the wrong one. What separates them here is
+# *connectivity*: the sweep touches the frame edge all the way round and the
+# figure does not. The edge-seeded flood is the right tool.
+#
+# **No dusk is baked in.** These sit in the page's dark margin and the room
+# already owns its own umber; darkening belongs to the stylesheet as a
+# multiply sheet over the plate, never to the file (`velatio` holds back in
+# CSS, `templum` blends in CSS, and `animist levels` can only lift a floor).
+# The asset ships as the museum lit it.
+animist: 1
+
+why_committed: >
+  They stand in the page's own margin, which is a slot that exists only above
+  about twelve hundred pixels -- so they are drawn and undrawn as the window
+  changes, beside the one thing on the page that is already moving. A figure
+  that resolved from somebody else's CDN would arrive late, at a different
+  moment on each resize, next to a banner mid-breath. They are also a
+  photograph of an ancient work, which is the category where somebody else's
+  file quietly changes licence or vanishes; a copy checked once and committed
+  is a copy whose provenance stays true.
+
+sources:
+  # The Met's own Open Access programme: `isPublicDomain` is true on both
+  # objects, and their whole licence vocabulary is that one boolean.
+  custos_iuvenis:
+    provider: met
+    identifier: "247000"
+    title: "Marble statue of a youthful Hercules, 69-96 CE"
+    landing: https://www.metmuseum.org/art/collection/search/247000
+    found_via: >
+      the Met Open Access API, searching the Greek and Roman Art department
+      for full-length standing statues with a studio plate -- the pair of
+      over-life-size Hercules statues (247000 and 247001) are the only two
+      figures in the results shot on the same sweep, in the same light,
+      within the same accession group
+    licence: CC0-1.0
+  custos_barbatus:
+    provider: met
+    identifier: "247001"
+    title: "Marble statue of a bearded Hercules, 68-98 CE"
+    landing: https://www.metmuseum.org/art/collection/search/247001
+    found_via: >
+      the same search and the same shoot as `custos_iuvenis`; the museum
+      catalogues the two together
+    licence: CC0-1.0
+
+outputs:
+  # **Height, because height is the axis the lane controls.** The banner is
+  # 16:9 across a 992-pixel column, so it stands 558 pixels tall, and a figure
+  # drawn to 0.84 of that is 469 -- tall enough to read as a figure, short
+  # enough that its own footing line is the banner's. 940 is that number at
+  # 2x, and it is the only one here that is not a taste call.
+  #
+  # Quality 84 rather than the floor's 70, for `secutor`'s reason in the same
+  # direction: marble photographed under soft studio light is broad smooth
+  # gradient across the shoulders and the drapery, which is exactly what a low
+  # quality setting bands.
+  #
+  # **Tolerance 42 on both, and the knee was swept on the FULL plate.** An
+  # earlier sweep on a 1200x1600 probe said 34 and it is wrong: at 34 the
+  # full plate keeps a fifth of its border ring at a faint alpha (mean 8/255),
+  # which is invisible against white and is a pale cloud across the top-left
+  # once the plate is composited on this app's own `--page: #0d0d0d`. At 42
+  # that ring residue is 0.66% and the mean alpha is under one. Above 42 the
+  # flood stops taking ground and starts taking figure: at 50 both plates show
+  # erosion in the shadowed legs, and at 58 it is unmistakable. `border: 8`
+  # because the plates are 2902 wide and two pixels of seed at that size is a
+  # sample, not a median; `soft: 22` is the ramp that lets a contact shadow
+  # fade rather than be kept as a wedge or cut as a scallop.
+  - file: custos-iuvenis.webp
+    from: custos_iuvenis
+    ops:
+      # The matte runs on the whole plate and before the crop -- a
+      # connectivity key is seeded from the frame edge, so cropping first
+      # would take away the thing it keys on.
+      - matte_backdrop: {tolerance: 42, border: 8, soft: 22}
+      # **The bottom only, and it is the pair's footing line rather than a
+      # frame.** The two statues are bottom-aligned in two lanes a thousand
+      # pixels apart, so the one thing that must agree between the plates is
+      # where the plinth stops -- and the museum framed these two differently:
+      # the bearded one's plinth runs to the bottom edge of his plate, this
+      # one's stops at 0.9385 with bare sweep under it. Measured, not eyed:
+      # opaque-and-not-near-white pixels in the middle 70% of the columns,
+      # lowest row, and the answer does not move between luma cut-offs of
+      # 170, 190 and 210. 0.9400 keeps six pixels of air under the stone so
+      # the matte's soft edge is not clipped back to a hard one.
+      #
+      # Nothing is taken off the sides or the top. The two plates share a
+      # width and a framing, and that shared framing is most of why they read
+      # as a pair; cropping either one to its own figure would end it.
+      - crop: {frac_box: [0.0000, 0.0000, 1.0000, 0.9400]}
+      - resize: {height: 940}
+    encode: {format: webp, quality: 84}
+    expect: {width: 750, height: 940, budget_kb: 200, metadata: none}
+
+  - file: custos-barbatus.webp
+    from: custos_barbatus
+    ops:
+      - matte_backdrop: {tolerance: 42, border: 8, soft: 22}
+      # **No crop, and that is the measurement rather than an omission.** His
+      # plinth already runs to the bottom edge of the plate (the same probe
+      # answers 1.0000 at every cut-off), so there is nothing under it to
+      # take, and taking anything off the sides would break the framing he
+      # shares with his brother.
+      #
+      # What stays with him is the **cast shadow**, thrown across the sweep to
+      # his right and reaching the floor of the frame. No tolerance separates
+      # it: a connectivity flood treats a shadow as part of the object it
+      # belongs to, and raising the number eats his legs before it takes the
+      # shadow (47.96% of the border ring survives at 42, 35.19% at 58, and at
+      # 58 his legs have visibly gone). It is kept on purpose -- a cast shadow
+      # is a ground, and a figure standing on nothing is a sticker. The page
+      # is where it is made to read as one: the lane fades to the page's own
+      # colour at its rim, so what is left of the sweep goes with it.
+      - resize: {height: 940}
+    encode: {format: webp, quality: 84}
+    expect: {width: 705, height: 940, budget_kb: 200, metadata: none}

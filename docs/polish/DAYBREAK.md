@@ -226,6 +226,19 @@ version) and a third is worth expecting. · **Recommendation:** no decision.
 Worth one Blue or Colorless slice asking what *else* in that file
 over-approximates, since both holes were in the same twenty lines. Ledger: Red,
 2026-09-26 (rainbow).
+**Green: the arena's two guardians are BUILT AND GREEN and parked for your
+walk — and they draw from 1344px, not the 1280 the brief named.** The two
+Hercules you chose (Met 247000 left, 247001 right, CC0) stand in the Coliseum's
+page margins, sized to the 1728 layout. One departure: the proof sheet's own
+readout refuses a lane narrower than 150px, and at 1280 the lane is 120 — the
+pair render 120×150 beside a 558-pixel banner, which is two ornaments rather
+than two guardians. The lane is `(vw − 992)/2 − 24`, which reaches 150 at 1340,
+so the floor is 84rem. · *Cost of leaving it at 80rem:* a laptop at exactly
+1280–1343 gets two thumbnails in its margins instead of nothing, which reads as
+a bug rather than as a decoration. · **Recommendation:** walk it at 1344 and at
+1280 and say which you want; the number is one token in `index.css` and the
+credit line moves with it automatically. Ledger: Green + White, 2026-09-26
+(rainbow).
 
 ## Open — a few clicks in the repository settings
 

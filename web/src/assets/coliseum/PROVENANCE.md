@@ -315,3 +315,28 @@ Why committed rather than hotlinked: The eight scenes beside it, and more sharpl
 
 Why committed rather than hotlinked: It stands under a stone that is drawn on the beat a player falls and must be there when the stone comes up; ground that arrives from somebody else's host a second after the pall has settled is a stone floating over sand and then, suddenly, a field. And the licence is an individual photographer's CC0 release on an aggregator, mirrored to Commons -- precisely the category where a third party's copy quietly changes terms or moves. A copy confirmed once and committed is a copy whose provenance stays true.
 <!-- animist:end hortus -->
+
+<!-- animist:begin custodes -->
+## custos-barbatus.webp, custos-iuvenis.webp
+
+### from `custos_barbatus`
+- **Source**: "Marble statue of a bearded Hercules, 68-98 CE", <https://www.metmuseum.org/art/collection/search/247001>, found via the same search and the same shoot as `custos_iuvenis`; the museum catalogues the two together
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-09-27).
+- **Transformations** (Pillow, scripted -- `animist build custodes.recipe.yaml`):
+  - `matte_backdrop`: tolerance=42, border=8, soft=22.
+  - `resize`: height=940.
+  - Encoded WEBP, quality 84.
+
+### from `custos_iuvenis`
+- **Source**: "Marble statue of a youthful Hercules, 69-96 CE", <https://www.metmuseum.org/art/collection/search/247000>, found via the Met Open Access API, searching the Greek and Roman Art department for full-length standing statues with a studio plate -- the pair of over-life-size Hercules statues (247000 and 247001) are the only two figures in the results shot on the same sweep, in the same light, within the same accession group
+.
+- **Licence**: CC0. Confirmed through met at fetch time (2026-09-27).
+- **Transformations** (Pillow, scripted -- `animist build custodes.recipe.yaml`):
+  - `matte_backdrop`: tolerance=42, border=8, soft=22.
+  - `crop`: frac_box=[0.0, 0.0, 1.0, 0.94].
+  - `resize`: height=940.
+  - Encoded WEBP, quality 84.
+
+Why committed rather than hotlinked: They stand in the page's own margin, which is a slot that exists only above about twelve hundred pixels -- so they are drawn and undrawn as the window changes, beside the one thing on the page that is already moving. A figure that resolved from somebody else's CDN would arrive late, at a different moment on each resize, next to a banner mid-breath. They are also a photograph of an ancient work, which is the category where somebody else's file quietly changes licence or vanishes; a copy checked once and committed is a copy whose provenance stays true.
+<!-- animist:end custodes -->
