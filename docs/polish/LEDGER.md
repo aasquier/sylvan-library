@@ -12326,6 +12326,146 @@ for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
 
+### 2026-09-28 (cleanup) — the fourth run
+
+Run in the evening after the daylight rainbow of 09-26/28 had fully landed —
+`main` at `f2a8d30` (#517), zero PRs open, the instance deployed from that sha
+and answering `pool_age_days: 16`, `schema_version: 17` — with Aaron's brief
+in hand rather than a conversation: regroup the queue, retire what landed,
+leave the real questions, and make the two load flakes honest. So the Upkeep
+beat is the queue file, and the four questions he named (the coverage floor,
+the shelf memo, the dossier's `allies` golden, the prompt-cache write column)
+are the spine of what stays.
+
+**Queue depth: 35 headings before, 17 after.** The file's own recipe read
+**33** going in, not 35: two headings began `**White (leg two):` and the
+`grep` cannot see a parenthesis between the colour and the colon, which is
+its own small finding — the header paragraph now says so and every heading
+starts `**Colour:` again. Nothing was silently carried: every retired heading
+is named below with the PR that answered it, and the five that were work
+rather than questions are listed as owed work with their pointers.
+
+**Untap — 35 headings read, four-way:**
+
+- *Already done, by a merged and deployed PR — eighteen.* Black's mode prompts
+  (#513; its two contested sentences stay, under *a ruling*). Red's gleaming
+  edge (#503). Red's `reducedmotion_test.go` pseudo-element rule (rode #509).
+  Green's 44px floor and the 201→265px phone header (#509 — Aaron merged it
+  on his walk, which is the ruling; "fewer nav entries on a phone" was offered
+  and not asked for, so it does not stay). Green's 404 painting (#509).
+  Green's reading room (#511). Green's tarot classes inside commandment 19's
+  gate (#511). Red's fifth ball — the card-peek ring, the lit row, the 99's
+  words (#518). Red's fourth ball — the seat's fire and lifegain's blessing,
+  both taste calls answered by the merge (#516). Red's `boxesIn` fix (#516).
+  Green's Hercules and their 84rem floor (#517). Green's MDFC land count —
+  "union", one golden moved (#506). Green's `pool_age_days` (#515; the live
+  body says 16). White's next grind fixture — `pool.OpenFaulty` (#514).
+  Green's app-wide touch targets (the shape was ruled by #509 landing:
+  `min-height` under `pointer: coarse`). That is fifteen distinct items;
+  three of them had been filed twice under different colours.
+- *Work owed, no ruling wanted — five*, moved out of the queue because a line
+  that needs no answer is furniture there, and into the list below because
+  the ledger is where owed work is found again.
+- *Still true, still needs Aaron — seventeen*, regrouped by the cost of the
+  answer. Re-verified today, not inherited: the Dependabot alerts are still
+  exactly 9 (API); `main` printed **97.0** in the `Coverage floor` step (run
+  36504824056, arm64 leg), so the ratchet trigger leg two named has fired and
+  the two White floor items collapsed into one; the skill still names
+  "mono-green/Goreclaw" and the instance has no such deck; the pool is 16
+  days old with *Reality Fracture* four days out; the two prompt sentences
+  are still as #513 left them; `COVERAGE.md` still carries both lever
+  arguments in place and neither in *Left deliberately*. One item is new to
+  the file rather than carried: the dossier's `allies` golden, which had
+  lived only inside the #513 item's paragraph and is now its own watched-
+  deploy line.
+- *Gone stale — none.* Every retired heading was retired by a merge, not by
+  a re-reading.
+
+**Owed work, no ruling (the pointers a later colour picks up):**
+
+- **The determinism replay, still owed** (White, 2026-09-26). Tried tonight
+  from the public side: `GET /api/tarot/reading?seed=1909` and the brew
+  reading both answer **401 `authentication required`** unauthenticated, so
+  the replay needs the signed-in `claude` seat, and the 09-19 baselines (tarot
+  741 bytes / `e406f504…`, brew 503 bytes / `54c5036e…`) wait for it.
+- **The `.prose-link` sweep** (Red, 2026-09-26): `grep -rn "color:
+  'var(--series-1)'" web/src` counts **13** inline on 09-28, one more than
+  the 12 the item recorded (`index.css`, `personagrid.tsx`, `artpicker.tsx`,
+  `charts.tsx`, `Import.tsx`, `NewDeck.tsx`, `DeckDetail.tsx`,
+  `Simulator.tsx`). A Red slice, recording any it deliberately leaves.
+- **`CardHover`'s `reachable` on the other nineteen sites** (Red,
+  2026-09-26): a Green slice by surface, writing down each site examined and
+  left, with the reason on the prop.
+- **Which other rooms render card art with no `artBearing` entry** (Green,
+  2026-09-26): one Colorless slice walking JSX for `art_crop` classes.
+- **What else in `reducedmotion_test.go` over-approximates** (Red,
+  2026-09-26): two holes of one shape in twenty lines in two days; a Blue or
+  Colorless slice reads the whole extractor once.
+
+**Discard to hand size — landed on this branch, every fix with a test broken
+once:**
+
+1. **The Coliseum carousel flake is honest.** `Coliseum.test.tsx > "walks
+   itself when nobody has asked it not to"` read `0` against `2` on the
+   first attempt of #517's run (job 109201440276). The mechanism, proven
+   rather than guessed: the room lays its two clocks in a passive effect,
+   which React flushes one task after the commit that put the slide's words
+   on the page; `findByText` resolves on the commit, and the harness then
+   drains a **0 ms timer** before handing back — on a loaded runner that
+   timer is already due and fires *ahead of* the scheduler's task, so the
+   count is taken before the clocks exist. Forcing the drain onto the
+   microtask queue reproduced the exact CI assertion every time on this Mac
+   (eight plain runs at load 388 had not); with `await act(async () => {})`
+   after the find it passes under the same forcing. The sibling "sets no
+   clock at all" test got the same flush, because a zero read before the
+   effect would have passed for the wrong reason. No bundle change: a test
+   file only.
+2. **The mulligan sweep's nil dereference is honest.**
+   `TestEverySweepAgreesWithTheCorpus` panicked on the arm64 coverage leg's
+   first attempt of `white-coverage-leg-four` (job 108639871330) and the log
+   held **one line** — `panic: runtime error: invalid memory address or nil
+   pointer dereference [recovered, repanicked]` — with no frame under it,
+   because two things each dropped the stack: `convoke.Indexed` re-raised
+   the worker's *value* on the caller (its own doc said "the original stack
+   is lost to the crossing"), and `ci.yml`'s failure grep keeps only lines
+   matching `^panic:`. Neither the plain nor the coverage-instrumented sweep
+   (25 and 40 runs, `GOMAXPROCS=4`) reproduced it here, and the engine
+   shares nothing writable between rows — cards are read-only pointers,
+   `Run`'s tallies are local, `Candidates()` builds fresh — so the cause is
+   unproven and *said so* rather than guessed. What landed is the
+   instrument: `convoke.Panic{Value, Stack}` carries `debug.Stack()` read on
+   the worker, prints as the value followed by the frames, and `Unwrap`s an
+   error value; the CI step now prints the sixty lines after any `panic:`.
+   The next occurrence names its frame. `internal/convoke` is not a
+   fingerprinted package, so no Tier 1 cache moved.
+3. **The local gauntlet was red on this Mac and CI could not see it.**
+   `TestEveryFileInThisCheckoutPassesTheTrackedFileScan` walked **111 s**
+   through two extra venvs (`.venv-depth`, `.venv311`, from the Python era,
+   each carrying its own `.gitignore` of `*`), a `.hypothesis` cache and a
+   `.env` at the repo root, and flagged all four. The walk now skips what
+   git could never track — a directory whose own ignore file is exactly
+   `*`, and any name the root `.gitignore` lists verbatim, read literally so
+   that a line it cannot follow leaves a file *in* the walk — and a test
+   builds all three shapes on a temp root, plus the glob it must not follow.
+   The walk takes **3.4 s** now. Mutation: the venv rule removed puts
+   `venv/lib/site.py` back in the walk and the test says so.
+
+**Measurements:** coverage on `main` 97.0 (arm64, floor 95.0); the checkout
+walk 111.8 s → 3.4 s on this Mac; Dependabot 9 open (1 critical, 3 medium, 5
+low, all `pip/torch`, `development`); pool 16 days, 35,517 oracle / 108,583
+printings; inline `--series-1` inks 13; `web/src` Vitest 42/42 in the
+Coliseum file, 1,639 tests in the suite on CI's last green.
+
+**What stayed in hand, and what would have to be true:** the seventeen lines
+are all his — a click he alone can make, a word, a dollar, a deploy he
+watches, a migration window — and none of them is landable by a run, which
+is the honest reason for a queue that shortened by half rather than to zero.
+The Dependabot line is on its third carry with the same stated reason (the
+pass cannot click in the Security tab), which the phase's own rule says to
+call a finding: the finding is that it should be a *one-line ask in the
+morning summary* until it is clicked, not a paragraph re-verified each
+cleanup.
+
 ### 2026-09-19 (cleanup) — the third run
 
 The seventh and last leg of the 2026-09-19 rainbow, run in daylight

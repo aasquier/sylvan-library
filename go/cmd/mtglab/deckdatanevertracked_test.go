@@ -129,22 +129,52 @@ func TestTheTrackedFileScanRefusesDeckDataAndEveryOtherForbiddenShape(t *testing
 // safe way: a file present but untracked -- somebody's scratch deck, a local
 // pool -- would be flagged here and is not a CI failure, so the one thing this
 // can do wrongly is fail a laptop for a file the laptop is allowed to have.
-// That is the right direction for a guard about not committing things, and the
-// skip list below names the directories where untracked local data is expected
-// (`decks/` most of all: the one-copy rule permits scratch there, which is the
-// whole distinction between present and tracked).
+// That is the right direction for a guard about not committing things, and
+// `checkoutFiles` names what a working checkout is allowed to hold.
 func TestEveryFileInThisCheckoutPassesTheTrackedFileScan(t *testing.T) {
 	t.Parallel()
 	scan := trackedFileScan(t)
 	root := repoRoot(t)
+	files := checkoutFiles(t, root)
+	for _, rel := range files {
+		if scan.MatchString(rel) {
+			t.Errorf("%s is in this checkout and the tracked-file scan refuses "+
+				"it -- either it must not be committed (check `git ls-files`) or "+
+				"the pattern is too wide", rel)
+		}
+	}
+	// An empty walk would pass and prove nothing; the repository has over a
+	// thousand tracked files, so a few hundred is a floor with slack in it.
+	if len(files) < 300 {
+		t.Fatalf("only %d files walked from %s, so this swept almost nothing",
+			len(files), root)
+	}
+}
+
+// checkoutFiles is every file under root, slash-separated and relative, less
+// what a working checkout is allowed to hold untracked. Three kinds of that:
+// the directories named in `skip` (app data, worktrees, dependencies -- and
+// `decks/` most of all: the one-copy rule permits scratch there, which is the
+// whole distinction between present and tracked); any directory carrying its
+// own `.gitignore` of exactly `*`, which git could never track a file from and
+// which every Python venv writes for itself; and any entry the root
+// `.gitignore` names verbatim (`.env`, `.hypothesis/`). That last reading is
+// deliberately literal -- a line with a glob character, a leading `!` or an
+// inner slash is not followed -- and a line it cannot follow makes the walk
+// stricter, never laxer, which is the safe direction for a guard about not
+// committing things. Measured once on the dev Mac: two extra venvs, a
+// hypothesis cache and a `.env` at the root failed this test for a hundred
+// seconds of walking torch, and none of them was a fact about the code.
+func checkoutFiles(t *testing.T, root string) []string {
+	t.Helper()
 	skip := map[string]bool{
 		".git": true, "node_modules": true, ".venv": true,
-		// App data and downloads a working checkout is allowed to hold.
 		"decks": true, "data": true,
 		// Worktrees of this same repository live here; each is its own tree.
 		".claude": true,
 	}
-	seen := 0
+	ignored, ignoredDirs := literalIgnores(t, filepath.Join(root, ".gitignore"))
+	var files []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -153,27 +183,116 @@ func TestEveryFileInThisCheckoutPassesTheTrackedFileScan(t *testing.T) {
 		if relErr != nil {
 			return relErr
 		}
+		if rel == "." {
+			return nil
+		}
+		name := d.Name()
 		if d.IsDir() {
-			if rel != "." && skip[d.Name()] {
+			if skip[name] || ignored[name] || ignoredDirs[name] || ignoresEverything(path) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		seen++
-		if scan.MatchString(filepath.ToSlash(rel)) {
-			t.Errorf("%s is in this checkout and the tracked-file scan refuses "+
-				"it -- either it must not be committed (check `git ls-files`) or "+
-				"the pattern is too wide", rel)
+		if ignored[name] {
+			return nil
 		}
+		files = append(files, filepath.ToSlash(rel))
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// An empty walk would pass and prove nothing; the repository has over a
-	// thousand tracked files, so a few hundred is a floor with slack in it.
-	if seen < 300 {
-		t.Fatalf("only %d files walked from %s, so this swept almost nothing",
-			seen, root)
+	return files
+}
+
+// literalIgnores reads the names a `.gitignore` lists verbatim: `names` for
+// lines that match a file or a directory of that name at any depth, `dirs`
+// for lines with git's trailing slash, which match directories only. A
+// missing file is no ignores at all.
+func literalIgnores(t *testing.T, path string) (names, dirs map[string]bool) {
+	t.Helper()
+	names, dirs = map[string]bool{}, map[string]bool{}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return names, dirs
+		}
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") ||
+			strings.ContainsAny(line, `*?[\`) {
+			continue
+		}
+		dir := strings.HasSuffix(line, "/")
+		line = strings.TrimSuffix(line, "/")
+		if strings.Contains(line, "/") {
+			continue
+		}
+		if dir {
+			dirs[line] = true
+		} else {
+			names[line] = true
+		}
+	}
+	return names, dirs
+}
+
+// ignoresEverything reports a directory whose own `.gitignore` is the single
+// rule `*` -- nothing under it can be tracked from within it.
+func ignoresEverything(dir string) bool {
+	body, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	return err == nil && strings.TrimSpace(string(body)) == "*"
+}
+
+// TestTheCheckoutWalkSkipsWhatGitCouldNeverTrack builds the three shapes on
+// a temporary root and reads the walk back: the venv's own `*`, the root
+// file's literal names at every depth, the trailing-slash rule for
+// directories only -- and the one it must NOT follow, a glob, so a pattern
+// the reading cannot honour leaves the file in the walk rather than out.
+func TestTheCheckoutWalkSkipsWhatGitCouldNeverTrack(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	write := func(rel, body string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(".gitignore", "# local\n.env\n.env.*\n.hypothesis/\n*.log\n!keep.log\nbuild/out\n")
+	write(".env", "secret")
+	write("sub/.env", "secret")
+	write(".hypothesis/cache", "")
+	write("sub/.hypothesis/cache", "")
+	write("venv/.gitignore", "*\n")
+	write("venv/lib/site.py", "")
+	write("half/.gitignore", "*.pyc\n")
+	write("half/kept.py", "")
+	write("keep.txt", "")
+	write("noise.log", "")
+	// A FILE named like the directory rule stays: `.hypothesis/` is git's
+	// directories-only spelling.
+	write("sub2/.hypothesis", "")
+
+	got := map[string]bool{}
+	for _, rel := range checkoutFiles(t, root) {
+		got[rel] = true
+	}
+	for _, want := range []string{"keep.txt", "half/kept.py", "half/.gitignore",
+		"noise.log", "sub2/.hypothesis", ".gitignore"} {
+		if !got[want] {
+			t.Errorf("%s left the walk, and nothing in the ignore file says it may", want)
+		}
+	}
+	for _, gone := range []string{".env", "sub/.env", ".hypothesis/cache",
+		"sub/.hypothesis/cache", "venv/lib/site.py", "venv/.gitignore"} {
+		if got[gone] {
+			t.Errorf("%s is in the walk, and git could never track it", gone)
+		}
 	}
 }

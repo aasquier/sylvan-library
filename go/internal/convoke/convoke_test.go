@@ -1,6 +1,7 @@
 package convoke_test
 
 import (
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -68,8 +69,24 @@ func TestAPanicReRaisesOnTheCaller(t *testing.T) {
 		if p == nil {
 			t.Fatal("the panic did not cross back to the caller")
 		}
-		if s, ok := p.(string); !ok || s != "tier1: Run needs at least one game" {
-			t.Fatalf("re-raised %v, want the original value", p)
+		pp, ok := p.(*convoke.Panic)
+		if !ok {
+			t.Fatalf("re-raised %T, want a *convoke.Panic carrying the value", p)
+		}
+		if s, ok := pp.Value.(string); !ok || s != "tier1: Run needs at least one game" {
+			t.Fatalf("re-raised %v, want the original value", pp.Value)
+		}
+		// The stack is the worker's, read where the panic happened: it names
+		// the fn this test handed in, which the caller's own stack -- Indexed
+		// waiting on its group -- never could.
+		if !strings.Contains(string(pp.Stack), "TestAPanicReRaisesOnTheCaller") {
+			t.Fatalf("the stack does not name the frame that panicked:\n%s", pp.Stack)
+		}
+		// And the printed form carries both, because `panic:` in a log prints
+		// Error() and nothing else.
+		if msg := pp.Error(); !strings.Contains(msg, "tier1: Run needs at least one game") ||
+			!strings.Contains(msg, "TestAPanicReRaisesOnTheCaller") {
+			t.Fatalf("Error() = %q, want the value and the stack", msg)
 		}
 		// The stop flag halts hand-out; with 2 workers over 1000 pieces a
 		// panic at index 3 must leave most of the grid untouched.

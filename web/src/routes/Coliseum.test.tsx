@@ -18,7 +18,7 @@
  * halfway through the last one's.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -1122,6 +1122,18 @@ describe('the lore carousel under reduced motion', () => {
     return laid
   }
 
+  /** The clocks are laid in a passive effect, and React flushes those one
+   *  task after the commit that put the slide's words on the page. `findByText`
+   *  resolves on the commit, and the harness then drains a 0ms timer before
+   *  handing back — on a loaded runner that timer is already due and fires
+   *  ahead of the scheduler's task, so a count taken straight after the find
+   *  reads the clocks before they exist (CI read 0 against 2; forcing the
+   *  drain onto the microtask queue reproduces it every time). `act` returns
+   *  only once every pending effect has run, which is the fact both tests
+   *  actually need — the second as much as the first, since a "no clock" read
+   *  taken before the effect would pass for the wrong reason. */
+  async function effectsFlushed() { await act(async () => {}) }
+
   afterEach(() => { vi.restoreAllMocks() })
 
   it('walks itself when nobody has asked it not to', async () => {
@@ -1130,6 +1142,7 @@ describe('the lore carousel under reduced motion', () => {
     const laid = clocks()
     show()
     await screen.findByText('First of the Coliseum.')
+    await effectsFlushed()
     // Two: the slide's and the room's. This half is the anti-vacuity — a spy
     // that saw nothing would make the test below pass for the wrong reason.
     expect(laid.length).toBeGreaterThanOrEqual(2)
@@ -1145,6 +1158,7 @@ describe('the lore carousel under reduced motion', () => {
     const laid = clocks()
     show()
     await screen.findByText('First of the Coliseum.')
+    await effectsFlushed()
 
     expect(laid).toEqual([])
 
