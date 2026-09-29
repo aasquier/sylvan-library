@@ -545,3 +545,24 @@ func firstCardName(t *testing.T, d *deck.Deck) string {
 	}
 	return d.Cards[0].Name
 }
+
+// TestTheInterviewAsksForItsOwnCap holds the opening's number to
+// `MaxQuestions` by reading it off the constant rather than restating it.
+// "Three to five" once sat beside a cap of six, so a model following the ask
+// perfectly was never cut and a seventh question vanished in silence; the
+// number the prompt asks for and the number a person feels are one constant
+// now, and this is what says so.
+func TestTheInterviewAsksForItsOwnCap(t *testing.T) {
+	t.Parallel()
+	opening, err := interviewOpening(wire.OrderedMap{{Key: "card", Value: "Sol Ring"}}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("Ask up to %d questions", MaxQuestions)
+	if !strings.Contains(opening, want) {
+		t.Fatalf("the opening does not ask for the cap %q:\n%s", want, opening)
+	}
+	if strings.Contains(opening, "three to five") {
+		t.Fatalf("the opening still carries the old range beside the cap:\n%s", opening)
+	}
+}

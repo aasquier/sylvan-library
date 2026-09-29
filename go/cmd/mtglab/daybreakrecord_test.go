@@ -131,6 +131,87 @@ func TestEveryOpenDaybreakItemNamesALedgerSectionThatExists(t *testing.T) {
 	}
 }
 
+// openMarker is the token a waiting ledger record wears at the head of its
+// bold lead -- `**(open) …**` -- struck when Aaron answers. It exists so the
+// reverse direction below has something a test can read: "queued" in ledger
+// prose never did, and that is how five items waited in the ledger alone for
+// a month while the forward guard stayed green.
+var openMarker = regexp.MustCompile(`\*\*\(open\)`)
+
+// openMarkersBySection counts the `(open)` markers under each `## ` section
+// of LEDGER.md, keyed by the section's name as ledgerSections reads it.
+func openMarkersBySection(t *testing.T, root string) map[string]int {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(root, "docs", "polish", "LEDGER.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	section := ""
+	for _, line := range strings.Split(string(body), "\n") {
+		if rest, ok := strings.CutPrefix(line, "## "); ok {
+			section = rest
+			if before, _, cut := strings.Cut(rest, " — "); cut {
+				section = before
+			}
+			section = strings.TrimSpace(section)
+			continue
+		}
+		counts[section] += len(openMarker.FindAllStringIndex(line, -1))
+	}
+	return counts
+}
+
+// TestTheLedgerAndTheQueueAgreeOnWhatIsOpen is the reverse of the guard above,
+// read off the marker. A section carrying an `(open)` record that no queue
+// line points at is the ledger-only breach caught by name; a queue line whose
+// section carries no `(open)` is a record nobody marked, which the next
+// answer would leave undiscoverable. A queue line that names the Cleanup
+// section is saying who carried it, not where its record lives, so that one
+// pointer demands no marker; Cleanup's entries record rulings and carry none.
+func TestTheLedgerAndTheQueueAgreeOnWhatIsOpen(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	names := ledgerSections(t, root)
+	patterns := make([]*regexp.Regexp, len(names))
+	for i, name := range names {
+		patterns[i] = regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
+	}
+	pointedAt := map[string]bool{}
+	for _, item := range openDaybreakItems(t, root) {
+		for i, p := range patterns {
+			// "carried by Cleanup" is a note about who re-verified the item,
+			// never where its record lives, so a pointer at Cleanup demands
+			// no marker there.
+			if names[i] != "Cleanup" && namesALedgerSection(item, []*regexp.Regexp{p}) {
+				pointedAt[names[i]] = true
+			}
+		}
+	}
+	marked := openMarkersBySection(t, root)
+	total := 0
+	for section, n := range marked {
+		total += n
+		if n > 0 && !pointedAt[section] {
+			t.Errorf("LEDGER.md's %s section carries %d record(s) marked "+
+				"(open) and no open daybreak item points at %s -- the record is "+
+				"waiting where nobody reads", section, n, section)
+		}
+	}
+	for section := range pointedAt {
+		if marked[section] == 0 {
+			t.Errorf("open daybreak items point at LEDGER.md's %s section and no "+
+				"record there is marked (open) -- mark the one they mean, or the "+
+				"answer will strike a line with no record behind it", section)
+		}
+	}
+	if total == 0 {
+		t.Fatal("LEDGER.md carries no (open) marker at all, which reads exactly " +
+			"like a broken extractor; an honestly empty ledger is a deliberate " +
+			"visit to this test")
+	}
+}
+
 // namesALedgerSection looks for a known section name within a few words of
 // any mention of the ledger, either side, which covers every pointer shape
 // the queue actually writes.

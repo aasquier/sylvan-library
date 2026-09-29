@@ -189,7 +189,7 @@ func TestLiveAToolRoundTripAndACacheRead(t *testing.T) {
 // schema** -- the interview's is recorded data in modes.json,
 // and a schema the API rejects is a 400 that no scripted server would ever
 // produce. The rest is worth watching rather than asserting hard: the model is
-// asked for three to five questions and `OnlyQuestions` drops anything that is
+// asked for up to `MaxQuestions` questions and `OnlyQuestions` drops anything that is
 // not one, so a drop count above zero is a real signal about the prompt and
 // not a test failure.
 func TestLiveTheRationaleInterviewAsksRealQuestions(t *testing.T) {

@@ -530,8 +530,11 @@ func interviewOpening(facts wire.OrderedMap, focus string) (string, error) {
 		"",
 		string(raw),
 		"",
-		"Ask three to five questions that would help me write this card's " +
-			"rationale, or decide it does not deserve one.",
+		// The number is the cap itself, by ruling: a prompt whose number IS
+		// `MaxQuestions` cannot drift from it, where "three to five" once sat
+		// beside a cap of six and a seventh question vanished in silence.
+		fmt.Sprintf("Ask up to %d questions that would help me write this card's "+
+			"rationale, or decide it does not deserve one.", MaxQuestions),
 	}
 	if strings.TrimSpace(focus) != "" {
 		// The user's own steer, quoted rather than interpolated into the

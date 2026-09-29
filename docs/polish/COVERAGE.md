@@ -67,7 +67,9 @@ lever and a grind is visible before the work starts.
 | leg two, 2026-09-26 (the rainbow's White lane) | **96.7%** | |
 | the grind of 2026-09-26 (one lane, the faulty handle) | **96.9%** | 96.86% |
 | leg three, 2026-09-26 (the pool's faulty connector) | **96.7%** measured on leg two's base | |
-| floor in `ci.yml` | **95.0** (set at a measured 96.6, 2026-09-24) | |
+| floor in `ci.yml` | 95.0 (set at a measured 96.6, 2026-09-24) | |
+| merged `main` after the cleanup step, 2026-09-28 | **97.0%** (run 36504824056) | |
+| floor in `ci.yml` | **95.5** (ratcheted 2026-09-29 at that 97.0; Aaron: "ratchet", the gap is kept) | |
 
 **Leg two is the leg that says the climb is over**, and the number is the
 argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
@@ -103,7 +105,7 @@ package costs coverage" trap below, paid knowingly and kept small — the first
 `authtest/faulty.go` paid forty-nine of them. **CI's arm64 print on the merged
 branch is the authority; neither lane's local number is.**
 
-The gate is at 95.0 and the tree is over 96 because Aaron asked for exactly
+The gate is at 95.5 and the tree is over 97 because Aaron asked for exactly
 that pair: a diff can cost a few tenths of honest refactoring without going
 red, and a diff that costs a whole point is what the floor exists to notice.
 
@@ -195,8 +197,8 @@ as meaningful to whoever finds it next.
   branch cannot fire with a literal `"*"`; the `fs.ReadFile` branch beside
   it can and does.
 - **`users.go:prompt.secret`'s terminal branch** — five statements, and it is
-  **closed by argument rather than open**, which 2026-09-26 worked out and is
-  queued for the ruling that makes it official. A real pty needs
+  **closed by argument rather than open**: worked out on 2026-09-26 and
+  ruled closed by Aaron on 2026-09-29 ("yes to both"). A real pty needs
   platform-specific test code nobody has argued for. The alternative, handing
   the terminal read in as a value (the tree's standing move — `Settings.Java`,
   `RefreshOptions.IndexURL`), was designed and **rejected**: the seam's own
@@ -205,7 +207,8 @@ as meaningful to whoever finds it next.
   about four — and restructuring a password-reading path to buy four statements
   is the wrong trade at any coverage number. Do not re-derive this.
 - **`ApplyBulk`'s four fold-error branches** (`internal/deckedit/bulk.go`) are
-  defensive depth behind a guard, probed rather than assumed on 2026-09-26:
+  defensive depth behind a guard, probed rather than assumed on 2026-09-26
+  and ruled closed by Aaron on 2026-09-29 ("yes to both"):
   `PlanBulk` reads the deck through the same `locateCard`, so a file that would
   make a fold fail is refused while it is still a plan on screen. Reaching them
   needs a hand-built `BulkPlan` with a matching `Basis` that the planner would

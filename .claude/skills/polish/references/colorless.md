@@ -46,13 +46,16 @@ Cleanup acts on the queue. Colorless audits it and leaves it.
   being answered, since the line leaves and takes the reasoning with it. Look
   for the third hiding place too: a finding written into the document it is
   about (a README, a package comment) and never entered anywhere.
-  **And walk the other direction, which the guard cannot.**
-  `daybreakrecord_test.go` proves every queue line has a record; nothing
-  proves every record has a line, because "queued" in ledger prose carries no
-  marker a test can read. So `grep -n 'Queued for Aaron' docs/polish/LEDGER.md`
-  and, for every block, ask whether the file Aaron reads has ever carried it —
-  `git log -S '<a phrase from the item>' -- docs/polish/DAYBREAK.md` answers
-  "ever" rather than "now". Measured 2026-09-19: **five items had waited in
+  **And walk the other direction, which the guard now reads off a marker.**
+  A waiting ledger record opens its bold lead `**(open) …**` (Aaron's ruling
+  of 2026-09-29), and `daybreakrecord_test.go` holds both directions: every
+  `(open)` sits in a section some queue line points at, and every queue
+  line's section carries an `(open)`. What that cannot see is a record that
+  was never marked — a "queued" written in plain prose — so this run still
+  reads `grep -n 'Queued for Aaron\|Queued (new' docs/polish/LEDGER.md` for
+  blocks with no `(open)` and asks of each whether it is answered, stale, or
+  waiting unmarked; `git log -S '<a phrase from the item>' --
+  docs/polish/DAYBREAK.md` answers "ever" rather than "now". Measured 2026-09-19: **five items had waited in
   the ledger alone since August**, each re-verified and re-carried by its own
   colour every run, each called out as a standing gap, none ever in front of
   him — and two more had been answered by the world without being struck.

@@ -132,7 +132,7 @@ claim no gate enforces"* — true when it was written, and the pass's own
 favourite example of a rule enforced by nothing. It is answered: `ci.yml`'s
 **`Coverage floor`** step runs `go test -count=1 -coverprofile
 -coverpkg=./...` on the arm64 leg and fails the build under `MINIMUM`, which
-stands at **95.0**. Two guards hold the shape of that number rather than the
+stands at **95.5** (ratcheted 2026-09-29 at a measured 97.0, keeping the gap). Two guards hold the shape of that number rather than the
 number itself, and they are what you check rather than re-deriving the
 history: `go/cmd/mtglab/coveragefloor_test.go`
 (`TestEveryGoFileCompilesOnBothCILegs` — one leg may compute the total only
@@ -145,7 +145,7 @@ different. The gate is CI's. The watched number is this facet's: read the
 total with `go tool cover -func` over a `-coverpkg=./...` profile — the same
 arithmetic the step uses, which is *not* what a hand merge of the same
 profile reads — record it in the ledger every run, and treat a fall as a
-finding even when it clears 95.0. **The floor is a ratchet: raise it when the
+finding even when it clears 95.5. **The floor is a ratchet: raise it when the
 tree passes a higher number, never lower it to make a red check green.** The
 size of the margin between the tree and the floor is Aaron's ruling of
 2026-09-24 rather than a number to optimise, so a run that wants to click the
