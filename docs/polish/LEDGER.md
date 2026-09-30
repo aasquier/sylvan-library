@@ -6371,6 +6371,20 @@ branch because doc-only PRs are not a thing here.
   and the worker one sha behind is a red check about the workflow, not the
   instance, which is the third time that sentence has been written in this
   section. Queued nowhere: the next Red run reads this and decides.
+- **A flake #519 shipped, caught by the arm64 leg the same night and made
+  honest here.** `TestAPanicReRaisesOnTheCaller` failed inside the coverage
+  run on the dossier branch (#525, run 36663192868): *"all 1000 pieces ran
+  despite the panic"*. `convoke.Indexed`'s recover read `debug.Stack()`
+  **before** raising the stop flag — the stack read is milliseconds under
+  coverage on that runner, and in those milliseconds the second worker
+  drained the other 996 pieces of a grid whose `fn` is one atomic add. The
+  flag now goes up first and the stack is read after; the test is unchanged
+  because it already says what the contract is (a panic at index 3 of a
+  thousand "must leave most of the grid untouched"), and it is the test
+  that found this. The laptop never showed it — the full `-race` suite
+  passed here tonight before the change, and fifty runs of the package
+  passed after — which is the usual shape: an eight-core Mac is the wrong
+  instrument for a race that needs a slow stack walk to open.
 
 ### 2026-09-26 (rainbow)
 
