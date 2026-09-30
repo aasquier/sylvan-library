@@ -28,7 +28,9 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > the *watched deploy* group that was the pass's to build went as its own PR
 > in a session Aaron was in — Black's 2026-09-29 entry has the numbers — and
 > the worker machine's half-landed deploy from the morning was read and
-> repaired by hand first (Red, 2026-09-29).
+> repaired by hand first (Red, 2026-09-29). The other watched-deploy item,
+> the dossier's `allies` golden, went as the branch stacked on it: two
+> sentences and one golden re-recorded, eight left.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -79,19 +81,6 @@ besides 200. Ledger: Red, the queued list carried in the 2026-09-05 entry,
 items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
-
-**Black: the dossier's `allies` gap is a frozen golden's to move, so it wants
-its own watched branch.** #513 repaired nine prompt sentences and left the
-dossier untouched on purpose: its instructions and schema are hash-frozen in
-`testdata/dossier.json`, and its own drift — `allies` missing from the search
-enumeration, in the prompt and again in `dossierOpening` — cannot land without
-re-recording that golden, which invalidates every dossier the instance has
-stored. · *Cost of leaving it:* the dossier mode is told to search for one
-fewer thing than the schema asks it to report, on every deck it is asked
-about. · **Recommendation:** "go" — one branch that fixes both sentences,
-re-records the golden from the tool's own output and says so, and lands on a
-morning you can watch; nothing else rides it. Ledger: Black, 2026-09-26
-(rainbow, prompts).
 
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
