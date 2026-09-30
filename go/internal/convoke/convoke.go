@@ -69,7 +69,8 @@ func Indexed(n, workers int, fn func(int)) {
 				// milliseconds under coverage on CI's arm64 leg -- and while
 				// it ran the other worker drained a thousand trivially cheap
 				// pieces, which is "stops the hand-out" failing in public
-				// (`TestAPanicReRaisesOnTheCaller`, 2026-09-29). The stack is
+				// (`TestAPanicReRaisesOnTheCaller`; the Red ledger has the
+				// night). The stack is
 				// still read here, on the worker, while the frames that
 				// raised it are below this one.
 				stop.Store(true)
