@@ -30,6 +30,7 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/decklog"
 	"github.com/aasquier/sylvan-library/go/internal/flymetrics"
 	"github.com/aasquier/sylvan-library/go/internal/jobs"
+	"github.com/aasquier/sylvan-library/go/internal/library"
 	"github.com/aasquier/sylvan-library/go/internal/night"
 	"github.com/aasquier/sylvan-library/go/internal/pool"
 	"github.com/aasquier/sylvan-library/go/internal/shelves"
@@ -206,6 +207,13 @@ type API struct {
 	lazyDB      *sql.DB
 	lazyWriteDB *sql.DB
 
+	// deckMemo is the process's memory of parsed deck files, handed down
+	// through `library.Resolver` into every file tier a request builds. It
+	// lives here and not on the source because a source lives for one
+	// request; `library.Memo` argues the rest. Read by tests, rendered
+	// nowhere.
+	deckMemo *library.Memo
+
 	scryfallDir string
 	dataDir     string
 	poolPath    string
@@ -263,7 +271,8 @@ func New(cfg Config) *API {
 		forgeClient: cfg.ForgeWorker,
 		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
 		claude: cfg.Claude, forge: cfg.Forge,
-		setsFeed: cfg.SetsFeed, bulkIndex: cfg.BulkIndex}
+		setsFeed: cfg.SetsFeed, bulkIndex: cfg.BulkIndex,
+		deckMemo: library.NewMemo()}
 	a.playCore = a.playForgeMatch
 	return a
 }

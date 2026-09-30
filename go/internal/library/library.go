@@ -24,13 +24,20 @@ type Library struct {
 	appDB      *sql.DB
 	appWriteDB *sql.DB // nil when nothing may write app.db here
 	maintainer string  // the maintainer's handle, or "" when there is none
+	memo       *Memo   // the process's memory of parsed deck files, or nil
 }
 
 // Resolver is what a Library needs from the process: the decks root, the
-// read-only app.db (nil when there is none), and the maintainer's handle.
+// read-only app.db (nil when there is none), the maintainer's handle, and
+// the memory of parsed deck files that outlives any one request.
 type Resolver struct {
 	DecksDir string
 	AppDB    *sql.DB
+	// Memo is the process's memory of parsed deck files, handed to every
+	// file tier this resolver's libraries build -- which is the only
+	// arrangement under which it is ever consulted, since a Library is
+	// built per request ([Memo] argues it). Nil parses every time.
+	Memo *Memo
 	// AppWriteDB is the read-write app.db handle the SQL tier's writes use,
 	// or nil. Separate from AppDB because the read handle is opened
 	// `mode=ro` and a write through it would fail at the driver rather than
@@ -47,7 +54,7 @@ type Resolver struct {
 // For builds the caller's Library.
 func (r Resolver) For(ctx context.Context, scope auth.Scope) (*Library, error) {
 	lib := &Library{scope: scope, decksDir: r.DecksDir, appDB: r.AppDB,
-		appWriteDB: r.AppWriteDB}
+		appWriteDB: r.AppWriteDB, memo: r.Memo}
 	if scope.Authenticated && r.Maintainer != nil {
 		m, err := r.Maintainer(ctx)
 		if err != nil {
@@ -85,6 +92,13 @@ func (l *Library) MyOwner() string {
 // whoever is at this machine.
 func (l *Library) Actor() string { return l.scope.Username }
 
+// files is the file tier under this library's root, remembering parsed
+// decks through the resolver's memo. Every file tier a Library hands out is
+// built here, so none of them can forget to be handed the memory.
+func (l *Library) files(writable bool) *FileSource {
+	return NewFileSource(l.decksDir, writable).WithMemo(l.memo)
+}
+
 func (l *Library) isMe(owner string) bool {
 	return l.scope.Username != "" && strings.EqualFold(owner, l.scope.Username)
 }
@@ -103,7 +117,7 @@ func (l *Library) SourceFor(ctx context.Context, owner string) (Source, error) {
 	// exists to be asked about, and asking would reach for app.db.
 	if !l.scope.Authenticated {
 		if strings.EqualFold(owner, LocalOwner) {
-			return NewFileSource(l.decksDir, true), nil
+			return l.files(true), nil
 		}
 		return nil, ErrNotFound{Slug: owner}
 	}
@@ -113,9 +127,9 @@ func (l *Library) SourceFor(ctx context.Context, owner string) (Source, error) {
 	// are therefore nobody's in particular.
 	if strings.EqualFold(owner, l.FileOwner()) {
 		if mine || (l.maintainer == "" && l.scope.IsAdmin) {
-			return NewFileSource(l.decksDir, true), nil
+			return l.files(true), nil
 		}
-		return NewSharedOnly(NewFileSource(l.decksDir, false)), nil
+		return NewSharedOnly(l.files(false)), nil
 	}
 	// The SQL tier: somebody's own decks.
 	ownerID, err := l.ownerID(ctx, owner)
@@ -151,10 +165,10 @@ func (l *Library) ownerID(ctx context.Context, owner string) (*int64, error) {
 // Mine is `mine`: the caller's own decks, whichever tier they are in.
 func (l *Library) Mine() (Source, error) {
 	if !l.scope.Authenticated {
-		return NewFileSource(l.decksDir, true), nil
+		return l.files(true), nil
 	}
 	if l.scope.Username != "" && l.isMaintainer(l.scope.Username) {
-		return NewFileSource(l.decksDir, true), nil
+		return l.files(true), nil
 	}
 	if l.scope.UserID == 0 {
 		return nil, ErrNotFound{Slug: "no account"}

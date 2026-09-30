@@ -103,6 +103,9 @@ type Source interface {
 type FileSource struct {
 	Root     string
 	writable bool
+	// memo is the parsed decks this tier remembers between requests, or nil
+	// for a tier that parses every time -- see [Memo] for whose it is.
+	memo *Memo
 }
 
 // NewFileSource is a file tier over root. `writable` is the caller's
@@ -111,39 +114,56 @@ func NewFileSource(root string, writable bool) *FileSource {
 	return &FileSource{Root: root, writable: writable}
 }
 
-// deckPaths is `config.deck_paths`: every `*/deck.yaml`, sorted, an
+// WithMemo hands this tier a memory of parsed decks and answers the tier, so
+// a caller can say `NewFileSource(root, w).WithMemo(m)` in one breath. The
+// Library does this for every file tier it builds; nil is a tier that
+// remembers nothing.
+func (f *FileSource) WithMemo(m *Memo) *FileSource {
+	f.memo = m
+	return f
+}
+
+// deckFile is one `<root>/<slug>/deck.yaml` and how it looked when listed.
+// The stat the listing already paid for is the memo's key, so remembering
+// costs no syscall the old walk did not make.
+type deckFile struct {
+	path string
+	info fs.FileInfo
+}
+
+// deckFiles is `config.deck_paths`: every `*/deck.yaml`, sorted, an
 // underscore-prefixed directory being scaffolding and `.trash` invisible
 // to the glob.
-func (f *FileSource) deckPaths() ([]string, error) {
+func (f *FileSource) deckFiles() ([]deckFile, error) {
 	entries, err := os.ReadDir(f.Root)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []string{}, nil
+			return []deckFile{}, nil
 		}
 		return nil, err
 	}
-	out := []string{}
+	out := []deckFile{}
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), "_") || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
 		path := filepath.Join(f.Root, e.Name(), "deck.yaml")
 		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
-			out = append(out, path)
+			out = append(out, deckFile{path: path, info: info})
 		}
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].path < out[j].path })
 	return out, nil
 }
 
 func (f *FileSource) Slugs(context.Context) ([]string, error) {
-	paths, err := f.deckPaths()
+	files, err := f.deckFiles()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]string, 0, len(paths))
-	for _, p := range paths {
-		out = append(out, filepath.Base(filepath.Dir(p)))
+	out := make([]string, 0, len(files))
+	for _, file := range files {
+		out = append(out, filepath.Base(filepath.Dir(file.path)))
 	}
 	return out, nil
 }
@@ -155,41 +175,77 @@ func (f *FileSource) Slugs(context.Context) ([]string, error) {
 // walked out of its root: anything with a separator, or that is only dots,
 // is simply not a deck.
 func (f *FileSource) path(slug string) (string, error) {
-	if slug == "" || strings.Trim(slug, ".") == "" || strings.ContainsAny(slug, `/\`) {
-		return "", ErrNotFound{Slug: slug}
-	}
-	p := filepath.Join(f.Root, slug, "deck.yaml")
-	if info, err := os.Stat(p); err != nil || !info.Mode().IsRegular() {
-		return "", ErrNotFound{Slug: slug}
-	}
-	return p, nil
+	p, _, err := f.file(slug)
+	return p, err
 }
 
-func (f *FileSource) Get(ctx context.Context, slug string) (*deck.Deck, error) {
-	text, err := f.ReadText(ctx, slug)
+// file is path with the stat it made: the memo's key for one deck, taken
+// from the syscall the lookup already paid for.
+func (f *FileSource) file(slug string) (string, fs.FileInfo, error) {
+	if slug == "" || strings.Trim(slug, ".") == "" || strings.ContainsAny(slug, `/\`) {
+		return "", nil, ErrNotFound{Slug: slug}
+	}
+	p := filepath.Join(f.Root, slug, "deck.yaml")
+	info, err := os.Stat(p)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", nil, ErrNotFound{Slug: slug}
+	}
+	return p, info, nil
+}
+
+// Get and All read the same way: the memo first, at the stamp the stat just
+// saw, and only on a miss the file and the parse -- after which the memo
+// learns the result under that same stamp. The two are written out rather
+// than shared so each keeps the error it always returned: All names the file
+// in front of a parse error because it is reading twenty-five of them, Get
+// does not because the caller named the one.
+func (f *FileSource) Get(_ context.Context, slug string) (*deck.Deck, error) {
+	p, info, err := f.file(slug)
 	if err != nil {
 		return nil, err
 	}
-	return deck.FromText(text, slug)
+	if d := f.memo.remembered(p, info); d != nil {
+		return d, nil
+	}
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	d, err := deck.FromText(string(raw), slug)
+	if err != nil {
+		return nil, err
+	}
+	f.memo.learned(p, info, d)
+	return d, nil
 }
 
 func (f *FileSource) All(context.Context) ([]*deck.Deck, error) {
-	paths, err := f.deckPaths()
+	files, err := f.deckFiles()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*deck.Deck, 0, len(paths))
-	for _, p := range paths {
-		raw, err := os.ReadFile(p)
+	out := make([]*deck.Deck, 0, len(files))
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.path)
+		if d := f.memo.remembered(file.path, file.info); d != nil {
+			out = append(out, d)
+			continue
+		}
+		raw, err := os.ReadFile(file.path)
 		if err != nil {
 			return nil, err
 		}
-		d, err := deck.FromText(string(raw), filepath.Base(filepath.Dir(p)))
+		d, err := deck.FromText(string(raw), filepath.Base(filepath.Dir(file.path)))
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", p, err)
+			return nil, fmt.Errorf("%s: %w", file.path, err)
 		}
+		f.memo.learned(file.path, file.info, d)
 		out = append(out, d)
 	}
+	// The listing is the population: whatever the memo still holds under
+	// this root that was not just listed has left the library.
+	f.memo.keepOnly(f.Root, paths)
 	return out, nil
 }
 

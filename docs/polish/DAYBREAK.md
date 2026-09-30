@@ -23,6 +23,12 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > entry says where each went). What stays is grouped by what an answer costs
 > you: a few clicks, a dollar, a watched deploy, a migration window — and the
 > last group needs nothing today.
+>
+> **2026-09-29, evening: the shelf memo landed, nine left.** The one item in
+> the *watched deploy* group that was the pass's to build went as its own PR
+> in a session Aaron was in — Black's 2026-09-29 entry has the numbers — and
+> the worker machine's half-landed deploy from the morning was read and
+> repaired by hand first (Red, 2026-09-29).
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -73,23 +79,6 @@ besides 200. Ledger: Red, the queued list carried in the 2026-09-05 entry,
 items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
-
-**Black: every visit to the deck shelf re-reads and re-parses the whole
-library — ~42 ms of CPU and 27 MB of allocation for 25 decks, on a machine
-with two shared cores — and the memo that fixes it has been refused by the
-harness twice.** `/api/decks` builds a fresh `FileSource` per request, so
-nothing memoises anything; ~90% of the cost is inside the YAML library, so the
-only lever that pays where it ships is not parsing a file that has not
-changed. The lane brief for it was refused by the auto-mode classifier on
-2026-09-26, twice, because it describes a watched deploy; it needs a session
-you are in. · *Cost of leaving it:* the home page's shelf call spends 42 ms of
-server CPU per visit for an answer that was identical last time, forever. ·
-**What makes it a question:** the memo needs an owner that outlives a request
-— the long-lived `*API`, handed down through `Resolver` into `NewFileSource`,
-five to eight files — and its invalidation is the pool's file-stamp guarantee
-applied to live user data. · **Recommendation:** "yes" — its own PR, built in
-a session where you say the word and watch the deploy, with hit and miss
-counters in from the start and rendered nowhere. Ledger: Black, 2026-09-26.
 
 **Black: the dossier's `allies` gap is a frozen golden's to move, so it wants
 its own watched branch.** #513 repaired nine prompt sentences and left the
