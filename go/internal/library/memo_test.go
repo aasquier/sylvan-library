@@ -280,10 +280,14 @@ func TestALibraryHandsItsMemoToEveryFileTierItBuilds(t *testing.T) {
 // reader can ever see half a deck. `-race` is the assertion on the memo's
 // locking; the rest holds the accounting: every lookup is a hit or a miss,
 // every file was missed at least once, and once the visitors have gone the
-// memory has converged -- one more visit is all hits and says the new name.
-// (Several visitors missing the same file at once each parse it; nothing
-// single-flights a miss, because a parse is 1.6 ms and a stampede is bounded
-// by the number of people at the door.)
+// memory converges within one quiet visit -- the visit after that is all
+// hits and says the new name. **One, not zero**: the last visitor's read may
+// have raced the write, learning the new bytes under the stamp it saw before
+// the rename, and that entry is unreachable rather than wrong (`Memo.learned`
+// argues it) -- so the first quiet visit may miss once more, and CI's arm64
+// leg is where that window first opened. (Several visitors missing the same
+// file at once each parse it; nothing single-flights a miss, because a parse
+// is 1.6 ms and a stampede is bounded by the number of people at the door.)
 func TestTheMemoIsSafeUnderConcurrentVisits(t *testing.T) {
 	t.Parallel()
 	root := memoShelf(t, 6)
@@ -320,9 +324,16 @@ func TestTheMemoIsSafeUnderConcurrentVisits(t *testing.T) {
 	if hits+misses != 8*5*6 || misses < 6 {
 		t.Fatalf("hits=%d misses=%d over 240 lookups", hits, misses)
 	}
+	// The quiet visit: at most one miss, for a last read that raced the write.
 	names := shelfNames(t, root, m)
-	wantCounts(t, m, hits+6, misses)
+	if h, mi := m.Counts(); h+mi != hits+misses+6 || mi > misses+1 {
+		t.Fatalf("the first quiet visit read hits=%d misses=%d after hits=%d misses=%d", h, mi, hits, misses)
+	}
 	if names["deck-03"] != "Deck 03, edited" {
 		t.Fatalf("after the visitors left, deck-03 reads %q", names["deck-03"])
 	}
+	// And the one after it is all hits: the memory has converged.
+	hits, misses = m.Counts()
+	shelfNames(t, root, m)
+	wantCounts(t, m, hits+6, misses)
 }
