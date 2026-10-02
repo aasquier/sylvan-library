@@ -19,8 +19,9 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-09-26 (rainbow, and its second leg — the grind).
-  Previous: 2026-09-24 (the coverage climb, outside the rainbow), 2026-09-19
+- **Last run:** 2026-10-02 (solo, daylight). Previous: 2026-09-26 (rainbow,
+  and its second leg — the grind), 2026-09-24 (the coverage climb, outside
+  the rainbow), 2026-09-19
   (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
   2026-08-19, 2026-08-16.
 - **Read the 2026-08-19 and 2026-08-16 blocks below as history, not as
@@ -30,6 +31,174 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-10-02 (solo, daylight) — the replay comes back, the census becomes a register, and the compile kernel gets its first baseline
+
+A solo run named by Aaron the afternoon the library was gathered again, run
+in daylight with him in the room and the `gyome` seat signed in through his
+Chrome — which is what made the determinism replay possible after a week of
+being owed. The tree had no defect to find in the first two facets; the
+substance is the third.
+
+- **Verified this run — licensing, triple-checked:**
+  - **`animist verify`: 36 recipes, every one `held`**, nothing else printed.
+    Committed binaries by home: 78 `assets/tarot/*.webp` (the 1909 Rider
+    deck, `PROVENANCE.md`), 4 `web/public/*.png` (the PWA icons, their own
+    `PROVENANCE.md`, read by `mediaprovenance_test.go`), 66 under
+    `web/src/assets` (the recipes above). Nothing under `git ls-files` is a
+    Wizards image; the deck pages, the search and the shelf hotlink
+    Scryfall's art with the painter and the printing beside it (walked today
+    on v442).
+  - **No monetisation surface.** The three hits for the sweep's words are
+    all "donated material" — the Keeper's flavour text about his creatures.
+  - **The licence gate has no force path**: the only `force` in
+    `tools/animist` is `enforce_height`, a verifier's own strictness switch.
+  - **Dependency licences, swept 2026-10-02 from the packages themselves.**
+    Go (`go-licenses report ./...`): **32 third-party, composition identical
+    to 09-19** — 19 MIT, 10 BSD-3-Clause, 2 Apache-2.0, `modernc.org/mathutil`
+    Unknown to the classifier and BSD-3-Clause by its LICENSE (ruled
+    2026-08-24); the 53 "Unknown" rows are this module's own packages. npm
+    (every `node_modules/*/package.json` the lockfile names): 261 entries,
+    **173 with a licence** — 133 MIT, 15 ISC, 10 Apache-2.0, 4 MPL-2.0, 3+3
+    BSD, 2 MIT-0, 1 each BlueOak-1.0.0 / CC0-1.0 / "MIT AND ISC"; 88 are
+    workspace links and nested paths with no package.json. **Zero
+    AGPL/GPL/SSPL/UNLICENSED on either side.**
+- **Verified this run — security & isolation:**
+  - **CodeQL: 0 open alerts.** Dependabot: 9 open, all `pip/torch`,
+    `development` scope — the queued item, unchanged.
+  - **No route registration has moved since 09-26**: the commits touching
+    `internal/api` and `internal/door` since then add tests, the health
+    body's rows and the shelf memo; the door's sweeps derive from the served
+    table regardless. The address rule is `addressreach_test.go`'s now and
+    needed no grep.
+  - **One string-built SQL statement in the tree**, `pooltest.go:168`, a
+    test helper interpolating a *table name the test chose* — nothing from a
+    request reaches it. Not a finding; recorded so the next grep does not
+    re-read it.
+  - Session cookie `HttpOnly`, `Secure` by `MTGLAB_SECURE_COOKIES`,
+    `SameSite=Lax` (`api/accounts.go`); Argon2id parameters are named
+    constants in `auth/passwords.go`; the throttle answers 429 with
+    `Retry-After`; `.env` and `.env.*` are gitignored.
+- **Verified this run — testing discipline:**
+  - **The determinism replay — FULL PASS, live, all four surfaces, 39 days
+    after the first baseline**, through the signed-in seat (the two readings
+    answer 401 to a stranger now; last run's entry read them the same way):
+    - **Tarot**: `GET /api/tarot/reading?seed=1909` — **741 bytes, sha256
+      `e406f504c05f962cb6c2ccabb7d9d18fead04235997917639ac93c90135a3928`,
+      byte-identical to the 2026-08-24 baseline**; Three of Wands / Ten of
+      Swords / The Devil.
+    - **Brew**: `GET /api/brew/reading?seed=1909` — **503 bytes, sha256
+      `54c5036e0afd2b17a2943e1d9062df39bff5858885bc47a0fc3843d91bebead8`,
+      identical to the 09-12 baseline**; Quince / Storm-rain / Hawthorn.
+    - **Wheel**: two spins of `POST /api/decks/gyome/arahbo-cats/wheel
+      {"seed":1909}` — self-identical (912 bytes, sha256 `bafeb2576c9d9c37…`),
+      `symbol: sword`, `sword_face: edge`, `answered_by: dice`, seed 1909 —
+      **the fate equals the 08-24 record.** The card half is **The Wanderer**
+      today, over the pool gathered this afternoon; 09-19 read Thornwatch
+      Scarecrow over the 09-13 pool, 09-12 another over the 08-30 pool. Three
+      readings, three pools, one fate: the record's own rule, confirmed a
+      third time.
+    - **Tier 1**: `POST /api/sim/mana {"owner":"gyome","slug":"arahbo-cats",
+      "seed":1909}` twice. **The route answers a job envelope now** (`id`,
+      `kind: sim.mana`, `status: done`, `result`), so the comparison is of
+      `result`: **both `cached: true`, `computed_at` 2026-09-12T22:42:32Z,
+      byte-identical minus the cache fields (7,483 bytes)** — the deployed
+      cache has held the 09-12 computation for **twenty days** across every
+      deploy since and across today's pool refresh, because no fingerprinted
+      package moved (the two 09-26 commits under `internal/sim` touched
+      `tier3` and `cache`, both outside `engineSources`) and the compiled
+      deck did not change with the data. The 7,420 bytes 09-19 quoted was the
+      bare result; the envelope's `result` is 63 bytes wider, not different.
+  - **Skip census: 61 `t.Skip`/`t.Skipf` call sites** (09-26 read 59; the
+    two new ones are the button-gleam pair, gated on the committed bundle
+    holding a gleam, and `promptdrift_test.go`'s "no drafting mode" fixture
+    condition). By class: 24 gated on `os.Geteuid() == 0`, 8 on a `MTGLAB_*`
+    live switch, the rest on a fixture's shape or a child-process half.
+    **The count is a register's now (fix 1).**
+  - **`t.Setenv` call sites: 0.** Eight mentions in the tree, every one a
+    comment explaining why it is gone. CLAUDE.md's "no remaining reason to
+    exist" holds, and the serial register holds it at runtime (Go panics on
+    `t.Setenv` under `t.Parallel`).
+  - **`time.Sleep` in tests: 15 sites in 10 files** — first count, the
+    baseline for the facet's "a test that got a longer sleep is a finding".
+    Half are `cmd/mtglab`'s shim and serve tests waiting on a child process.
+  - **`data/app.db` untouched** by two full suite runs (mtime Sep 27).
+- **Fixed this run:**
+  1. **The skip census is a register** (`go/cmd/mtglab/skipcensus_test.go`,
+     `TestNoTestSkipsItselfUnconditionally`). The facet's rule — every skip
+     conditional on a real absence — was held by a hand count written into
+     this ledger each run, and the number had moved 15 → 40 → 59 → 61 with
+     each reading done by eye. The register walks every `_test.go` under
+     `go/`, logs the count (read it off `go test -v -run
+     TestNoTestSkipsItself ./cmd/mtglab/`, never off this paragraph) and
+     refuses the one shape that is dead on arrival: a `t.Skip` that is a
+     statement of a top-level test's own body, which runs every time and
+     reads green. The two helper-trailing skips (a price rate "scheduled to
+     move", after a loop that returns when it finds one) are not tests and
+     are not read. **Mutation-verified**: a `t.Skip("planted")` at the top
+     of `TestCardsShowPrintsThePoolsFacts` fails by `file:line` and name;
+     restored. **Honest limit, in the test's own comment:** the 09-26 dead
+     skip sat inside an `if`, which this cannot see — the count moving is
+     still the signal, and a moved census is still read by hand.
+  2. **The compile kernel's first mutation baseline, and the one survivor
+     that was a hole.** `gremlins unleash ./internal/sim/compile/` on a
+     throwaway worktree, raw:
+
+     ```
+     Mutation testing completed in 2 minutes 862 milliseconds
+     Killed: 34, Lived: 6, Not covered: 0
+     Timed out: 5, Not viable: 0, Skipped: 0
+     Test efficacy: 85.00%
+     Mutator coverage: 100.00%
+     ```
+
+     | package | killed | lived | not covered | efficacy |
+     |---|---|---|---|---|
+     | `internal/sim/compile` | 34 | 6 | 0 | **85.00%** |
+
+     **The six survivors, read rather than counted.** Five are equivalent
+     mutants and noise: `233:47` (`stop > 0` → `>=`, a clause that begins
+     with "." and adds nothing either way), `243:33` and `258:48` (a max
+     written with `>`, where `>=` is the same max), `251:18` (`len(after) >
+     0`, unreachable empty because the clause had to contain "mana" or a
+     symbol to get there), `265:10` (the floor at one, where `best == 1`
+     answers 1 both ways). **One is real: `168:8`, the digit test's lower
+     bound** — `r < '0'` moved to `<=` and nothing noticed, because no symbol
+     in the frozen corpus carries a 0 or a 9 digit (`{0}` reads as zero both
+     ways; nothing larger with a zero in it ever reached the reader). Its
+     upper-bound twin at `168:19` was caught only as TIMED OUT — bluntly.
+     `TestManaSymbolsReadsEveryASCIIDigit` (`symbols_internal_test.go`,
+     eight symbol cases whose expectation is the symbol's own arithmetic)
+     kills both cleanly — **verified on the copy**: `{10}` and `{90}` read 0
+     under `<= '0'`; `{9}` and `{90}` read 0 under `>= '9'`. A branch the
+     product takes rarely (a producer whose cost or yield names ten or
+     more), but a reader's bounds are the reader's contract. The corpus is
+     untouched.
+- **Measurements (2026-10-02, solo):** raw output, not a summary. **The load
+  caveat is the whole caveat**: the timing run started at load 3.5 and the
+  coverage run was started behind it, so the per-package tail below was taken
+  while the load climbed to 138; the shape is the fact, the seconds are the
+  laptop's mood.
+
+  ```
+  go test -count=1 -json ./...          (no -race; 16:10, load 3.56 → 16:13, load 138.69)
+    packages 52 fail 0 — wall ≈ 3 min
+    104.28s internal/api        81.14s internal/claude      55.42s internal/cards
+     41.78s internal/claude/tools  36.21s internal/config    35.59s internal/convoke
+     35.31s internal/auth        31.86s internal/claude/ledger  27.68s internal/deck
+     26.11s internal/door        26.09s internal/library     25.65s internal/gate
+  go test -count=1 -coverpkg=./... ./... ; go tool cover -func
+    total: 97.0%     (09-29: 97.0; floor 95.5 — flat, the margin holds)
+  grep -rhE '^func Test' go --include='*_test.go' | wc -l   → 2614
+  ```
+
+  `internal/api` is the wall clock at 104 s and has been every run; the
+  next three (`claude`, `cards`, `claude/tools`) are the only others over 40.
+  Nothing here is slower than its reason, and the facet's standing lever —
+  the expensive fixture built once — was spent on `api` in August.
+- **Queue movement: none.** Seven items before, seven after; nothing this
+  run found needs Aaron, and the one thing that was owed to the pass itself
+  — the replay — is paid above.
 
 ### 2026-09-26 (rainbow)
 
