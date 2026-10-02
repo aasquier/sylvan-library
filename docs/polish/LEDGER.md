@@ -6428,6 +6428,17 @@ branch because doc-only PRs are not a thing here.
   passed here tonight before the change, and fifty runs of the package
   passed after — which is the usual shape: an eight-core Mac is the wrong
   instrument for a race that needs a slow stack walk to open.
+- **A fixture rotted on schedule and skipped a deploy (2026-10-02).** #524
+  merged green and the `tests` run on `main` (37054653173) failed both Go
+  legs on `TestTheActivityViewRefusesRatherThanReportingADayItCouldNotRead`:
+  the half-answering-db fixture seeded its two edits on `2026-09-01` and
+  `2026-09-02`, the activity view's window is thirty days back from now, and
+  10-02 is the first day both fall outside it. Every PR run that day had
+  been green on the same code because the PRs ran the night before. The
+  deploy job was skipped and the site stayed on v440 with the memo merged
+  and unserved — the cost of a written date that was never a fact. The
+  fixture seeds yesterday and the day before now; the fix rides #526 so one
+  merge repairs `main` and ships the dossier.
 
 ### 2026-09-26 (rainbow)
 
