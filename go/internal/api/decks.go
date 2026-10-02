@@ -62,6 +62,7 @@ func (a *API) appDB() *sql.DB {
 func (a *API) library(ctx context.Context) (*library.Library, error) {
 	db := a.appDB()
 	resolver := library.Resolver{DecksDir: a.decksDir, AppDB: db, AppWriteDB: a.writeDB,
+		Memo: a.deckMemo,
 		Maintainer: func(ctx context.Context) (string, error) {
 			return library.MaintainerUsername(ctx, db, a.adminEmail)
 		}}
@@ -476,7 +477,9 @@ func isoformat(t time.Time) string {
 func (a *API) challengeProgress(w http.ResponseWriter, r *http.Request) {
 	// `Decks` is the instance's file tier (`deps.deck_source`), not the
 	// caller's library: the 32 Deck Challenge is scored over the curated six.
-	src := library.NewFileSource(a.decksDir, auth.ScopeFrom(r.Context()).IsAdmin)
+	// The same memory the shelf reads through: this route parses every deck
+	// on the file tier too, and a file that has not moved is not parsed twice.
+	src := library.NewFileSource(a.decksDir, auth.ScopeFrom(r.Context()).IsAdmin).WithMemo(a.deckMemo)
 	filled := map[string][]wire.OrderedMap{}
 	havePool := false
 	err := a.withPool(r.Context(), func(c *pool.Conn) error {
@@ -495,11 +498,7 @@ func (a *API) challengeProgress(w http.ResponseWriter, r *http.Request) {
 		ordered := []entry{}
 		wantedSet := map[string]bool{}
 		for _, slug := range slugs {
-			text, err := src.ReadText(r.Context(), slug)
-			if err != nil {
-				return err
-			}
-			d, err := deck.FromText(text, slug)
+			d, err := src.Get(r.Context(), slug)
 			if err != nil {
 				return err
 			}

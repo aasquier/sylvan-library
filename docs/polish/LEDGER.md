@@ -4100,7 +4100,8 @@ was built and re-opening it here would trade one bad tap for another.
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+- **Last run:** 2026-09-29 (the shelf memo, its own watched PR). Previous:
+  2026-09-26 (rainbow), 2026-09-19 (rainbow),
   2026-09-19 (cleanup), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
   2026-08-24, 2026-08-19, 2026-08-16, plus two un-run entries from that week
   — the targeted performance pass and the measuring shelf — both kept below.
@@ -4110,6 +4111,101 @@ was built and re-opening it here would trade one bad tap for another.
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-09-29 — the shelf remembers (its own PR, the watched deploy)
+
+Not a rainbow leg: the one Black item on the daybreak queue that was the
+pass's to build, landed in a session with Aaron in it because the classifier
+had refused it as a lane twice (a brief that says "watched deploy" does not
+pass). The measurement is the 2026-09-26 entry's; this entry is the lever.
+
+- **Landed: `library.Memo`, the file tier's memory of parsed decks, owned by
+  the `*api.API`.** Keyed on the file's stamp — mtime in nanoseconds plus
+  size, the pool's idiom exactly — and handed down through
+  `library.Resolver.Memo` into every `FileSource` a `Library` builds, which
+  is the whole design argument from the queue line: a Library is built per
+  request, so a memo on the source would have been the register's own
+  cautionary tale (correct, tested, never consulted). `Library.files` is now
+  the one place a file tier is built inside the package, so none of the five
+  former call sites can forget the memory. The stat the shelf's listing
+  already paid for is the key, so remembering costs **no syscall the old walk
+  did not make**; the listing is also the population, so a deck that left the
+  library (deleted to the crypt) is forgotten at the next visit and the memo
+  is bounded by the shelf. `GET /api/colors/progress`, which parsed every deck
+  on the file tier for itself with `ReadText` + `FromText`, now reads through
+  `Get` and the same memory. **Counted from the start** — `Memo.Counts()`,
+  the third entry in this facet's cache register beside `etagCounts` and
+  `cache.Store.Counts` — and rendered nowhere.
+- **The number, same benchmark, same laptop, quiet (`-benchmem -count=5`,
+  load 3.4, nothing else running):**
+
+  ```
+  BenchmarkShelfAll-8               27   41504377 ns/op  27160068 B/op  438092 allocs/op
+  BenchmarkShelfAll-8               28   41581580 ns/op  27148724 B/op  438085 allocs/op
+  BenchmarkShelfAll-8               27   41689241 ns/op  27139063 B/op  438072 allocs/op
+  BenchmarkShelfAll-8               28   42306975 ns/op  27136904 B/op  438070 allocs/op
+  BenchmarkShelfAll-8               28   41496288 ns/op  27134824 B/op  438069 allocs/op
+  BenchmarkShelfAllRemembered-8   6549     181332 ns/op     23223 B/op     218 allocs/op
+  BenchmarkShelfAllRemembered-8   6344     185904 ns/op     23366 B/op     221 allocs/op
+  BenchmarkShelfAllRemembered-8   6489     183026 ns/op     23251 B/op     219 allocs/op
+  BenchmarkShelfAllRemembered-8   6406     184651 ns/op     23320 B/op     220 allocs/op
+  BenchmarkShelfAllRemembered-8   6415     185226 ns/op     23319 B/op     220 allocs/op
+  ```
+
+  A visit whose files have not moved is **41.5 ms → 0.18 ms, 27.1 MB →
+  23 KB, 438,000 allocations → 220** — what is left is the ReadDir, the
+  twenty-five stats and twenty-five map lookups, which is the floor for a
+  design that trusts the filesystem rather than a clock. The
+  `BenchmarkShelfAllRemembered` shape is the route's: a fresh `FileSource`
+  per visit over one Memo. Per the facet's own rule this is a laptop number
+  and the instance's is the watched deploy's to take: `/api/decks` twice,
+  signed in through the claude seat (the route answers 401 to a stranger),
+  and the second reading is the one that changed.
+- **The invalidation is argued, tested and has its edge pinned.** Every
+  write verb on the tier is `writeAtomically` — a fresh file renamed into
+  place — so an edit moves the mtime and nearly always the size; the memo
+  learns under the stamp read *before* the file, so a file rewritten between
+  the stat and the read is remembered under a stamp no longer on disk and
+  the next visit misses (an entry that could be stale is unreachable rather
+  than wrong). The pool's stated hazard carries over unchanged — different
+  bytes, identical size, mtime put back is the same stamp — and
+  `TestTheSameStampIsTheSameDeckByContract` pins it as the contract's edge
+  so nobody discovers it. A touch with no byte changed is a miss too: a moved
+  mtime is the one signal a write leaves and nothing second-guesses it.
+- **A remembered deck is shared, so it is read and never written, and that
+  was checked rather than assumed.** Every assignment to a `Deck`-named
+  field outside `internal/deck` was read (twenty-five of them): all are on
+  other types or on a fresh parse (`SQLSource.parse`, which is not
+  remembered), and the one route that reshapes a deck before reading it
+  (`api.without`) copies first and says so in its own comment. The edit
+  engine works on the file's text. Recorded in `Memo`'s doc comment as the
+  contract; no typed guard, because a `go/types` walk is the two
+  `packages.Load` costs Red already carries and a name-only walk cannot tell
+  `row.Cards` from `d.Cards`.
+- **Not done, on purpose.** No single-flight on a stampede — eight visitors
+  missing the same file at once each parse it, bounded by the people at the
+  door, and a parse is 1.6 ms. The SQL tier is not remembered — its rows are
+  one query and no stamp. `nightDeck`'s per-bout house read
+  (`api/night.go`) still builds a bare `FileSource`; it reads one deck a bout
+  and was left alone to keep this to the shelf. Nothing renders the counts,
+  which is the register's remaining half and was already the standing line.
+- **Tests: nine in `library/memo_test.go`, one in `api/shelfmemo_test.go`,
+  every one through a fresh source or a fresh Library over one memo, the way
+  a route reads.** The route test drives `GET /api/decks` through a real API
+  twice and reads the API's own counters, with a byte-identical second body,
+  the challenge route sharing the memory, and one on-disk edit costing
+  exactly one miss. **Mutation-verified three ways**: never comparing the
+  stamp fails `TestARewrittenDeckIsReadAgainAndTheRestAreNot`,
+  `TestAWriteThroughTheTierIsReadBackFresh` and the concurrent visit; never
+  pruning fails `TestADeckThatLeftTheLibraryIsForgotten`; and the API
+  forgetting to hand its memo to the resolver — the cautionary tale itself —
+  fails `TestTheShelfIsAnsweredFromMemoryOnTheSecondVisit` by name. The
+  concurrent test's first draft wrote its mid-flight edit with
+  `os.WriteFile`, and a reader saw a truncated file: a true statement about
+  a write the app never makes, fixed by editing through the tier's own
+  `WriteText` so the test exercises the atomic write the guarantee rests on.
+- **Queue movement:** the shelf memo leaves the daybreak queue (**10 → 9**);
+  its 2026-09-26 record below is struck. Nothing new is queued.
 
 ### 2026-09-26 (rainbow)
 
@@ -4501,9 +4597,9 @@ will notice it moving.
   take the interview's cap and the theme's union rule as questions for Aaron
   rather than assuming the prompt is the stale side.
 
-- **(open) Queued (new, 2026-09-26): the deck shelf parses the whole library on every
-  visit, and the only lever that pays on two cores needs an owner for a
-  cache.** Numbers above: ~42 ms and 27 MB per visit at 25×100, ~90% of it
+- **Queued 2026-09-26, landed 2026-09-29 (the entry above): the deck shelf
+  parses the whole library on every visit, and the only lever that pays on
+  two cores needs an owner for a cache.** Numbers above: ~42 ms and 27 MB per visit at 25×100, ~90% of it
   inside goccy. The fix is not to parse a deck whose file has not changed —
   the pool's own idiom, a memo keyed on the file's stamp (mtime in nanoseconds
   plus size), with hit and miss counters like `etagCounts` and
@@ -6214,6 +6310,81 @@ runs against a cache nobody emptied.
   2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
   2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
   first Red run and the baseline the numbers below are a trend against.
+
+### 2026-09-29 — the worker's 409, read off the machine and repaired by hand
+
+Not a run: the record of a deploy's second half, owed by the Cleanup entry
+of 2026-09-29 (the eight rulings, #521) and carried on the shelf memo's
+branch because doc-only PRs are not a thing here.
+
+- **What happened.** #521 merged as `7694bd0`; the `tests` run on `main`
+  (36586231222) passed every test job, `flyctl deploy` put the app at
+  **v440** and the smoke checks passed, and then *Point the forge-worker
+  machine at it, and put it to sleep* died on the machine-update `POST`
+  with **HTTP 409 six times** in sixteen seconds — the `--retry 5` from #505
+  doing exactly what it was told against an answer that was not transient
+  in the way the retry assumed. `curl -fsS` hides the body, so the log
+  reads six bare `curl: (22) The requested URL returned error: 409` lines
+  and nothing else. Both recoveries the session could have made were
+  refused by the auto-mode classifier (`fly machine update … --skip-start`
+  and `gh run rerun --failed`), which is why this waited for a session with
+  a person in it.
+- **The cause, off the machine's own event log rather than the HTTP body.**
+  `GET /v1/apps/sylvan-library/machines/080e90dec3d918` lists every attempt
+  as an `update` from `user` (`replacing`, `persist_rootfs:
+  PERSIST_ROOTFS_NEVER`) reverted by `flyd` within 200 ms, and the revert
+  carries the reason the 409 did not:
+
+  ```
+  governor policy blocked start: hard gate failed: mem_overcommit_exceeded
+  (memory allocation would exceed max overcommit)
+  ```
+
+  So the 409 was the *host* refusing to reserve an 8,192 MB
+  `performance-4x` slot for the replacement VM — an update of a stopped
+  machine is still a placement on its host, and that host was overcommitted
+  at 15:04Z. Nothing in this repository was involved; the same request
+  fourteen hours later was accepted first time.
+- **Repaired by hand, 2026-09-30 02:36Z, the deploy step's three calls made
+  one at a time with the body visible.** The update `POST` answered **200**
+  and the machine read `created` on `forge-worker-7694bd0…` with the new
+  digest recorded; `start` answered 200 (`previous_state: stopped`,
+  `migrated: false` — same host, so the overcommit had cleared rather than
+  the machine having moved); the `stop` was refused by the classifier in
+  both its shapes (the Machines API and `fly machine stop`), and it did not
+  matter: the shim's own idle watchdog (`MTGLAB_FORGE_IDLE_SECONDS`, 180)
+  exited the machine three minutes later, `guest_exit_code: 0`, and the
+  machine reads **stopped** holding the current sha. That watchdog is the
+  reason a refused stop costs three minutes of `performance-4x` and not a
+  night of it, and it is worth knowing the next time a hand has to finish a
+  deploy.
+- **What this changes in the step: nothing tonight, one thing to consider.**
+  A 409 with that body is a capacity answer, and the right retry is
+  minutes apart rather than two seconds; the step's five tries two seconds
+  apart are shaped for the transport hiccups #505 was written against and
+  cannot reach a host that needs a minute to free memory. Two honest
+  options, neither landed here because a `deploy`-job change can only be
+  watched: print the body on failure (`curl -sS -w '%{http_code}'` and
+  test the code, the shape `wake` already half-uses), so the next one names
+  itself in the log; and treat a `stopped` worker's update as
+  best-effort — the app deploy is proven before this step runs by design,
+  and the worker one sha behind is a red check about the workflow, not the
+  instance, which is the third time that sentence has been written in this
+  section. Queued nowhere: the next Red run reads this and decides.
+- **A flake #519 shipped, caught by the arm64 leg the same night and made
+  honest here.** `TestAPanicReRaisesOnTheCaller` failed inside the coverage
+  run on the dossier branch (#525, run 36663192868): *"all 1000 pieces ran
+  despite the panic"*. `convoke.Indexed`'s recover read `debug.Stack()`
+  **before** raising the stop flag — the stack read is milliseconds under
+  coverage on that runner, and in those milliseconds the second worker
+  drained the other 996 pieces of a grid whose `fn` is one atomic add. The
+  flag now goes up first and the stack is read after; the test is unchanged
+  because it already says what the contract is (a panic at index 3 of a
+  thousand "must leave most of the grid untouched"), and it is the test
+  that found this. The laptop never showed it — the full `-race` suite
+  passed here tonight before the change, and fifty runs of the package
+  passed after — which is the usual shape: an eight-core Mac is the wrong
+  instrument for a race that needs a slow stack walk to open.
 
 ### 2026-09-26 (rainbow)
 
