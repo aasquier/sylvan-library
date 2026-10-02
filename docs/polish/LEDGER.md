@@ -4100,8 +4100,9 @@ was built and re-opening it here would trade one bad tap for another.
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-09-29 (the shelf memo, its own watched PR). Previous:
-  2026-09-26 (rainbow), 2026-09-19 (rainbow),
+- **Last run:** 2026-10-02 (the two walks, the owed lines). Previous:
+  2026-09-29 (the shelf memo, its own watched PR), 2026-09-26 (rainbow),
+  2026-09-19 (rainbow),
   2026-09-19 (cleanup), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
   2026-08-24, 2026-08-19, 2026-08-16, plus two un-run entries from that week
   — the targeted performance pass and the measuring shelf — both kept below.
@@ -4111,6 +4112,59 @@ was built and re-opening it here would trade one bad tap for another.
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-10-02 — the two walks, and the fixture that rotted on schedule
+
+Not a run: the lines the two 2026-09-29 entries below owed once their deploys
+landed, written on the next work branch as the standing rule asks, with the
+one item from the shelf memo's "not done" list that was always a one-liner.
+Both PRs merged and deployed on 2026-10-02 — #524 as `17cc8fe`, #526 as
+`02beea1`, **release v441** — and the walks were taken from the `gyome` seat,
+read-only, against that release.
+
+- **The shelf memo, walked on the instance.** The 09-29 entry's number was
+  a laptop's and said the instance's was the watched deploy's to take.
+  Taken: `GET /api/decks`, six fetches before and six after the deploy on
+  the same wire. The body is **byte-identical (33,200 bytes)** either side;
+  the warm floor moved **~200 ms → 118 ms**; and the **first call after
+  the deploy answered in 655 ms** — the cold miss, the one visit that
+  parses the library and the exact shape the entry predicted (*"the second
+  reading is the one that changed"*). What is left in the 118 ms is the
+  wire and the aggregation, not the parse. Numbers are one wire on one
+  afternoon, per the facet's own rule; the delta is the finding.
+- **The dossier's `allies` golden, walked as far as a free read goes.** The
+  dossier `GET` at the new fingerprint answers `cached:false, dossier:{}` —
+  every stored dossier on the instance is missed, as the entry below
+  predicted and as the cost it named. The fresh `POST` spends a paid search
+  and was **left for Aaron's click**, so the second half of that walk — the
+  first page saying it was freshly written, the second saying it came from
+  the shelf — is his to read, not this ledger's to claim.
+- **The fixture that rotted on schedule, and skipped a deploy for a day.**
+  #524's `main` run went red on both Go legs the moment it merged, and the
+  deploy behind it was skipped: the site stayed on v440 until #526 landed.
+  The cause was `halfansweringdb_test.go` seeding the activity ledger with
+  the literal days `2026-09-01` and `2026-09-02`, read back through a view
+  whose window is thirty days back from *now* — and 2026-10-02 is the first
+  day both fall outside it. Green on every branch run for a month, red on
+  `main` on the day the calendar said. Fixed on #526 by seeding yesterday
+  and the day before, never a written date. Filed here because it rode this
+  facet's branches; the lesson is every colour's: **a literal date beside a
+  `time.Now()` window is a timed red on `main`**, and a fixture that passes
+  fifty times is still a fixture with an expiry.
+- **Landed on this branch: the night runner reads the house's deck through
+  the same memory as the shelf.** `nightDeck` in `api/night.go` built a bare
+  `FileSource` per bout — the 09-29 entry's "not done, on purpose" item,
+  left to keep that PR to the shelf. One call now, `.WithMemo(a.deckMemo)`,
+  and `TestTheHouseSeatIsReadFromTheSameMemoryAsTheShelf` reads the API's
+  own counters: one parse, then memory, the same `*deck.Deck` both times.
+  **Mutation-verified:** without the hand-off the test fails by name with
+  `hits=0`. The house reads one deck a bout, so the saving is a parse a
+  bout, which is nothing — the point is that the memo's cautionary tale
+  (a cache one caller forgets to be handed) now has no remaining caller in
+  the API that builds a file tier without it.
+- **Still not done, same reasons:** no single-flight on a stampede; the SQL
+  tier not remembered; the three cache registers (`etagCounts`,
+  `cache.Store.Counts`, `Memo.Counts`) rendered nowhere.
 
 ### 2026-09-29 — the shelf remembers (its own PR, the watched deploy)
 
@@ -8409,9 +8463,73 @@ written blind, at the top row (flush, the rail alight) and at the bottom
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+- **Last run:** 2026-10-02 (the library gathered again, the owed line).
+  Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow),
   2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24 (rainbow),
   2026-08-19 (rainbow), 2026-08-16 (rainbow).
+
+### 2026-10-02 — the library gathered again, after *Reality Fracture*
+
+Not a run: the one Green line on the daybreak queue whose date arrived,
+taken the afternoon it did. *Reality Fracture* (`fra`) and its commander
+decks (`frc`) released 2026-10-02; the pool read `pool_age_days: 19` that
+morning on bulk files dated 2026-09-13, and Scryfall's feed had already
+turned over for the day (`oracle_cards` 09:01Z, `default_cards` 09:05Z).
+
+- **The refresh, run and read back.** `fly ssh console -C "mtglab data
+  refresh"`, started 20:14:39Z, exit 0 at 20:15:17Z — **38 seconds end to
+  end, both downloads included** (oracle 24,595,823 B, default 78,689,871 B).
+  Its own account: `loaded 35,460 oracle cards`, `loaded 109,332 printings`,
+  `swept 2 older bulk files (102,853,644 bytes freed)`. The terminal rather
+  than the queue line's button, because the button is behind the admin seat
+  and that seat is Aaron's to sign in; the runbook names both routes and this
+  one shows the row counts. No `.rebuilding` left beside the pool; the pool
+  file is still `mtglab mtglab` after the rename. **The two new bulk files
+  are `root root`** — the ssh console's user — where the ones they replaced
+  were `mtglab`'s: the serving process reads them fine and can sweep them
+  fine (the directory is `mtglab`'s), so this is a note for the next person
+  reading `ls -la /data/scryfall` and not a fault.
+- **Health after:** `pool_age_days: 0`, bulk files `2026-10-02`, oracle
+  35,517 → **35,460**, printings 108,583 → **109,332**, `disk_free_mb` 2568 →
+  2539, the body answered in 0.247 s from outside. **The released product
+  resolves:** `mtglab cards show 'Aerid Konstrari'` on the instance answers
+  the card (`{1}{R}{G}{G}`, Elder Sphinx, identity `[G, R]`), and the pool
+  holds `fra` at **461 printings over 285 oracle ids** and `frc` at **103
+  over 87**, every one `released_at` 2026-10-02 — the queue line's 249 was
+  the preview-season count, and the set record read 461 by release day.
+- **The oracle count fell by 57, and every missing name is an Alchemy
+  rebalance.** Diffed against the laptop's 2026-08-19 pool through a
+  throwaway SQL window onto a read-only copy (deleted afterwards, with the
+  copy): 216 names gone since August, **all 216 `A-` prefixed**, 283 names
+  new, one `A-` card left in the whole pool. Scryfall has retired the
+  rebalanced digital faces from its oracle feed, and nothing a Commander
+  table can play went with them. Not a fault; recorded so the next health
+  read does not take a falling count for a broken load.
+- **The pool file did not hold near 85 MB — 84,684,800 → 114,569,216 bytes
+  (+29.9 MB); `/data` 198M → 227M, 9%.** A large number is a question, so
+  it was measured on the copy rather than explained. `pragma_database_size`:
+  **437 blocks of 256 KiB, 402 used, 35 free (8%)** — *not* the dead-page
+  leak #472 closed; the rebuild-and-rename is doing its job. Column data by
+  table (`pragma_storage_info`, distinct persistent blocks):
+  `price_history` **75 blocks / 3 row groups** — **294,033 rows over three
+  days: 2026-08-28 97,435, 2026-09-14 97,593, 2026-10-02 99,005**, so the
+  refresh recorded its own day exactly as #473 promised and the carry across
+  the rebuild lost nothing — `printings` **58 / 1**, `oracle_cards` **69 /
+  1**. That is **202 blocks of column data against 402 used.** The other
+  ~200 blocks (~50 MB) are not column segments: the primary keys
+  `schema.sql` declares, the two secondary indexes (`idx_oracle_name`,
+  `idx_printings_oracle`) and the catalog — storage `pragma_storage_info`
+  cannot see, and this leg did not drop the keys on the copy to weigh them.
+  **Deferred, trigger named:** the next refresh adds a fourth history day.
+  If the file lands near 125 MB — one more day's ~25 blocks of column data
+  and its share of index — this closes as measured behaviour and the queue
+  line's "near 85 MB" is retired as a two-day number that was never going
+  to describe a three-day file. If it crosses ~145 MB the growth is
+  super-linear in the history, and the index over `price_history`'s key is
+  the thing to weigh: drop it on a copy, `CHECKPOINT`, compare the block
+  count. Either answer is one refresh away and costs nothing to wait for.
+- **Queue movement:** the refresh leaves the daybreak queue (**8 → 7**); its
+  record in the 2026-09-19 entry below is struck.
 
 ### 2026-09-26 (rainbow) — PRs #508 (mergeable) and #506 (PARKED)
 
@@ -8782,7 +8900,7 @@ for Colorless to carry onto its branch.
      if not, this line is its obituary and the ADR 30 rule held. Either way,
      the mtg-lab skill's trigger list still names "mono-green/Goreclaw" as one
      of your decks, which the instance contradicts — Blue's docs sweep.
-  2. **(open) The next refresh has a date.** Pool is fresh today (six days), but
+  2. **Queued 2026-09-19, landed 2026-10-02 (the entry above): the next refresh has a date.** Pool is fresh today (six days), but
      *Reality Fracture* (`fra`, 249 cards; `frc` commander decks) releases
      **2026-10-02**, and until a refresh runs after that day the shelves
      cannot resolve a released product. Deliberately waiting, nothing to do
