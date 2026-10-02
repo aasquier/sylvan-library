@@ -31,6 +31,13 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > repaired by hand first (Red, 2026-09-29). The other watched-deploy item,
 > the dossier's `allies` golden, went as the branch stacked on it: two
 > sentences and one golden re-recorded, eight left.
+>
+> **2026-10-02, afternoon: the library gathered again, seven left.** *Reality
+> Fracture* released, and the refresh ran from the terminal the same
+> afternoon — 38 seconds, the released commanders resolving on the instance;
+> Green's 2026-10-02 entry has the read-back, including a pool file that did
+> not hold near 85 MB and what it measured instead. The two walks the 09-29
+> pair owed are in Black under the same date.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -122,18 +129,6 @@ night shelf lands (ADR 46 names it as its own PR) and the settings room reads
 whether a night is scheduled off the wire. · **Recommendation:** unchanged —
 the copy becomes a fact the server owns when the shelf gives it something to
 read. Ledger: Blue, 2026-09-05.
-
-**Green: the pool is sixteen days old and still fine; the next refresh has a
-date rather than a deadline.** *Reality Fracture* (`fra`, 249 cards, plus the
-`frc` commander decks) releases **2026-10-02** — three days from this
-morning — and until a refresh runs after that day the shelves cannot resolve
-a released product. The health body said `pool_age_days: 16` on 09-28 (bulk
-files still `2026-09-13`). · *Cost of leaving it:* nothing until 10-02, then
-names from a new set fail on import and search. · **Recommendation:** "Gather
-the library again" on the Admin Upkeep tab in the week of 10-05 — a deployed
-button now, no ssh — then read the pool file's size back once; the #472
-rebuild took it 224 MB → 81 MB on 09-13 and it should hold near there. Ledger:
-Green, 2026-09-19.
 
 **Black: the cache-read price is one constant for the whole family, and the
 family stopped agreeing — but nothing is mispriced yet.**
