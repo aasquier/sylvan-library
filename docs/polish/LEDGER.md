@@ -4207,6 +4207,49 @@ pass). The measurement is the 2026-09-26 entry's; this entry is the lever.
 - **Queue movement:** the shelf memo leaves the daybreak queue (**10 → 9**);
   its 2026-09-26 record below is struck. Nothing new is queued.
 
+### 2026-09-29 — the dossier searches for its allies (the stacked watched branch)
+
+The second watched-deploy item, ruled "go" on the queue and built as the
+branch stacked on the shelf memo's, because both wait on the same morning.
+#513 (2026-09-26, prompts) found the drift and left it: `allies` is a
+**required, source-bearing** section since `DossierVersion = 3`, and the
+prompt told the model what to search for in two sentences that both
+predate it, with `dossierOpening`'s ask making a third. Fixing a
+hash-frozen prompt means moving a frozen golden, which is exactly the kind
+of change a polish run does not make alone.
+
+- **Landed: three sentences, one word each.** `modes.json`'s
+  commander-dossier instructions — the opening paragraph now reads *"who
+  competes for their seat, who stood beside them and who they fought in the
+  story"*, and the source rule reads *"The meta, the archetype's history,
+  the allies, the rivals and the standing come from the web"* — and
+  `dossierOpening`'s ask in `claude/dossier.go` now lists *"the
+  competitors, the allies, the rivals and the standing"*. Nothing else in
+  the prompt moved; the schema is byte-identical and `DossierVersion` stays
+  3, because the *shape* of a dossier has not changed — only what the model
+  is told to go and look for.
+- **The golden, re-recorded from the tests' own reported values and saying
+  so.** `testdata/dossier.json` moves in exactly the places the fingerprint
+  hashes: `instructions_sha256` (`bff96aea…` → `aa00490a…`), the sonnet
+  fingerprint `1099e695f258d61c` → `707dffec8e618cb7` (eight keys), opus
+  `3a0b73db316073e5` → `06b124af1a978a60`, fable `19256ae067e2c99a` →
+  `c42f19229a980892`, the model-override key `c16adac282142d98` →
+  `58a3d75df54b1178`, and the recorded opening sentence. Every other byte
+  of the corpus — the schema dump, the reports, the recorded turns, the
+  frozen clock — is untouched, and the file's own `note` now carries the
+  date and the list. This is the one deliberate exception to "never
+  regenerate a golden": the golden's job is to notice the prompt moving,
+  it noticed, and the move was Aaron's ruling.
+- **What it costs where it ships.** The fingerprint is the cache key, so
+  every dossier the instance has stored is missed after the deploy — each
+  commander's next dossier is a fresh paid search rather than a row — which
+  is the reason this could only ever land on a watched morning and is the
+  thing to read on the walk: the first deck page's dossier after the deploy
+  should say it was freshly written, and the second visit should say it
+  came from the shelf.
+- **Queue movement:** the dossier's `allies` golden leaves the queue
+  (**9 → 8**); its record in the 2026-09-26 (prompts) entry below is struck.
+
 ### 2026-09-26 (rainbow)
 
 A daylight leg, run in parallel with four other lanes (Red's gzip-writer pool
@@ -4715,7 +4758,7 @@ reaches a model and thence a newcomer's screen.
   proposal was "Measured at 226 seconds **with four searches**"; its hosted
   search has been bounded at three since #262 and four is the dossier's and
   research's budget, so the clause is gone and the figure stands.
-- **(open) NOT fixed, deliberately: the dossier, and the reason is a hash.**
+- **NOT fixed then, deliberately — landed 2026-09-29 on its own watched branch (the entry above): the dossier, and the reason was a hash.**
   `Fingerprint` (`dossier.go:145`) hashes `DossierVersion`, `mode.Instructions`
   and `dumpJSON(mode.ResponseSchema)`, and `testdata/dossier.json` pins that
   digest (`instructions_sha256`) plus the brief's opening message as bytes. So
@@ -6385,6 +6428,17 @@ branch because doc-only PRs are not a thing here.
   passed here tonight before the change, and fifty runs of the package
   passed after — which is the usual shape: an eight-core Mac is the wrong
   instrument for a race that needs a slow stack walk to open.
+- **A fixture rotted on schedule and skipped a deploy (2026-10-02).** #524
+  merged green and the `tests` run on `main` (37054653173) failed both Go
+  legs on `TestTheActivityViewRefusesRatherThanReportingADayItCouldNotRead`:
+  the half-answering-db fixture seeded its two edits on `2026-09-01` and
+  `2026-09-02`, the activity view's window is thirty days back from now, and
+  10-02 is the first day both fall outside it. Every PR run that day had
+  been green on the same code because the PRs ran the night before. The
+  deploy job was skipped and the site stayed on v440 with the memo merged
+  and unserved — the cost of a written date that was never a fact. The
+  fixture seeds yesterday and the day before now; the fix rides #526 so one
+  merge repairs `main` and ships the dossier.
 
 ### 2026-09-26 (rainbow)
 

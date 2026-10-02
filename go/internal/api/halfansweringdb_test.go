@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/auth"
 	"github.com/aasquier/sylvan-library/go/internal/auth/authtest"
@@ -89,8 +90,12 @@ func faultyAdmin(t *testing.T) (*API, *authtest.Fault) {
 	}
 	// Two days of edits, so the activity view's result set is more than one
 	// row and a read can be cut short in the middle of it rather than at its
-	// end.
-	for _, day := range []string{"2026-09-01", "2026-09-02"} {
+	// end. Yesterday and the day before, never a written date: the view's
+	// window is thirty days back from now, and two literal September days
+	// fell out of it on 2026-10-02 and turned every run on `main` red with
+	// the deploy skipped behind it.
+	for _, back := range []int{1, 2} {
+		day := time.Now().UTC().AddDate(0, 0, -back).Format(time.DateOnly)
 		if _, err := db.ExecContext(ctx,
 			"INSERT INTO deck_log (created_at, owner_id, slug, actor, action,"+
 				" summary) VALUES (?, ?, ?, ?, ?, ?)",

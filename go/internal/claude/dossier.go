@@ -130,8 +130,8 @@ func dossierOpening(facts wire.OrderedMap) string {
 		dumpJSON(body, dumpOptions{Indent: 2}),
 		"",
 		fmt.Sprintf("Write the dossier for %s. Search the web for the character's "+
-			"story, the archetype, the competitors, the rivals and the standing; "+
-			"take the card's own facts from above.", name),
+			"story, the archetype, the competitors, the allies, the rivals and "+
+			"the standing; take the card's own facts from above.", name),
 	}, "\n")
 }
 
