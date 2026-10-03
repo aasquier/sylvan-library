@@ -44,22 +44,27 @@ var casefoldFile []byte
 
 // folds is every code point whose fold is not itself. Multi-character
 // folds are why the value is a string.
-var folds map[rune]string
+// Built by a function that takes its bytes rather than by an `init` reading the
+// embed, for the reason `loadDigitZeros` and `loadModes` give: the refusal is a
+// damaged build speaking, and a panic nothing can enter is a sentence nobody can
+// prove still works. `casefoldFile` is the only document ever passed.
+var folds = loadFolds(casefoldFile)
 
-func init() {
+func loadFolds(raw []byte) map[rune]string {
 	var payload struct {
 		Folds []struct {
 			CP   rune   `json:"cp"`
 			Fold string `json:"fold"`
 		} `json:"folds"`
 	}
-	if err := json.Unmarshal(casefoldFile, &payload); err != nil {
+	if err := json.Unmarshal(raw, &payload); err != nil {
 		panic(fmt.Sprintf("claude: casefold.json will not parse: %v", err))
 	}
-	folds = make(map[rune]string, len(payload.Folds))
+	out := make(map[rune]string, len(payload.Folds))
 	for _, f := range payload.Folds {
-		folds[f.CP] = f.Fold
+		out[f.CP] = f.Fold
 	}
+	return out
 }
 
 // casefold is the full folding over one string.

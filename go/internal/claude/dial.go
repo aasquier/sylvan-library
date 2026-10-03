@@ -97,6 +97,28 @@ func surfaceStanceFor(surface string, requested any, limit *Stance) (Stance, err
 	}
 }
 
+// surfaceDefaultFor is the same dispatch asked the half of the question that
+// cannot fail: what a deckless surface answers when nothing was requested.
+//
+// Still one dispatch -- this is the switch above, read with a nil request,
+// rather than a second copy of it.
+//
+// **The error is dropped here and nowhere else, and this is the whole of the
+// licence.** With a nil request every branch of that switch answers
+// `defaultStance(…)` or `Clamp(SecondOpinion, …)`, and neither can refuse: a
+// preset is a lookup, not a parse. Only a *requested* stance can be unreadable,
+// and this path never passes one. What that buys is a dial with no
+// `Off`-on-error fallback in it — and that fallback was worth removing on its
+// own merits, because `Off` as a failure is indistinguishable from `Off` as the
+// answer: a surface quietly standing down is exactly the bug `dialSurfaces`
+// exists to prevent, and the dial would have reported it as normal. A surface
+// that ever starts parsing something on its nil path has to say so at the
+// surface.
+func surfaceDefaultFor(surface string, limit *Stance) Stance {
+	s, _ := surfaceStanceFor(surface, nil, limit)
+	return s
+}
+
 // DialDefault is what "no preference" resolves to,
 // asked of whoever owns the answer.
 //
@@ -110,15 +132,7 @@ func surfaceStanceFor(surface string, requested any, limit *Stance) (Stance, err
 // wrong one here, so this checks for the deck first.
 func DialDefault(deck DeckStatused, surface string, limit *Stance) Stance {
 	if deck == nil && dialSurfaces[surface] {
-		s, err := surfaceStanceFor(surface, nil, limit)
-		if err != nil {
-			// Unreachable with a nil request -- neither surface parses
-			// anything on that path -- and `Off` rather than a panic if it
-			// ever becomes reachable, because failing closed is what the
-			// ceiling does with an unreadable value too.
-			return Off
-		}
-		return s
+		return surfaceDefaultFor(surface, limit)
 	}
 	if deck == nil {
 		return Off
@@ -218,12 +232,9 @@ var dialModeOrder = []string{
 func DialModes() []DialMode {
 	out := make([]DialMode, 0, len(dialModeOrder))
 	for _, name := range dialModeOrder {
-		mode, err := GetMode(name)
-		if err != nil {
-			// A name in this list that is not a mode is a programming error
-			// caught at startup by the test above, not a runtime condition.
-			panic(err)
-		}
+		// A name in this list that is not a mode is a programming error rather
+		// than a runtime condition, and `modeOf` is where this package says so.
+		mode := modeOf(name)
 		out = append(out, DialMode{
 			Name:    mode.Name,
 			Purpose: mode.Purpose,
@@ -276,10 +287,10 @@ func Status(requested any, deck DeckStatused, surface string, set Settings) (Dia
 	limit := set.ceiling()
 	presets := make([]DialPreset, 0, len(PresetNames))
 	for _, name := range PresetNames {
-		preset, presetErr := Preset(name)
-		if presetErr != nil {
-			return Dial{}, presetErr
-		}
+		// PresetNames and the preset table are two literals in one file, so
+		// this lookup cannot miss -- see presetOf, which is where a name this
+		// package got wrong stops the process instead of becoming a 500.
+		preset := presetOf(name)
 		presets = append(presets, DialPreset{
 			Name:   name,
 			Blurb:  PresetBlurbs[name],

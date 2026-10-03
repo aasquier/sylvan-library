@@ -465,10 +465,7 @@ func Interview(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 				"this deck still works."), nil
 	}
 
-	mode, err := GetMode(ModeRationaleInterview)
-	if err != nil {
-		return InterviewReport{}, err
-	}
+	mode := modeOf(ModeRationaleInterview)
 	opening, err := interviewOpening(facts, req.Focus)
 	if err != nil {
 		return InterviewReport{}, err

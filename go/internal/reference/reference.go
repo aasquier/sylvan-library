@@ -582,10 +582,15 @@ func mustCompact(name string, raw []byte, into any) []byte {
 	if err := json.Unmarshal(raw, into); err != nil {
 		panic(fmt.Sprintf("reference: %s does not parse: %v", name, err))
 	}
+	// Compacting cannot fail here, and the refusal that used to sit beside it
+	// was a guard over the line above rather than over the data: `json.Compact`
+	// walks the same bytes with the same scanner `json.Unmarshal` has just
+	// walked to the end, and a `bytes.Buffer` has no failing write. So there is
+	// no document that parses and will not compact, which means no test could
+	// ever enter that panic and no reader could tell whether it worked. The
+	// parse is where a damaged file is caught; this is only the rendering.
 	var buf bytes.Buffer
-	if err := json.Compact(&buf, raw); err != nil {
-		panic(fmt.Sprintf("reference: %s will not compact: %v", name, err))
-	}
+	_ = json.Compact(&buf, raw)
 	return buf.Bytes()
 }
 

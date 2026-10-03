@@ -127,20 +127,81 @@ var registry map[string]*Tool
 var Names []string
 
 func init() {
+	registry, Names = loadRegistry(toolsJSON)
+	// Explicitly last, and explicitly here: see registerHandlers.
+	registerHandlers()
+	// And then the two halves are held equal, once, before anything can ask.
+	requireWired(registry)
+}
+
+// loadRegistry reads the embedded schemas into the registry and the sorted name
+// list beside it.
+//
+// **The bytes are a parameter and the result is returned rather than assigned**,
+// which is what makes the refusal above it something a reader can see happen: a
+// document that will not parse is a damaged build and must stop it, and until
+// this took its bytes from a caller that panic was a line no test could enter
+// and nobody could prove still worked. It touches no package state, so a test
+// may call it beside every other test in the tree.
+//
+// It is also where `properties` and `required` are filled in when the data
+// leaves them out. `Schemas` used to do that at render time, which put two more
+// unenterable branches on the hot path — the committed file carries `{}` and
+// `[]` on every tool, so neither arm could fire — and it is the wrong place
+// besides: a `null` where the model expects an object is a fact about the
+// *registry*, and a registry is allowed to normalise what it was handed once
+// instead of asking the same question on every turn.
+func loadRegistry(raw []byte) (map[string]*Tool, []string) {
 	var doc struct {
 		Tools []*Tool `json:"tools"`
 	}
-	if err := json.Unmarshal(toolsJSON, &doc); err != nil {
+	if err := json.Unmarshal(raw, &doc); err != nil {
 		panic(fmt.Sprintf("claude/tools: the embedded schemas are unreadable: %v", err))
 	}
-	registry = make(map[string]*Tool, len(doc.Tools))
+	set := make(map[string]*Tool, len(doc.Tools))
+	names := make([]string, 0, len(doc.Tools))
 	for _, t := range doc.Tools {
-		registry[t.Name] = t
-		Names = append(Names, t.Name)
+		if t.Properties == nil {
+			t.Properties = map[string]any{}
+		}
+		if t.Required == nil {
+			t.Required = []string{}
+		}
+		set[t.Name] = t
+		names = append(names, t.Name)
 	}
-	sort.Strings(Names)
-	// Explicitly last, and explicitly here: see registerHandlers.
-	registerHandlers()
+	sort.Strings(names)
+	return set, names
+}
+
+// requireWired holds the schemas and the dispatch equal at startup: every tool
+// the data describes has a function beside it.
+//
+// It panics, and the moment is the whole point. The alternative — and what this
+// package did until it was written — is for `Run` to notice at the one instant
+// somebody's conversation asks for the tool, and answer the model "that has a
+// schema but nothing is wired to it". That is a wiring mistake discovered by a
+// user, in the most expensive place, and it is also a branch nothing could
+// reach: `registerHandlers` wires all of them, `Register` already refuses a
+// name with no schema and a name wired twice, so the only way to meet it was to
+// ship a tool somebody forgot. Asking here means `Run` may simply dispatch.
+func requireWired(set map[string]*Tool) {
+	for _, name := range sortedNames(set) {
+		if set[name].fn == nil {
+			panic(fmt.Sprintf("claude/tools: %q has a schema in data/tools.json "+
+				"and no handler; registerHandlers has to wire every tool the "+
+				"data describes", name))
+		}
+	}
+}
+
+func sortedNames(set map[string]*Tool) []string {
+	out := make([]string, 0, len(set))
+	for name := range set {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Register wires a handler to a schema the embedded data already carries.
@@ -184,21 +245,16 @@ func Schemas(names []string) ([]map[string]any, error) {
 	out := make([]map[string]any, 0, len(picked))
 	for _, name := range picked {
 		t := registry[name]
-		props := t.Properties
-		if props == nil {
-			props = map[string]any{}
-		}
-		required := t.Required
-		if required == nil {
-			required = []string{}
-		}
+		// `properties` and `required` are non-nil for every registered tool:
+		// `loadRegistry` fills them in, so what renders here is an object and a
+		// list rather than two nulls, and this loop has nothing to ask.
 		out = append(out, map[string]any{
 			"name":        t.Name,
 			"description": t.Description,
 			"input_schema": map[string]any{
 				"type":                 "object",
-				"properties":           props,
-				"required":             required,
+				"properties":           t.Properties,
+				"required":             t.Required,
 				"additionalProperties": t.AdditionalProperties,
 			},
 		})
@@ -231,10 +287,10 @@ func Run(ctx context.Context, name string, arguments map[string]any, deps Deps, 
 			"%s is not offered by this mode. Its tools are %s.",
 			quoted(name), strings.Join(offered, ", "))}
 	}
-	if t.fn == nil {
-		return nil, &ErrNotAllowed{Msg: fmt.Sprintf(
-			"%s has a schema but no handler; nothing is wired to it", quoted(name))}
-	}
+	// Nothing is asked about the handler. Every registered tool has one or this
+	// package did not finish loading -- see requireWired, which is where a
+	// schema with no function beside it stops the process rather than meeting
+	// somebody's conversation.
 
 	args := map[string]any{}
 	for k, v := range arguments {
