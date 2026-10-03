@@ -41,6 +41,51 @@ func TestParseReadsCostsAsRecorded(t *testing.T) {
 	}
 }
 
+// The generic-cost reader's two bounds, swept rather than sampled.
+//
+// `isDigits` tests `r < '0' || r > '9'`, and the upper bound had nothing
+// holding it: every recorded cost in this file's table and in the oracles
+// stops at 8, so `r >= '9'` reads `{9}` as *not digits*, the symbol falls to
+// the `default` arm, and a nine-generic cost quietly becomes one generic — a
+// mana value four off, with no error anywhere. Mutation testing is how that
+// came out (`gremlins unleash ./internal/mana/`), and it is the same fault the
+// compile kernel had at its own digit test, found the same way: a reader's
+// bounds are only pinned by a symbol that *sits on* them, and nothing a deck
+// happens to contain is a bound.
+//
+// So the sweep is all ten digits and then past them, because the second digit
+// is read by the same loop and a cost can carry two.
+func TestParseReadsEveryASCIIDigitAsGeneric(t *testing.T) {
+	t.Parallel()
+	for d := 0; d <= 9; d++ {
+		cost := "{" + string(rune('0'+d)) + "}{G}"
+		got := Parse(cost)
+		if got.Generic != d {
+			t.Errorf("Parse(%q).Generic = %d, want %d", cost, got.Generic, d)
+		}
+		if len(got.Pips) != 1 {
+			t.Errorf("Parse(%q).Pips = %v, want the one green pip", cost, got.Pips)
+		}
+		if want := d + 1; got.ManaValue() != want {
+			t.Errorf("Parse(%q).ManaValue() = %d, want %d", cost, got.ManaValue(), want)
+		}
+	}
+	for _, c := range []struct {
+		cost    string
+		generic int
+	}{
+		{"{10}", 10},
+		{"{19}", 19},
+		{"{90}", 90},
+		{"{99}", 99},
+		{"{9}{9}", 18},
+	} {
+		if got := Parse(c.cost); got.Generic != c.generic {
+			t.Errorf("Parse(%q).Generic = %d, want %d", c.cost, got.Generic, c.generic)
+		}
+	}
+}
+
 func normalise(c Cost) Cost {
 	if len(c.Pips) == 0 {
 		c.Pips = nil

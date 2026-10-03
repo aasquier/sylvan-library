@@ -39,11 +39,29 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > not hold near 85 MB and what it measured instead. The two walks the 09-29
 > pair owed are in Black under the same date.
 >
-> **2026-10-03, night: Black added two, and one of them is about money.** The
-> Sonnet 5 price rise this project's whole rate table was built around was
-> cancelled, which the table does not know; the other is a year-long
-> `immutable` on an unversioned URL. Both sit in the *watched deploy* group,
-> and the pricing one asks to travel with the cache-write column below it.
+> **2026-10-03, night: seven lanes ran one after another — three merged, three
+> are held for your eye, and one of the night's questions is about money.**
+> Black added two: the Sonnet 5 price rise this project's whole rate table was
+> built around was cancelled, which the table does not know, and a year-long
+> `immutable` on an unversioned URL. Red added one: the press clause of
+> commandment 17, now a register, with the design pass it measures waiting on a
+> branch. All three are in the *watched deploy* group, and the pricing one asks
+> to travel with the cache-write column below it. **Green, the Queen and the
+> Coliseum each built a change that renders, took it to a green pull request
+> and stopped there** — nothing a person can see merges while you are asleep —
+> so the morning's first job is three walks and three merges, and the note at
+> the head of the *watched deploy* group is the order to take them in. Each of
+> those branches carries its own queue line onto this file as it lands, so this
+> paragraph's arithmetic is a reading of `main` and not a forecast. The
+> Colorless lane that wrote this paragraph added the eleventh item itself — one
+> ruling, at the foot, about where the night's own tooling should live. The
+> coverage lane, which landed after it, added two more: the climb re-measured
+> at 97.0% with nothing left above two statements, so it asks whether 95.5
+> stops being a target and becomes a regression guard with mutation testing
+> as the instrument — a ruling and nothing else — and a ten-statement gap
+> whose own item left this file during the 09-28 regroup without being
+> answered, found because `docs/polish/COVERAGE.md` still points at it. Count
+> with the recipe below, never with this paragraph.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -60,19 +78,78 @@ line, and so is the recipe for checking it. Run the recipe; re-read the recipe.
 
 ---
 
+## Open — a ruling, and nothing else
+
+**White: the coverage climb has no lever left bigger than two statements, and
+the floor's next click asks for a number the tree cannot reach by grinding.**
+Re-measured tonight with ci.yml's own formula, either side of this run's own
+nine statements: **97.0%, 646 missing of 21,814, spread over 387 functions —
+1.7 each** (655 over 391 before it). The largest single gap in
+the tree is ten statements and it is blocked (the item below); the next is a
+pair of six that this run took four of; everything after that is singletons,
+and every *class* they fall into is already named in COVERAGE.md's *Left
+deliberately* — a scan into `*any` cannot fail, `RowsAffected` after a
+successful `Exec` cannot fail, `sql.Open` never fails for a registered driver.
+The ratchet rule in `ci.yml` says the next click is 96.0 "once a merged main
+prints 97.5 or better, never sooner", and 0.5 points is 109 statements at 1.7
+per function: sixty-four more bespoke fixtures. · *Cost of leaving it:* every
+future coverage lane spends its night on singletons, each one honest and none
+of them the thing worth knowing, and the floor sits where it is forever anyway.
+· **Recommendation:** rule that 95.5 is now a **regression guard rather than a
+target** — it stays, it never drops, and nobody grinds toward 96.0 — and that
+the climb's instrument becomes mutation testing, which is what COVERAGE.md has
+ended on since it was written: *a LIVED mutant in code that reads as covered is
+worth more than the next tenth.* `gremlins` already runs report-only on pull
+requests, and `internal/sim/compile` got its first baseline on 2026-10-02 at
+85%. The next lane's mandate would be "find a LIVED mutant in covered code",
+not "close ten statements". · **That mandate was then run the same night, and
+it is the evidence for this ruling:** four kernels baselined, fourteen real
+survivors killed by four tests and six proved equivalent in writing, `floats`
+**76.32% → 91.43%** efficacy — including a `Fsum` whose final accumulation
+could be written `hi = x - y` with every frozen sequence still passing, and a
+generic-cost reader that answers *one* for `{9}`. Coverage was already 100% on
+all of it. Ledger: White, 2026-10-03 (both entries).
+
+**Colorless: every night rewrites the same four tooling files in a scratch
+directory, and three of them are recipes this project already describes in
+prose.** Tonight's seven lanes ran off `gowrap.sh` (five lines: this Mac's
+three Go exports, a `cd` into `go/`, `exec "$@"` — the wrapper the skill
+describes because the harness refuses the compound form), `deploy.sh` (poll
+the `tests` run on `main` by sha, then the deploy job, then the machine image
+tags, then `/api/health`), `poll.sh` (the same loop for a pull request's
+checks) and a shared `LANE_BRIEF.md` carrying the night rules, the harness
+traps and the two test families that fail on load rather than on truth. All
+four worked; all four vanish with the scratch directory. · *Cost of leaving
+it:* every night spends its first twenty minutes turning prose into scripts
+before it can run a gauntlet or watch a deploy, and the brief's traps get
+re-learned one lane at a time instead of read once. · **One of them must not
+be committed as written:** `poll.sh` freezes the eight required check names as
+a literal, and the skill's own landing step says to read that list back from
+the API *because it has grown twice with no prose noticing*. Read tonight, the
+API returns exactly those eight — so the script is correct today, which is
+what makes the frozen form a trap rather than an error. · **Recommendation:**
+yes — a new `.claude/polish/` holding `gowrap.sh`, `deploy.sh` and the lane
+brief, with `poll.sh` rewritten first to read its check list from
+`gh api repos/aasquier/sylvan-library/branches/main/protection`. Three small
+files and one rewrite, no dependency and nothing that ships. Ledger:
+Colorless, 2026-10-03.
+
 ## Open — a few clicks in the repository settings
 
-**White: the nine open torch Dependabot alerts are triaged in prose and never
-dismissed on GitHub, so the security tab re-asks a settled question forever.**
-The triage lives in `tools/pyproject.toml` (containment: dev-Mac only, never
-ships, safetensors-only snapshot — pinned by real code since #463). Re-read
-from the API 2026-09-28: still exactly 9, all `pip/torch`, all `development`
-scope. They stay open because dismissing needs repo-admin, which the pass does
-not have and should not. · *Cost of leaving it:* every future security read
-spends the hour re-deriving this paragraph. · **Recommendation:** dismiss all
-nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage" (two
-minutes in the Security tab). Ledger: White, 2026-09-12; carried by Cleanup on
-09-12, 09-19 and 09-28 for the same stated reason: the pass cannot click this.
+**White: nine Dependabot alerts, all `pip/torch`, all `development`, triaged in
+prose since 09-12 and never dismissed — two minutes in the Security tab.**
+Re-read from the API tonight: **9 open, 1 critical / 3 medium / 5 low, every
+one `pip/torch`, every one `development` scope** — the same nine. · *Cost of
+leaving it:* the security tab re-asks a settled question forever and every
+security read pays to re-derive the answer. · **Recommendation:** dismiss all
+nine as "tolerable risk — see `tools/pyproject.toml`'s depth-extra triage"
+(dev-Mac only, never ships, safetensors-only, pinned by real code since #463).
+· **Shorter than it was, on purpose:** the 09-28 Cleanup entry found that an
+item carried only because *the pass cannot click in the Security tab* earns a
+one-line ask rather than a paragraph re-verified each cleanup, and this is that
+finding acted on instead of restated. Carried 09-12, 09-19, 09-28 and 10-03 for
+that one reason; a fifth carry should stop re-reading the API. Ledger: White,
+2026-09-12.
 
 ## Open — a dollar and an account
 
@@ -94,6 +171,65 @@ besides 200. Ledger: Red, the queued list carried in the 2026-09-05 entry,
 items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
+
+> **Three branches are stacked behind your eye this morning, and the order is
+> cheaper than it looks.** `polish/green-2026-10-03` (#532, the colour wheel's
+> five discs), `polish/queen-2026-10-03` (#533, the press reply) and
+> `polish/coliseum-2026-10-03` (#534, the Forge match's remaining-time line).
+> Read as a bundle problem this is frightening and it is not one: the three
+> rebuilt **three disjoint files** under `web_dist/assets/` — `pentagram.js`,
+> `DeckDetail.js` plus `index.css`, and `Coliseum.js` — so no two of them touch
+> the same built file and the bundle cannot conflict between them. What
+> conflicts is `DAYBREAK.md` and `LEDGER.md`, which all three edit.
+>
+> **That paragraph was reasoning; this one is a reading.** For each branch, the
+> files changed on the branch and changed on `main` since that branch's own
+> merge base were intersected, and for all three the answer is **exactly those
+> two documents and nothing else** — so the disjoint-bundle claim is now
+> measured rather than argued. **All three were brought up to `main` at the
+> end of the night and read `MERGEABLE`** — the orchestrator did the two
+> document resolves so the morning would not. Merging any one of them puts the
+> other two behind again, on these same two files: try `gh pr update-branch`
+> first, and when it refuses (it declines a branch whose merge is not clean),
+> the resolve is a local `git merge origin/main` on the branch, **keep both
+> sides of the two document hunks**, push. Nothing was reflowed; it is a
+> two-minute resolve each. One more thing #534 carries: it opens a second `## Open — a ruling`
+> group a few lines above the existing `## Open — a ruling, and nothing else`.
+> Fold the new item into the existing group as it lands — two groups asking for
+> the same kind of answer is how a reader stops trusting the grouping. **Never
+> hand-resolve a file under `web_dist/`** — it is generated, and a hand-merged
+> bundle is a file no build can reproduce; if one ever does conflict, take
+> either side, run `npm --prefix web run build`, commit what that writes, and
+> then `go test -race -count=1 ./cmd/mtglab/`, because Go's test cache tracks
+> nothing outside `go/` and the guards that read the bundle will otherwise
+> answer a stale green. When the last one is in, one `npm --prefix web run
+> build` on `main` should write **no** diff — that is the proof the three
+> partial rebuilds compose, and it costs a minute.
+
+**Red: commandment 17 names three replies and the third one was never
+enforced by anything — fifteen classes answer the hover and take the click in
+silence, and one of them is a family the commandment names by name.** The
+register landed tonight (test-only, so it may merge); what it measures is a
+design pass that renders, so it is yours. The list: `.card-action` (10
+buttons), `.strip-tab` (9), `.disclosure-toggle` (5), `.art-pick-tile`,
+`.menu-row`, `.reader-tile`, `.field-hint`, `.tarot-hinge`, `.hand-folded`,
+`.lab-note`, `.wheel-folded`, `.wheel-fold-btn` and three modifiers riding
+them. `.chip-toggle:active` already exists *with a comment arguing exactly
+this fault*, and `.strip-tab` is its sibling in the commandment's own
+sentence. · *Cost of leaving it:* nothing breaks; a third of the app's
+dressed buttons stay two-thirds of a control, and the register holds the
+number where it is. · **Where to look, when you want to:** the `web-dev` and
+`mtglab-ui` entries in `.claude/launch.json` (Vite on 5173 against the Go
+server on 8765; auth is off locally, so the deck pages open), then the
+Coliseum's tab strip and a deck page's card actions — press and *hold* one of
+each and watch nothing happen. Nothing animates here, so there is no cycle
+time to wait out. · **Recommendation:** give
+the three big ones (`.card-action`, `.strip-tab`, `.disclosure-toggle`, 24 of
+the 34 buttons) `.chip-toggle:active`'s `transform: translateY(1px)` in one
+Queen-lane branch and lower the register to 12 in the same diff; rule on the
+bespoke four (`.art-pick-tile`, `.reader-tile`, `.wheel-folded`,
+`.tarot-hinge`) separately, since those are the deliberately-bespoke surfaces
+and a lift may be wrong on a card tile. Ledger: Red, 2026-10-03.
 
 **Green: the colour wheel's five discs now answer a thumb, and its ten guild
 lines cannot — 44px there is geometry, not effort.** The 44px floor #509 took
@@ -121,13 +257,45 @@ phone). Ledger: Green, 2026-10-03.
 
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
-is forward-only and applies unwatched, and `deploy.yml` still has no snapshot
-step. · *Cost of leaving it:* the one deploy that needs a rollback point is the
+is forward-only and applies unwatched, and the `deploy` job in
+`.github/workflows/ci.yml` still has no snapshot step — re-read tonight: the
+only `snapshots` word anywhere in the workflows is a Forge release tag. **This
+line said deploy.yml for a month and there has never been such a file in this
+repository** (`git log --all` knows nothing of it), so three carries sent a
+reader to a path that does not exist; continuous deployment lives in `ci.yml`'s
+own `deploy` job, gated on the `tests` job, and that is where the step goes. ·
+*Cost of leaving it:* the one deploy that needs a rollback point is the
 one guaranteed not to have a fresh one. · **Recommendation:** a `fly volumes
-snapshots create` step ahead of `flyctl deploy` in the deploy job, non-fatal
-on failure, once the deploy token's scope is checked — a workflow change only
-CI can prove, so it lands as its own PR on a morning you can watch the deploy.
-Ledger: Red, the queued list carried in the 2026-09-05 entry, item 6.
+snapshots create` step ahead of the `flyctl deploy --local-only` call in that
+job, non-fatal on failure, once the deploy token's scope is checked — a
+workflow change only CI can prove, so it lands as its own PR on a morning you
+can watch the deploy. Ledger: Red, the queued list carried in the 2026-09-05
+entry, item 6; the filename corrected by Cleanup, 2026-10-03.
+
+**White: `internal/deckread`'s commander dossier has ten unreachable
+statements, the fixture that would reach them already exists, and the item
+asking whether to plug it in fell out of this queue without being answered.**
+`pooltest.OpenFaulty` is a real card pool behind a connector that refuses
+after a budget — it is what made `probeStaleness` refusable at each of its six
+statements — but `deckread` reaches the pool through a `*pool.Pool`, and a
+`Pool` opens its own file inside `acquire`, so there is no way to hand it a
+handle that fails on purpose. One field on `pool.Pool` closes this and the
+equivalents in three other packages; it is the tree's own standing move (a
+reader of the process became a lookup handed in; `tier3.Settings.Java`,
+`api.Config.BulkIndex`), applied one layer further in. COVERAGE.md still
+records it as "a daybreak item (White, 2026-09-26)" and **it is not in this
+file** — it left during the 09-28 regroup without a ruling, which is the rot
+that section of COVERAGE.md warns about, found in COVERAGE.md. · *Cost of
+leaving it:* ten statements in `deckread` plus the three siblings stay
+unreachable, and this is the single largest non-deliberate gap in the tree —
+it is 1.5% of everything still missing, in one function. · **Recommendation:**
+yes to a `connector driver.Connector` field on `pool.Pool` whose zero value is
+today's `sql.Open`, test-reachable only, with `export_test.go`'s existing
+`ConnOver` argument as the precedent for why the door belongs in production
+code this time rather than in a test file. It is a change to the serving hot
+path, so it lands as its own PR on a morning you can watch the deploy — and if
+the answer is no, COVERAGE.md's *Left deliberately* gets the entry and no lane
+re-derives it. Ledger: White, 2026-10-03.
 
 **Black: the Sonnet 5 price increase was cancelled, the price table still
 applies it from September 1st, and the "go and check the rates" link on your
@@ -221,8 +389,25 @@ path and `mtglab` verb the licensing record names, `skillrecord_test.go` holds
 reads is `docs/`, `web/README.md` and the package comments — and the 09-13
 morning found two rot instances there, both fixed, neither caught by anything
 but a person reading. · *Cost of leaving it:* nothing legal; this is tidiness
-with a mechanism. · **What would have to be true:** somebody decides the wider
-prose is worth a third extractor — the kit exists now, so it would be reused
-rather than rewritten. · **Recommendation:** one more cycle of measured rot
-and it stops being tidiness; until then this line is the reminder. Ledger:
-White, 2026-08-24; narrowed Cleanup, 2026-09-05.
+with a mechanism — and the mechanism bit this month: the snapshot item above
+sent three readers to a deploy.yml that has never existed in this repository.
+· **The cycle of measured rot arrived, and it also measured why the extractor
+cannot simply be pointed at `docs/`.** Run tonight over the two files of this
+pass, the existing `repoPaths` rule flags **5 anchors in `DAYBREAK.md`, and 4
+of the 5 are the queue doing its job** — `gowrap.sh`, `deploy.sh`, `poll.sh`
+and `LANE_BRIEF.md` are named by the Colorless item *because they are not in
+the tree*; the fifth is a gitignored deck file. A queue names what does not
+exist yet; a record names what does, which is why the same extractor is honest
+on `NOTICE.md` and would cry wolf here. The map is the other case:
+`COVERAGE.md` names **41 anchors and 40 resolve**, the one miss being a
+gitignored `deck.yaml` — but only once the resolver allows a path written
+relative to `go/`, because that file speaks from inside the Go tree.
+Root-anchored resolution alone calls 19 of its 20 slashed paths broken. ·
+**Recommendation:** not a third extractor over `docs/` wholesale — a **suffix
+resolver** added to the kit plus a guard on the *maps* (`COVERAGE.md`,
+`web/README.md`), never on this queue, and never on `LEDGER.md`, which is
+history and is supposed to name files that were deleted. The first increment
+landed with this measurement (Cleanup, 2026-10-03: this queue's workflow and
+manifest anchors are held, which is the one slice with no false alarms in it).
+Ledger: White, 2026-08-24; narrowed Cleanup, 2026-09-05; measured Cleanup,
+2026-10-03.

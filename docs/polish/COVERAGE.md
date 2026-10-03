@@ -70,6 +70,7 @@ lever and a grind is visible before the work starts.
 | floor in `ci.yml` | 95.0 (set at a measured 96.6, 2026-09-24) | |
 | merged `main` after the cleanup step, 2026-09-28 | **97.0%** (run 36504824056) | |
 | floor in `ci.yml` | **95.5** (ratcheted 2026-09-29 at that 97.0; Aaron: "ratchet", the gap is kept) | |
+| the night lane of 2026-10-03, either side of its own nine statements | **97.0%** flat | 97.00% → **97.04%** |
 
 **Leg two is the leg that says the climb is over**, and the number is the
 argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
@@ -236,8 +237,16 @@ as meaningful to whoever finds it next.
   `pooltest.OpenFaulty` is exactly that pool, but `deckread` reaches it through
   a `*pool.Pool`, and a Pool opens its own file inside `acquire`. One field on
   `Pool` closes this and three other packages' equivalents; it is a daybreak
-  item (White, 2026-09-26) rather than something a coverage lane took on its
-  own.
+  item rather than something a coverage lane took on its own.
+  **Re-queued 2026-10-03 (White) after this paragraph was found pointing at a
+  queue entry that was not there**: the 2026-09-26 item left `DAYBREAK.md`
+  during the 09-28 regroup without a ruling, and a coverage lane four nights
+  later read this sentence, went looking for the item, and found nothing. It is
+  now the largest non-deliberate gap in the tree — ten statements, 1.5% of
+  everything still missing, in one function — which is the whole argument for
+  asking again rather than writing it into the list above. A fact recorded in
+  prose is a claim to re-check: this one rotted in the file whose own job is to
+  say so.
 
 The 2026-09-26 grind added four more, and they are **classes** rather than
 branches — each one names a shape to recognise rather than a line to skip:
@@ -516,6 +525,44 @@ the one database it could not reach:
     the same arms through `SweepBulk` and assert the thing that matters — that a
     file the sweep cannot confidently name is left where it is.
 
+The night lane of 2026-10-03 added two, and the first is a **sweep** rather
+than a fixture — it names a shape to go looking for across the whole tree:
+
+36. **The seam's own default.** Every injection in this tree leaves behind a
+    one-line wrapper composing the real thing — `LoadSettingsFrom(os.Getenv)`,
+    `DownloadBulkFrom(ctx, BulkIndex, …)`, `nightPlayer{a}.Play` over
+    `playNightBout` — and by construction every test drives the *injected*
+    half. So the wrapper is the line the deployed binary runs and no test does,
+    and it sits at exactly 0% until somebody goes looking. Lever 8 found two of
+    them by noticing; the sweep finds the rest, and `grep -rn 'os.Getenv'`
+    plus the 0% rows of `-func` is the whole method. What makes each one worth
+    a test rather than a shrug is that a wrong argument in a wrapper is
+    invisible: a blank lookup, a mirror URL, a different method, `return 0,
+    nil`. Three shapes of assertion, one per kind:
+    **a fact of this process** (`LoadSettings().PathList` must equal
+    `os.Getenv("PATH")` — the one variable copied verbatim rather than
+    defaulted, and set in every process that can run a Go test);
+    **the URL in a refusal** (`http.Transport.RoundTrip` selects on
+    `ctx.Done()` before it dials, so a pre-cancelled context is refused with
+    no network and `http.Client` wraps it in a `*url.Error` carrying the URL
+    it was going to ask — 0.00s, no stub); and
+    **agreement rather than a restated message** (over the thinnest state with
+    a definite answer, the seam and the method it delegates to must answer the
+    same way, whatever that way is).
+37. **A doctrine the tree applies everywhere and enforces nowhere is the claim
+    to make checkable** — lever 27 with the target chosen by *how the rule is
+    stated* rather than by what a checklist greps. "A reader of the process
+    became a lookup handed in" is in `CLAUDE.md`, in ADR 39 and ADR 40, and in
+    four package comments; nothing held it, and the failure it prevents is not
+    in the diff that breaks it — it arrives weeks later as a `t.Setenv`
+    somebody could not avoid beside a `t.Parallel`. `processreaders_test.go`
+    is the register (seven argued readers, held equal both ways). Two things
+    it taught about writing one: match the **selector** and not the
+    `CallExpr`, because this tree's own registered readers pass `os.Getenv`
+    *as a value* (`envOr(os.Getenv, …)`); and cover every spelling
+    (`Getenv`, `LookupEnv`, `Environ`, `ExpandEnv`) or a different word is the
+    way around it.
+
 ## Corrections to this file
 
 **A corrupt pool is not a failing pool.** #290 predicted that pointing
@@ -626,6 +673,15 @@ and `ci.yml` gated on the other.
   None`, which reads like a broken JVM. The fix is one committed executable
   (`testdata/fakejava`) and per-test **data** it reads from the subprocess's
   cwd, which `spawn` already makes the Forge home.
+- **`OpenWriter` makes its own parent, so "the directory is not there" is not
+  a fixture.** `pool.OpenWriter` calls `os.MkdirAll` on the file's directory
+  before `sql.Open`, so the only way to fail it from outside is a parent that
+  is not writable — and then `removeBuild`, which runs first, calls
+  `os.Remove` on a name that does not exist inside it. Linux answers ENOENT
+  there (which `removeBuild` reads as absence and ignores, correctly) but that
+  is a lookup-before-permission ordering rather than a promise, so the fixture
+  lands on the *already covered* branch on any platform that checks the other
+  way round. One statement, two architectures in the gate: not worth it.
 - **A test fixture in a non-test package costs coverage.** The first
   `authtest/faulty.go` wrapped every optional driver interface with a
   fallback; the driver implements all of them, so 49 fallback statements sat
