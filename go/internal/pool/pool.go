@@ -114,11 +114,34 @@ func stat(path string) (stamp, error) {
 	return stamp{mtime: info.ModTime().UnixNano(), size: info.Size()}, nil
 }
 
+// Connect is how a Pool reaches the file at a path: [Open]'s shape, as a
+// value that can be handed in.
+//
+// **The app never passes one, and that is the whole design of it.** A Pool's
+// zero `connect` is [Open] read-only with a handful of connections — the two
+// lines that used to stand inside [Pool.acquire], unchanged, so nothing about
+// a served pool moved when this door was cut.
+//
+// It exists because **a Pool opens its own file**, which was the one wall a
+// fixture could not get over. `pooltest.OpenFaulty` is a real card pool behind
+// a connector that refuses after a budget — the fault a volume detaching
+// between two queries actually is — and every reader in this tree reaches the
+// pool through a `*Pool` rather than through a handle, so there was no way to
+// hand one a library that worked a moment ago and does not any more. Ten
+// refusals in `deckread`'s commander dossier alone had never been entered by
+// anything. `export_test.go`'s `ConnOver` is the same door one layer in and in
+// a test file; it could not help a different package, which is why this one is
+// here. Aaron ruled yes to it; `docs/polish/DAYBREAK.md`'s White item carries
+// the recommendation and the ruling with their dates on them.
+type Connect func(ctx context.Context, path string) (*sql.DB, error)
+
 // Pool is the leased, stamp-checked pool. Safe for concurrent use.
 type Pool struct {
 	path string
 	idle time.Duration
 	log  *slog.Logger
+	// connect is the seam [Connect] argues. Nil is the app.
+	connect Connect
 
 	mu       sync.Mutex
 	db       *sql.DB
@@ -208,6 +231,45 @@ func New(path string, log *slog.Logger) *Pool {
 	return &Pool{path: path, idle: IdleLease, log: log}
 }
 
+// NewOver is [New] over a [Connect] of the caller's own: the same leased,
+// stamp-checked, reaped pool, reaching its file by a road the caller chose.
+//
+// **Nothing the app builds calls this** — `cmd/mtglab` and `internal/api` both
+// build their pool with [New], which is the nil-connect default and therefore
+// exactly [Open]. The one caller is `pooltest`, so that a test can hand a
+// reader the pool as the app hands it: through `Use`, on a lease, as a
+// `*Conn` — and have it stop answering halfway down a read. [Connect] carries
+// the argument for why that door is in production code rather than in
+// `export_test.go`.
+//
+// A constructor rather than an exported field, because every other thing a
+// Pool knows is read under `p.mu` and a settable field would be the one that
+// is not.
+func NewOver(path string, log *slog.Logger, connect Connect) *Pool {
+	p := New(path, log)
+	p.connect = connect
+	return p
+}
+
+// openFile opens the pool's database: the caller's [Connect] if it was handed
+// one, else [Open] read-only with a handful of connections.
+//
+// The default arm is the app's only arm, and `poolseam_test.go` drives it
+// beside the other so that the seam's own default is not a line production
+// runs and no test does.
+func (p *Pool) openFile(ctx context.Context) (*sql.DB, error) {
+	if p.connect != nil {
+		return p.connect(ctx, p.path)
+	}
+	db, err := Open(ctx, p.path)
+	if err != nil {
+		return nil, err
+	}
+	// A handful of connections is plenty; DuckDB parallelises inside one.
+	db.SetMaxOpenConns(4)
+	return db, nil
+}
+
 // Conn is one leased use of the pool: the database and the per-open caches.
 type Conn struct {
 	db   *sql.DB
@@ -255,13 +317,11 @@ func (p *Pool) acquire(ctx context.Context) (*Conn, error) {
 		}
 	}
 	if p.db == nil {
-		db, err := Open(ctx, p.path)
+		db, err := p.openFile(ctx)
 		if err != nil {
 			p.log.Warn("the card pool could not be opened; answering without it", "error", err)
 			return nil, ErrNoPool
 		}
-		// A handful of connections is plenty; DuckDB parallelises inside one.
-		db.SetMaxOpenConns(4)
 		p.db = db
 		// The memory's one gate. A stamp that still matches is the same file
 		// this memory was learned from, so a pool handed back by the reaper
@@ -494,14 +554,20 @@ func (c *Conn) Columns(ctx context.Context, table string) (map[string]bool, erro
 	}
 	defer rows.Close()
 	cols := map[string]bool{}
+	// The one read in this package whose destination is typed, and the scan's
+	// refusal joins the walk's for the same reason the others do (`scanRecord`
+	// carries the argument): `information_schema.columns.column_name` is a name,
+	// DuckDB's types are strict, and there is no NULL in that column for a
+	// `*string` to refuse -- while a pool that stops answering halfway down the
+	// column list would otherwise hand back a short set, which is read here as
+	// "this pool does not have that column" and degrades a whole page.
+	var scanned error
 	for rows.Next() {
 		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&name))
 		cols[name] = true
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, err
 	}
 	c.pool.mu.Lock()
