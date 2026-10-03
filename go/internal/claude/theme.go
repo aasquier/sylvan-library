@@ -188,7 +188,11 @@ var themeLog = slog.Default().With("logger", "mtglab.claude.theme")
 // different clothes" from "the model wrote it that way" is to know whether
 // anything was substituted at all.
 func Prose(text any) string {
-	raw := plainOr(text)
+	// A `\u2014` the model wrote INSIDE a field's text survives the wire's
+	// one decode as six characters of punctuation; `textutil.Unescape` says
+	// why and how narrowly it is repaired. First, so the control-character
+	// sweep below sees the characters rather than the escapes.
+	raw := textutil.Unescape(plainOr(text))
 	removed := 0
 	cleaned := controlChars.ReplaceAllStringFunc(raw, func(string) string {
 		removed++
