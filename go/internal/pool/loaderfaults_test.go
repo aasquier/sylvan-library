@@ -394,3 +394,100 @@ func TestSkinThatCannotBeReadOrWornIsReported(t *testing.T) {
 			"not there, which is the one reading that lets the rename through")
 	}
 }
+
+// The three refusals of the rebuild itself, which is the step that decides
+// whether a refresh can destroy a library.
+//
+// Each of these is a `return err` on the road between "the old pool is
+// served" and "the new pool is served", and the property every one of them
+// has to keep is the same: **the old pool is still there and still the one
+// on disk.** The rebuild's whole safety argument is that it never touches
+// the served file until the rename, so a refusal anywhere above the rename
+// must leave nothing but litter — and the litter must be gone too, because a
+// half-built file left under the build name is what the next run's
+// `removeBuild` is for and what a *third* run would otherwise trip over.
+
+// A handle that already has the rebuild catalog attached is a previous
+// rebuild that never let go — `abandon`'s DETACH failed, or the process died
+// between the ATTACH and the tidy. ATTACH is per DuckDB instance rather than
+// per connection, so the stale name is visible on the fresh connection this
+// one takes, and the second ATTACH is refused by name.
+//
+// What the test is really about is the tidying: the file this run created
+// before it got to the ATTACH has to be removed on the way out, or the next
+// run finds a pool-shaped file under the build name and `removeBuild` is the
+// only thing standing between it and a load into somebody else's rows.
+func TestARebuildOntoAHandleThatNeverLetGoIsRefusedAndLeavesNoFile(t *testing.T) {
+	t.Parallel()
+	db, dbPath := aWritablePool(t)
+	ctx := context.Background()
+
+	// The leftover: the catalog name taken by a file that is not this run's.
+	stale := filepath.Join(t.TempDir(), "a-previous-run.duckdb")
+	leftover, err := OpenWriter(ctx, stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := leftover.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "ATTACH '"+stale+"' AS "+rebuildCatalog); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := startRebuild(ctx, db, dbPath)
+	if err == nil {
+		r.abandon(ctx)
+		t.Fatal("a second rebuild attached over the first one")
+	}
+	if !strings.Contains(err.Error(), dbPath+rebuildSuffix) {
+		t.Errorf("the refusal reads %q and does not name the file it was "+
+			"attaching", err)
+	}
+	if _, statErr := os.Stat(dbPath + rebuildSuffix); statErr == nil {
+		t.Errorf("the half-built %s survived a refused ATTACH, so the next "+
+			"refresh inherits it", dbPath+rebuildSuffix)
+	}
+}
+
+// The rename is the last act and the only one that touches the served path,
+// so the one fault it can meet is a path that cannot become a file: a
+// directory where the pool should be, which is what a volume mounted one
+// level too deep looks like from in here. Everything before it has already
+// succeeded — the history carried, the prices recorded, both handles
+// released — and the refusal still has to name the step.
+func TestARebuildThatCannotTakeTheOldPoolsPlaceSaysSo(t *testing.T) {
+	t.Parallel()
+	db, _ := aWritablePool(t)
+	ctx := context.Background()
+
+	// The served path is a non-empty directory. `db` is a real pool handle
+	// at its own path, which is all `startRebuild` asks of it -- the two are
+	// separate arguments precisely because the file being replaced and the
+	// handle being read are separate things.
+	mount := filepath.Join(t.TempDir(), "mtg.duckdb")
+	if err := os.Mkdir(mount, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mount, "something"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := startRebuild(ctx, db, mount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.finish(ctx)
+	if err == nil {
+		t.Fatal("a rebuild renamed a pool over a directory")
+	}
+	if !strings.Contains(err.Error(), "in place") {
+		t.Errorf("the refusal reads %q and does not name the rename", err)
+	}
+	// The directory is still a directory with its contents in it: the rename
+	// is all-or-nothing and the served path was not emptied on the way.
+	if entries, readErr := os.ReadDir(mount); readErr != nil || len(entries) != 1 {
+		t.Errorf("the served path holds %v entries (err %v) after a refused "+
+			"rename", entries, readErr)
+	}
+}

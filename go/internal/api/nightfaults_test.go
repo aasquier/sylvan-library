@@ -225,3 +225,41 @@ func TestTheWatchingReadRefusesWhenTheBoutsCannotBeRead(t *testing.T) {
 		t.Fatalf("the refusal carries nothing a person could read: %s", raw)
 	}
 }
+
+// The seam the night runner holds, driven as the runner drives it.
+//
+// **A seam's production implementation is reached by exactly one caller and
+// it is not a test.** [API.NightPlayer] is handed to `night.Runner` in
+// `door.New`, and the runner calls `Play` on its own schedule — so on a
+// machine where the night never fires, the one line joining the arena to the
+// scheduler never runs. Every test above calls [API.playNightBout] directly,
+// which is the right way to ask what a bout does and asks nothing at all
+// about the wiring: a `Play` that returned `0, nil`, or that reached for a
+// different method, would leave the whole file green and the Coliseum at
+// Night silently playing nothing while recording success.
+//
+// Asked through the thinnest state that produces a definite answer — an
+// instance with no job registry, which is [TestABoutWithNowhereToFightItFailsInWords]'s
+// fixture — and asked as agreement rather than as a restated message: the
+// seam and the method must answer the same way, whatever that way is.
+func TestTheNightPlayersSeamIsThePlayBoutPath(t *testing.T) {
+	t.Parallel()
+	a := New(Config{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	bout := night.Bout{
+		ID: 1, Seats: []night.Seat{{Slug: "kaheera"}, {Slug: "mono-green"}}, Games: 1}
+
+	directID, directErr := a.playNightBout(t.Context(), bout)
+	seatID, seatErr := a.NightPlayer().Play(t.Context(), bout)
+
+	if seatErr == nil {
+		t.Fatalf("the seam reported success (match %d) where the method "+
+			"refused with %v", seatID, directErr)
+	}
+	if seatID != directID {
+		t.Errorf("the seam named match %d and the method named %d", seatID, directID)
+	}
+	if seatErr.Error() != directErr.Error() {
+		t.Errorf("the seam answered %q and the method answered %q; the seam "+
+			"is not the method", seatErr, directErr)
+	}
+}

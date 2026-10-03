@@ -19,7 +19,9 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-10-02 (solo, daylight). Previous: 2026-09-26 (rainbow,
+- **Last run:** 2026-10-03 (night, the mutation lane). Previous: 2026-10-03
+  (night, the coverage lane), 2026-10-02
+  (solo, daylight), 2026-09-26 (rainbow,
   and its second leg — the grind), 2026-09-24 (the coverage climb, outside
   the rainbow), 2026-09-19
   (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
@@ -31,6 +33,371 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-10-03 (night, mutation) — the instrument the coverage lane asked for, pointed at four kernels: fourteen real survivors, six proofs of equivalence, and the digit bound again
+
+The mutation lane of the same serial night run, taken on the question the
+coverage lane's queued item ends on: *a LIVED mutant in code that reads as
+covered is worth more than the next tenth.* Four determinism kernels, each on a
+throwaway `git worktree` (the 2026-10-02 protocol), `gremlins unleash
+./internal/<pkg>/` with `go/.gremlins.yaml`'s four mutant families. **Test
+files only** — nothing under a fingerprinted package's non-test source moved,
+so ADR 18's deployed Tier 1 cache is untouched, and no `testdata/` corpus was
+read for an expected value, let alone regenerated.
+
+| package | before | after | killed → | lived → | not covered |
+|---|---|---|---|---|---|
+| `internal/floats` | **76.32%** | **91.43%** | 58 → 64 | **18 → 6** | 6 → 6 |
+| `internal/mana` | **90.24%** | **94.59%** | 37 → 35 | **4 → 2** | 2 → 2 |
+| `internal/textutil` | **90.91%** | **90.00%** | 10 → 9 | 1 → 1 | 2 → 2 |
+| `internal/mt19937` | **91.57%** | — | 76 | 7 | 9 |
+
+Raw, `internal/floats`, before and after:
+
+```
+Mutation testing completed in 19 seconds 217 milliseconds
+Killed: 58, Lived: 18, Not covered: 6
+Timed out: 0, Not viable: 0, Skipped: 0
+Test efficacy: 76.32%
+Mutator coverage: 92.68%
+
+Mutation testing completed in 18 seconds 820 milliseconds
+Killed: 64, Lived: 6, Not covered: 6
+Timed out: 6, Not viable: 0, Skipped: 0
+Test efficacy: 91.43%
+Mutator coverage: 92.11%
+```
+
+**`Fsum`'s finish is covered on nearly every call and was pinned nowhere.**
+Three survivors sat in the five lines that turn Shewchuk's partials back into
+one float: `hi = x + y` (87:11) could be written `hi = x - y`, `lo = y - (hi -
+x)` (88:11) could be written `y + (hi - x)`, and the sign test in the half-even
+correction (95, four positions) could be negated — and all twenty-odd recorded
+`fsum` sequences still passed. The reason is structural rather than sloppy: in
+every recorded sequence the smaller partial sits far below the larger's
+half-ulp, where `x + y` and `x - y` both round to `x`, and the correction block
+never decides anything. The corpus cannot be asked for the missing cases — it
+is frozen — so the expectation came from **an independent oracle**: a sum of
+float64s is a rational, `big.Float` at 4096 bits accumulates it exactly, and
+`Float64` rounds that once to nearest-even, which is the contract `Fsum`'s own
+doc claims. Two tests:
+
+  1. `TestFsumIsTheCorrectlyRoundedSumOfEveryDyadicTriple` — all **32,768**
+     ordered triples from a 32-value grid (±{1, 1.5}·2^e over eight exponents
+     straddling 2^53), each against the oracle. **0 disagreements, 0.02 s.**
+     *Exhaustive deliberately*: of those triples **350** tell `x + y` from `x -
+     y` and **80** tell the correction's sign test from its negation — a
+     seeded sample of a few hundred would have missed every one and read green.
+  2. `TestFsumFinishesTheAccumulationTheWayItsDocDescribes` — the three
+     sentences the doc ends on, each a sequence whose answer is an exact
+     float64 **written as the arithmetic that defines it**: `[1, -2^54,
+     1.5·2^53]` → `1 - 2^52` (an exact addition inside the top-down loop);
+     `[0.375, -1.5·2^51, -2^52, 1.5·2^52]` → `0.375 - 2^50` (two of them, the
+     only shape that tells `lo`'s sign apart — four terms, so the sweep above
+     cannot reach it); `[2^53, 1, 2^-53]` → `2^53 + 2` (the correction, where
+     without it the answer is one ulp under and a running total agrees with the
+     mutant). Each case also asserts that a naive running total *disagrees*, so
+     no case can rot into a vacuous one, and that the oracle and the hand
+     derivation agree, so a typo in either is caught by the other.
+     Mutation-verified by hand on the worktree: `hi = x - y` fails all three
+     named cases plus the sweep; restored, `git status` clean of non-test files.
+
+**`Repr`'s round-trip property cannot see the presentation, and six mutants
+proved it.** `repr_test.go`'s own header said the frozen corpus has no `repr`
+section and so wrote two *properties* instead — but every mutation of the
+fixed/exponential switch still produces a decimal that parses back to the same
+float64, because `1e+15` and `1000000000000000.0` **are** the same number.
+Round-tripping is a property of the digits; a boundary is a property of the
+*spelling*, and only a spelling pins a spelling.
+`TestReprRendersTheSpellingsItsOwnContractNames` is the doc comment's own
+claims as a table — five of the fifteen strings verbatim from it (`1e+16`,
+`1000000000000000.0`, `0.0001`, `1e-05`, `100.0`), the rest the same four rules
+one case further — and it kills all six plus four more. Hand-verified, each
+mutant failing by the case's name: `decpt >= 16` → `Repr(1e15) = "1e+15"`;
+`decpt <= -3` → `Repr(0.0001) = "1e-04"`; `case decpt < 0` → `Repr(0.5) =
+".5"`; `case decpt > len(digits)` → `Repr(25) = "25."`; `IsInf(v, 1)` on the
+negative arm → a panic inside `Repr`.
+
+**A trap worth the next session's five minutes: gremlins reports a mutant in a
+`switch` *case expression* as NOT COVERED however hard the tests drive it.**
+Go's coverage blocks begin at the case *body*, so the position of `case decpt
+<= 0:` falls outside every block and gremlins reads no counter for it. Four of
+`floats`' six NOT COVEREDs are that (`repr.go:38:21`, `71:13`, `73:13`), and so
+are all four in `mana`/`textutil` and six of `mt19937`'s nine. They are not
+gaps: three of them are killed by hand mutation above. The honest NOT COVERED
+in `floats` is `repr.go:55:49`, the panic on an unreadable exponent from
+`strconv.FormatFloat(v, 'e', …)` — unreachable without mutating `strconv`.
+
+**The six that survive `floats` are equivalent mutants, each with a proof
+rather than a shrug**, which is the half of a mutation report that has to be
+written down or the next run re-derives it:
+
+- `floats.go:59:19` — `math.Abs(x) < math.Abs(y)` → `<=`. Equal magnitudes
+  means `y == x` or `y == -x`, and both give `lo == 0` in either order, so the
+  swap is invisible. Twenty million random sequences found no counterexample.
+- `floats.go:95:20/43/57/80` (four boundaries) — `lo < 0.0` → `<=` and
+  `partials[n-1] < 0.0` → `<=`, plus their mirrors. `lo == 0` with `n > 0` is
+  unreachable: the loop exits with `lo == 0` only by reaching `n == 0`. And
+  `partials` never holds a zero — both append sites are guarded by `!= 0.0`.
+  (The four *negations* at the same positions are real and are now killed.)
+- `floats.go:175:14` — `sign(n *big.Int)`'s `n.Sign() < 0` → `<= 0`. `sign` is
+  called only from the two `switch` arms that require a non-zero remainder, so
+  `num == 0` never reaches it.
+
+**`internal/mana`: the digit bound again, in a second package, found the same
+way.** `mana.go:122` tests `r < '0' || r > '9'`; the **upper** bound had
+nothing holding it, because every recorded cost in the package's tables stops
+at 8. Under `r >= '9'`, `{9}` is not digits, the symbol falls to the `default`
+arm, and a nine-generic cost becomes **one** generic — a mana value four off
+with no error anywhere. This is `internal/sim/compile`'s `168:8` from the
+2026-10-02 baseline, one package over: *a reader's bounds are pinned only by a
+symbol that sits on them, and nothing a deck happens to contain is a bound.*
+`TestParseReadsEveryASCIIDigitAsGeneric` sweeps all ten digits and then past
+them (`{10}`, `{19}`, `{90}`, `{99}`, `{9}{9}`). Verified both ways by hand:
+`r >= '9'` fails with `Parse("{9}{G}").Generic = 1, want 9`; `r <= '0'` fails
+with `Parse("{0}{G}").Generic = 1, want 0`. The two that still live are
+`solver.go:169:17` and `205:17` — `src.Amount > 0` → `>= 0` in `unitCount`
+(adding zero), and `src.Amount <= 0` → `< 0` in `CanPay` (a `for range 0`
+loop) — equivalent, both by the arithmetic of zero.
+
+**`internal/textutil`: the one survivor was a panic, not a wrong answer.**
+`textutil.go:113`'s `if i < len(s) && s[i] == '\n'` is the only line in
+`SplitLines` that reads *past* the rune it is holding, and both of the
+corpus sweeps wrap their boundary in `"a" + … + "b"`, so nothing ever asked
+about the last byte. Moved to `i <= len(s)`, the function panics with an index
+out of range on any text whose final byte is a carriage return — a deck's YAML
+pasted out of a Windows editor.
+`TestATerminatorAtTheVeryEndAddsNoEmptyLine` is the documented claim ("no
+empty final element for a string that ends in one") applied to the end of the
+string: `"one\rtwo\r"`, `"one\r\ntwo\r\n"`, `"\r"`, `"\r\n"`, `"one\ntwo\n"`.
+Verified by hand; the mutant panics and the test fails by name.
+
+**`internal/mt19937` needed nothing, and that is a result.** 7 LIVED, every one
+equivalent, each by an argument about the kernel rather than about its tests:
+`seed < 0` → `<= 0` (two's-complement negation of zero is zero, and the
+`else` arm answers the same `0`); `BitLen() > 0` → `>= 0` (`(0-1)/32 + 1` is
+1, which is the default `keyused` anyway); `len(key) > k` → `>=` (equality
+assigns `k` to itself); `rest < 32` → `<= 32` (`k == 64` shifts by zero);
+`count <= 0` → `< 0` in `RandRangeStep` (a defensive panic the earlier
+emptiness check makes unreachable); and `floorDiv`'s two sign tests (`a == 0`
+makes `a%b == 0`, which short-circuits the conjunct; `b == 0` divides by zero
+one line earlier). Nothing to add: the seeded generator is the best-pinned
+kernel in the tree, which is the right place for the recorded goldens to have
+left it.
+
+- **Considered and rejected.** (a) *Changing `floats.go` so the correction
+  block is reachable from simpler inputs* — nothing is wrong with it, and ADR
+  18 forbids touching a fingerprinted non-test file tonight regardless. (b)
+  *Adding a `repr` section to `testdata/corpus.json`* — the corpus is frozen;
+  the doc comment is a better source of truth for a spelling anyway, since it
+  is the thing the code promises. (c) *A seeded random sweep instead of an
+  exhaustive one* — 350 of 32,768 is a 1% hit rate; a sample is a test that
+  passes for the wrong reason.
+- **A measurement caveat, honestly.** `timeout-coefficient: 4` over a baseline
+  of a fraction of a second is a budget this Mac's scheduler misses under its
+  own load: `textutil`'s two `Head` mutants swapped classification between the
+  two runs (TIMED OUT ↔ KILLED ↔ LIVED at the same position), which is why its
+  efficacy reads 90.91 → 90.00 while its one real survivor died. Across both
+  runs no mutant went from caught to surviving. **Read a LIVED next to a
+  TIMED OUT at the same position as one unstable mutant, and compare two runs**
+  — the rule `.gremlins.yaml` already states for benchmarks.
+- **Queue movement: none added.** Every survivor is now either killed by a test
+  or carries a written proof of equivalence; nothing here needs a code change,
+  which is the only thing that would have earned a daybreak line. The open
+  White item asking whether mutation testing becomes the climb's instrument now
+  has its first full night of evidence, and the sentence pointing at it is in
+  `DAYBREAK.md`.
+
+### 2026-10-03 (night, coverage) — four seams nothing had ever run, two of the rebuild's refusals, and the environment doctrine made checkable
+
+The coverage lane of a serial night run, measured either side with `ci.yml`'s
+own formula (`go test -count=1 -coverprofile -coverpkg=./... ./...`, then
+`go tool cover -func`) rather than with the hand merge, which reads a tenth
+differently and is not the gate.
+
+- **The numbers, before and after.** `-func` **97.0% → 97.0%**; merged
+  **97.00% → 97.04%**, **655 → 646 missing of 21,814**, **391 → 387 functions
+  with a gap**. Nine statements and four functions off zero. The suite with
+  `-coverpkg` takes **~2 minutes** on this Mac, not the five the lane file
+  budgeted. Denominator unchanged: nothing landed outside a `_test.go`.
+- **The floor does not move, by its own written rule.** `ci.yml`'s comment
+  says the next click is 96.0 "once a merged main prints 97.5 or better, never
+  sooner" (Aaron, 2026-09-29: ratchet, and the gap is kept). The tree prints
+  97.0. `MINIMUM` stays **95.5** and no workflow file was touched, which is
+  what makes this branch mergeable without a watcher.
+- **The worklist, by function rather than by file.** Ranked by missing
+  statements attributed to the function each uncovered block falls in
+  (`rank.py` in the lane's scratch: merge the profile by block key, bisect
+  each uncovered block's start line into `-func`'s own function starts). The
+  top of it before the work: `deckyaml.orderedValue` 13 and `sortedKeys` 5
+  (both *Left deliberately*), `deckread.CommanderDossier` 10 (blocked —
+  queued below), `pool/rebuild`'s `startRebuild` 6 and `finish` 6,
+  `users.go:prompt.secret` 5 (*Left deliberately*, closed by argument), then
+  **a floor of singletons**: everything else in the tree is a function missing
+  one to five statements, 1.7 on average.
+
+**A seam's own default is the one line the deployed binary runs and no test
+does, and the tree had four of them at exactly 0%.** This is lever 8's shape
+(`httpPost`, `realTransport`) and the climb never swept for the rest of it.
+The injection the tree has applied everywhere — a reader of the process
+becomes a lookup handed in, a package constant becomes a field — leaves behind
+a one-line wrapper composing the real thing, and every test by construction
+drives the injected half. Each of the four is now driven, and each was
+mutation-verified by breaking the production line, watching the named test
+fail, restoring, and proving the restore with `git diff`:
+
+  1. **`convoke.(*Panic).Unwrap`** (2 statements) is the sharpest of them,
+     because it is not only the wrapper — it is a *documented behaviour* that
+     nothing asked for. Every panic the package's tests raise is a string
+     (`TestAPanicReRaisesOnTheCaller` raises `"tier1: Run needs at least one
+     game"`), so the type assertion inside `Unwrap` had never been given an
+     error. A sweep is N calls of a kernel and a kernel refuses a programming
+     error by panicking; a caller that recovers and branches on
+     `errors.Is(err, sentinel)` reads **false** through an `Unwrap` that
+     answers nil, so the refusal arrives as "a panic" in the one place a stack
+     trace was already hard to read. Two tests: a panic carrying a typed error
+     that wraps a sentinel (both `errors.Is` and `errors.As` must read
+     through), and a string panic that must unwrap to nil rather than match
+     something by accident. Mutation: `return nil` — both reads fail by name.
+  2. **`tier3.LoadSettings`** (1) is the one reader of the Forge and Fly
+     variables, called once from `main`. The question a test *can* ask without
+     writing the process environment — which Go refuses beside `t.Parallel`,
+     which is the whole reason the seam exists — is whether the loaded
+     settings carry what this process's environment actually says. `PATH` is
+     the lever: it is set in every process that can run a Go test, it is the
+     one variable `LoadSettingsFrom` copies verbatim rather than defaulting,
+     and the JVM hunt walks it. Mutation: `LoadSettingsFrom(func(string)
+     string { return "" })` — a blank-lookup default produces settings that
+     could never find Java, and the test says so with both strings in the
+     message.
+  3. **`pool.DownloadBulk`** (1) is the production spelling of Scryfall's bulk
+     index, and `DownloadBulkFrom` carries the comment "no production caller
+     has a second way to spell the real index" — a claim nothing held. Asked
+     **without a network**: `http.Transport.RoundTrip` selects on `ctx.Done()`
+     before it dials, so a context cancelled before the call is refused with
+     no DNS lookup, and `http.Client` wraps the refusal in a `*url.Error`
+     carrying the URL it was *going* to ask. The test runs in 0.00s. Mutation:
+     a mirror URL in the wrapper — the refusal names the mirror and the test
+     prints both.
+  4. **`api.nightPlayer.Play`** (1) is the seam `night.Runner` holds. `door.New`
+     hands it over and the runner calls it on its own schedule, so on a machine
+     where the night never fires the one line joining the arena to the
+     scheduler never runs — while `night_test.go` already called
+     `a.NightPlayer()` (so the *constructor* read as covered) and every bout
+     test called `playNightBout` directly. Asserted as **agreement rather than
+     as a restated message**: over the thinnest state with a definite answer
+     (no job registry), the seam and the method must answer the same way,
+     whatever that way is. Mutation: `return 0, nil` — "the seam reported
+     success where the method refused".
+
+**Two of the rebuild's refusals, which is the step that can destroy a
+library** (`internal/pool/loaderfaults_test.go`, in-package because
+`startRebuild` and `finish` are unexported; `pooltest` cannot be imported from
+`package pool` without a cycle). The property both assert is the rebuild's own
+safety argument — the old pool is still there, and the litter is gone:
+
+  - **A handle that already has the rebuild catalog attached** (3 statements,
+    the whole ATTACH arm) is a previous rebuild that never let go: `abandon`'s
+    DETACH failed, or the process died between the ATTACH and the tidy. ATTACH
+    is per DuckDB *instance* rather than per connection, so the stale name is
+    visible on the fresh connection `startRebuild` takes and the second ATTACH
+    is refused by name. The assertion worth having is not the message but the
+    tidying: the file this run created before it reached the ATTACH has to be
+    removed on the way out, or the next refresh finds a pool-shaped file under
+    the build name. Mutation: drop the `removeBuild` on that arm — "the
+    half-built … survived a refused ATTACH, so the next refresh inherits it".
+  - **A served path that cannot become a file** (1) reaches `finish`'s last
+    statement, the rename. A non-empty **directory** where the pool should be
+    is what a volume mounted one level too deep looks like from in here, and
+    `startRebuild(ctx, db, dbPath)` takes the handle and the path as separate
+    arguments precisely because the file being replaced and the handle being
+    read are separate things — so the fixture is a real pool handle and a
+    directory. Everything before the rename succeeds (history carried, prices
+    recorded, both handles released) and the refusal still names the step.
+    Mutation: swallow the rename's error — "a rebuild renamed a pool over a
+    directory".
+
+**The night's one checked claim, which is the spend COVERAGE.md argues for at
+this altitude** (`go/cmd/mtglab/processreaders_test.go`, `addressreach_test.go`'s
+move on a different rule). **The tree applies the environment doctrine
+everywhere and enforced it nowhere.** ADR 39 made the configuration a value,
+ADR 40 the Claude endpoint, and `CLAUDE.md` states the general form; the reason
+is recorded beside the first one — eighty-eight tests in `cmd/mtglab` were
+serial because the only way to say "this deployment keeps its decks over there"
+was `t.Setenv`, and not one of them was about the environment. Nothing held it.
+A new package reading `os.Getenv` where it wants the value compiles, passes,
+and makes the next test that needs to describe a deployment serial again, and
+the failure arrives weeks later as a `t.Setenv` somebody could not avoid. The
+register walks every non-test `.go` file in `go/`, matches the **selector**
+rather than the call (one registered reader passes `os.Getenv` as a *value* —
+`envOr(os.Getenv, …)` in `ui.go` — and a `CallExpr` sweep would miss exactly
+the shape the tree is full of), covers `Getenv`, `LookupEnv`, `Environ` and
+`ExpandEnv` so a different spelling is not a way around it, and is held equal
+in both directions over a vacuity floor of four. It logs **7 readers, every
+one argued**, in three shapes: the composition root's four defaults
+(`config.Load`, `claude.EndpointFromEnv`, `claude.SettingsFromEnv`,
+`tier3.LoadSettings`), one Cobra flag pair whose `--help` names the variable
+(`uiCommand`), and two handed-in-first fallbacks (`flymetrics.Panel.token`,
+`valueOr`). Mutation-verified **both ways**: an `os.Getenv` added to
+`traffic.ClassOf` is named by package and function and line; handing `valueOr`
+its lookup instead is reported as a register entry that stopped mattering.
+The count is deliberately not written into the file's prose — the test logs
+the number it walked, which is the lesson the parallel register learned the
+hard way.
+
+- **Considered and rejected.**
+  - **`startRebuild`'s `OpenWriter` arm** (1 statement) has no cross-platform
+    fixture. `OpenWriter` `MkdirAll`s its own parent, so the only route is a
+    parent directory that is not writable — and then `removeBuild`'s
+    `os.Remove` of a name that is not there answers ENOENT on Linux and is not
+    guaranteed to on every platform the gate runs, which would land on the
+    *covered* branch instead and turn a green `main` red for a reason nobody
+    would read as this. Left; named here so the next lane does not re-derive it.
+  - **`finish`'s four middle arms** (snapshot, DETACH, `conn.Close`,
+    `db.Close`) want a pool handle that fails after the first statement
+    succeeded, which is exactly `pooltest.OpenFaulty` — and these are
+    `package pool` tests, so importing `pooltest` is an import cycle. A second
+    faulty connector written in-package would duplicate the one lever 33
+    argued. Left.
+  - **`internal/deckedit/ops.go`'s 27 single-statement gaps** are lever 26 one
+    layer up: `blockHeader`'s regex matches `key:` and `key: []` and nothing
+    else, so a top-level key written **quoted** (`"cards": []`) parses, holds
+    the right cards, and scans to nothing. One fixture family would reach
+    several of them. Not taken tonight — it is the grind the daybreak ruling
+    above is about, and it is the best-shaped grind left if the answer comes
+    back the other way.
+  - **`rebuild.go`'s ATTACH builds its statement by concatenation**
+    (`"ATTACH '"+buildPath+"' AS "+rebuildCatalog`), so a pool path containing
+    an apostrophe is a malformed statement rather than a named refusal. Not
+    queued and not fixed: the path comes from `MTGLAB_DATA_DIR`, the deployed
+    value is `/data`, and this is an operator-set value rather than anything a
+    user can reach — so it is a robustness nit, not an injection. The fix if
+    anybody ever wants it is doubling the quote, one line, with the ATTACH test
+    above already in place beside it.
+
+- **(open) `internal/deckread`'s commander dossier is the largest
+  non-deliberate gap in the tree — ten statements, 1.5% of everything still
+  missing, in one function — the fixture that would reach it exists, and the
+  item asking whether to plug it in left this queue without being answered.**
+  `pooltest.OpenFaulty` is a real pool behind a budgeted connector; `deckread`
+  reaches the pool through a `*pool.Pool`, and a `Pool` opens its own file
+  inside `acquire`. One field on `pool.Pool` closes this and three siblings.
+  COVERAGE.md recorded it as "a daybreak item (White, 2026-09-26)" while
+  **DAYBREAK.md did not have it** — it went during the 09-28 regroup without a
+  ruling, and a coverage lane four nights later read that sentence, went
+  looking for the item, and found nothing. That is this project's own rot
+  warning happening inside the map whose job is to carry it. Queued under *a watched deploy* (it is a change to the serving
+  hot path); COVERAGE.md's claim corrected in the same diff to say the item is
+  re-queued rather than still queued.
+- **(open) The climb has no lever left bigger than two statements, and the
+  floor's next click asks for a number the tree cannot reach by grinding.**
+  646 missing over 387 functions, every remaining *class* already named in
+  *Left deliberately*, and 0.5 points is 109 statements — sixty-four more
+  bespoke fixtures at tonight's rate. The recommendation is that 95.5 becomes
+  a regression guard rather than a target and that the next lane's mandate is
+  a LIVED mutant in covered code, which is the sentence COVERAGE.md has ended
+  on since it was written. Queued under *a ruling, and nothing else* — a group
+  the 09-29 morning emptied and this re-opens.
 
 ### 2026-10-02 (solo, daylight) — the replay comes back, the census becomes a register, and the compile kernel gets its first baseline
 
@@ -2392,6 +2759,21 @@ the spirit of Magic*
   section's foot so the colours could not conflict.
   Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
   night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
+- **The `os.Getenv` count changes definition at 2026-09-26, so read the trend
+  in two halves.** Every entry from 2026-08-23 to 2026-09-19 quotes one number
+  from `grep -c 'os.Getenv\|os.LookupEnv'`, which adds up three unlike things:
+  a real read of the process, `os.Getenv` handed in *as a value* to a
+  `func(string) string` at the composition root, and `[os.Getenv]` in a doc
+  comment. The 09-24 parallel work turned almost all of them into hand-ins, so
+  **the single number rose while the doctrine got strictly better** — a trend
+  line measuring the wrong thing. From 09-26 the bullet in `blue.md` asks for
+  **two** numbers instead (real reads, and hand-ins) and the entries quote both:
+  09-26 and 10-02 each read **2 real reads outside tests and 6 hand-ins**
+  against a naive 15. A single figure in an older entry is therefore *not*
+  comparable to the pair in a newer one; the naive grep is quoted alongside for
+  exactly that comparison. (Recorded here by Colorless, 2026-10-03, because the
+  correction landed in Blue's reference file rather than in this section and a
+  reader of the trend had no way to know.)
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -7020,8 +7402,10 @@ becomes a register. The design pass it measures is Aaron's and is queued.*
   the red check is *correct* about the worker being a sha behind, and the
   complaint was never that it was red but that it would not say why. Printing
   the body answers the actual complaint. **No new daybreak line**: the queue
-  already holds a `deploy.yml` item needing a watched deploy (item 6, the
-  snapshot step), there is no new question for Aaron here, and two lines
+  already holds a deploy-job item needing a watched deploy (item 6, the
+  snapshot step in `.github/workflows/ci.yml` — this sentence said
+  `deploy.yml`, a file this repository has never had; corrected by Cleanup,
+  2026-10-03), there is no new question for Aaron here, and two lines
   asking for one morning's attention to the same job is how a queue stops
   being read.
 - **Hot-spot patrol: `internal/api`, and the finding is in allocation
@@ -11244,8 +11628,9 @@ animation would have eaten it silently. It is a weaker gradient instead.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-09-26 (rainbow, daylight — one lane of a parallel wave;
-  entry directly below). Previous: 2026-09-19 (rainbow, daylight), 2026-09-12
+- **Last run:** 2026-10-03 (night — the sixth lane of a serial seven-lane
+  night; entry directly below). Previous: 2026-09-26 (rainbow, daylight — one
+  lane of a parallel wave), 2026-09-19 (rainbow, daylight), 2026-09-12
   (rainbow, night — ran past 04:00 into 09-13), 2026-09-05 (rainbow, night),
   2026-08-24 (rainbow), 2026-08-21 (scoped — the relic sweep only),
   2026-08-19 (rainbow, the first colorless run with five colors to audit),
@@ -11258,6 +11643,364 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-10-03 (night) — the queue's own count recipe becomes a test, and three of the shelf's standing items turn out to be two
+
+The sixth lane of a **serial** night: seven lanes dispatched one at a time from
+20:14 PDT by an orchestrator holding the context, each in the main working tree
+off a written lane file, with a shared brief for the harness traps and the
+gauntlet recipe. Branched from `348e76e`, which carried Blue (#529), Black
+(#530) and Red (#531) merged and deployed. Four PRs were open when this lane
+read them — Green #532, the Queen #533, the Coliseum #534, Coverage #535 — so
+**every claim below about those four is a claim about a green unmerged PR and
+says so**, the 09-12/09-26 precedent for reading an open branch honestly. All
+five parts run; the relic sweep ran passes 1, 2, 4, 5 and 6.
+
+- **Fixed this run:**
+  1. **The queue is counted by a recipe written in prose, and nothing held the
+     recipe to the queue.** `DAYBREAK.md` says how to count its open items
+     (`grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):'`) and records
+     why the convention matters — *"the recipe below cannot see a heading like
+     `**White (leg two):` and two of those hid from it for a week"*. The
+     convention was prose; the file's own paragraph warns that *"a count
+     written into prose is a claim that rots… and so is the recipe for checking
+     it"*, and it was right about itself. Meanwhile `daybreakrecord_test.go`
+     already held the *authoritative* definition of an item — a paragraph under
+     an `## Open` heading carrying `**Recommendation:**` — and the two
+     definitions could drift in both directions with nothing noticing: a
+     heading the recipe cannot see is an item missing from every count ever
+     quoted, and a recipe hit inside an item's *body* is a phantom item the
+     morning count invents. `TestTheQueuesOwnCountRecipeSeesEveryItem` holds
+     them equal. **The pattern is read out of the file's own fenced block
+     rather than restated in Go** — a test that repeats the recipe cannot tell
+     you the recipe is wrong, and the recipe is the half that has been wrong —
+     so a drift in the recipe itself now fails too. **Mutation-verified three
+     ways, each restore proved by an empty `git diff`:**
+
+     ```
+     (1) a heading rewritten to `**White (leg two): …`
+     daybreakrecord_test.go:277: an open daybreak item's heading is invisible to the file's own count recipe ((?m)^\*\*(White|Blue|Black|Red|Green|Colorless):), so every count quoted of this queue is short by one; the heading is: **White (leg two): the nine open torch Dependabot alerts are triaged in prose and never
+     daybreakrecord_test.go:283: DAYBREAK.md's own recipe counts 9 open items and the queue holds 10; a recipe hit outside an item heading is a phantom the morning count invents, and a heading the recipe misses is an item nobody counts
+     (2) the recipe's own `grep -cE '` spelling broken
+     daybreakrecord_test.go:261: DAYBREAK.md carries no `grep -cE '…'` recipe; without one this guard has nothing to hold the extractor against and would pass on anything
+     (3) both restored: `git diff -- docs/polish/DAYBREAK.md` empty
+     ```
+
+     **What it still cannot see, stated so nobody assumes otherwise:** a colour
+     dropped out of the recipe's alternation while no item of that colour is
+     open. The guard compares counts, so an unused alternative is invisible to
+     it; there is no honest way to check an alternative nothing matches, and
+     saying so is better than implying coverage it has not got.
+  2. **The night's own blockquote note said "Black added two" when the night
+     added three, and the queue it summarised held ten.** Black's two (the
+     cancelled Sonnet 5 rise, the unversioned `immutable`) were written; Red's
+     one (the press clause of commandment 17) was not, by nobody's fault —
+     Black wrote the note and Red ran after it, which is the serial shape's own
+     blind spot and exactly the *seven notes for one night* failure the header
+     is supposed to avoid. Rewritten as **one** dated note for the whole night:
+     what merged, what is held and why, the three walks the morning owes, and
+     the count as a reading of `main` rather than a forecast, since each held
+     branch brings its own queue line with it.
+  3. **The *watched deploy* group gets the morning's merge recipe at its head,
+     and the frightening half of it is not true.** Three held branches all
+     touch `web_dist/` and the obvious reading is a bundle merge nightmare.
+     Measured instead: they rebuilt **three disjoint files** —
+     `assets/pentagram.js` (#532), `assets/DeckDetail.js` + `assets/index.css`
+     (#533), `assets/Coliseum.js` (#534) — so no two touch the same built file
+     and the bundle cannot conflict between them. The filenames are stable
+     rather than content-hashed, which is what makes that true. What *does*
+     conflict is `DAYBREAK.md` and `LEDGER.md`, which all three edit, and
+     which is why #532 already reads `CONFLICTING` against `main` before
+     anything has merged. The note carries the order, the "keep both sides of
+     the document hunks" resolve, the standing refusal to hand-resolve a
+     generated file, and the close-out that costs a minute and proves the
+     three partial rebuilds compose: one `npm --prefix web run build` on `main`
+     should write **no** diff.
+  4. **`SKILL.md`'s "merge before advancing" is void at night for every lane
+     whose work renders, and the skill had not noticed it was arguing with
+     itself.** Serial is the default *because* merging each lane before the
+     next means the conflicts never exist; the Nightbound rule forbids merging
+     anything a user can see; so a serial night with three rendering lanes
+     advances anyway and ends holding three overlapping branches — a parallel
+     wave's integration cost, arrived at by the shape chosen to avoid it, and
+     paid by Aaron in the morning instead of the orchestrator at 3am. Both
+     consequences are now written where the next night reads them: assign
+     `web_dist/` and the stylesheet in the lane files **even when the lanes run
+     serially**, and put the merge order in the queue rather than in a report.
+     A second bullet records the other thing tonight proved: a lane file earns
+     its place serially too, because the brief is where seven lanes stopped
+     re-deriving the same harness traps one at a time.
+  5. **The cache register is finished, and two documents said it was
+     half-built.** Black's leg tonight landed `GET /api/admin/stats/system`'s
+     `caches` object — Tier 1, the deck shelf memo, the door's ETag memo, each
+     `{hits, misses}` or `null`. `SKILL.md`'s measuring shelf and
+     `colorless.md` part three each opened on *"nothing yet reads those counts
+     out of a running instance"*, which is the sentence a future Colorless run
+     would have re-queued as a standing item. Both corrected, with the reason
+     the route was the missing half rather than a nicety (a counter nobody
+     reads out of a *running* process proves nothing about the process) and the
+     door's handed-in reader named as the shape to copy. **Part three's
+     standing list drops from three items to two** — `benchstat`, and the bench
+     suite's one command plus its results ledger — and it has now shortened
+     four runs running, which is the honest answer to part three's own live
+     question about whether the rebuild is still shaped right: it is finishing,
+     not growing.
+  6. **`colorless.md` part three now says the two things about `animist verify`
+     that cost a lane its asset gate.** `tools/.venv` hard-points at the main
+     checkout, so a worktree lane verifies whichever branch the *main* tree has
+     out and reports it as its own — which is why 09-26 could not run it and a
+     serial night in the main tree always can. And the tool has **no
+     shrunken-run hole**: it exits non-zero with *"refused: no recipes named
+     and none found"*, so part three's "a shrunken run still prints a table"
+     warning is already answered for this one instrument. It prints no total,
+     so the count is `| grep -c ': held$'`.
+  7. **Blue's section head now says which `os.Getenv` numbers were measuring
+     what.** The 09-26 correction landed in `blue.md` and the 09-26 entry
+     recorded it *here* so it would not be fixed twice — but a reader of Blue's
+     trend line had no way to know that every entry from 08-23 to 09-19 quotes
+     one conflated number and every entry from 09-26 quotes a pair. A single
+     figure in an older entry is not comparable to the pair in a newer one, and
+     the section head is where a reader of the trend is already standing.
+- **Part one — is the ledger telling the truth?**
+  - **The queue, counted both ways on `main` before this lane touched it: 10
+    and 10.** The file's own recipe reads 10; `daybreakrecord_test.go`'s
+    extractor finds 10 and names all ten. They agreed before the new guard and
+    now cannot silently stop. This lane's own ruling makes it 11, both ways.
+  - **The marker audit is exact, which is the first time it has been.**
+    `(open)` markers by ledger section — **White 2, Blue 1, Black 4, Red 3 =
+    10** — against the queue's ten items by colour: White 2 (Dependabot,
+    `NOTICE.md`), Blue 1 (the unlit torches), Black 4 (Sonnet 5, the
+    unversioned `immutable`, the cache-write column, `CacheReadFraction`), Red
+    3 (off-platform uptime, the press pass, the deploy snapshot). Both
+    directions of `TestTheLedgerAndTheQueueAgreeOnWhatIsOpen` green, and the
+    totals match item-for-item rather than merely in aggregate. Those are the
+    arrival figures; this lane's own ruling adds Colorless 1 to each side.
+  - **Tonight's three merged lanes, two-places audit: 3 of 3 clean.** Black
+    wrote two `(open)` records and two queue lines; Red wrote one and one;
+    Blue queued nothing and said so in writing (*"the queue stays at seven and
+    `DAYBREAK.md` is untouched"* — true when written). Of the four open PRs,
+    #532 and #534 each add a queue line with a `Ledger: Green, 2026-10-03`
+    pointer, #533 **rewrites** Red's existing item rather than adding one (so
+    the count does not move on its merge), and #535 adds two with
+    `Ledger: White, 2026-10-03`. Projected queue after the whole train:
+    **11 → 16**. Not asserted as fact; four of those lines are on branches.
+  - **The unmarked-`Queued` walk, spot-checked rather than re-walked.** 25
+    `Queued for Aaron` blocks across the sections; the 09-26 run walked all of
+    them, so this run read the five written since 09-19. All five are
+    correctly unmarked: the interview's question count and the slot-set union
+    (Black, 5285) were answered in the 09-29 eight rulings; the Admin panel's
+    historical pricing (Black, 5754) is superseded by tonight's own Sonnet 5
+    record, which carries the marker; pool age (Green, 9470) was answered by
+    the 10-02 refresh; `goreclaw-stompy` (Green, 9615) was closed on 09-29.
+    `grep -ni 'ride the report'` returns only the 09-19/09-26/cleanup
+    archaeology of the mechanism itself — **no lane this night sent a question
+    to its report**, and this lane's own question is on the queue below.
+  - **Fix spot-checks, 4 of 4 hold:** `skillrecord_test.go` still carries
+    `TestTheSkillsNameOnlyTestsThatExist` (and now four tests, not the three
+    the 09-26 entry recorded — a fourth, the toolbox-verb leg, has joined
+    since); `daybreakrecord_test.go` still reads both directions off the
+    `(open)` marker; `colorless.md` part five still names the five
+    fingerprinted packages as the only hard exclusion; `blue.md`'s two-number
+    `os.Getenv` bullet is intact and 10-02's entry used it. Nothing reverted.
+  - **Corrections outrank overwrites, checked.** Every correction in fixes 5
+    and 6 is written beside what it corrects and quotes the sentence it
+    replaces, so the wrong reason cannot be re-derived from the fix.
+- **Part two — is the checklist finding things, or reciting them?**
+  - **Three colours earned it tonight through the standing question, which
+    remains the engine of the whole pass.** Red asked *which of commandment
+    17's three replies is enforced by nothing?* and found the press clause
+    held by nothing at all, 34 buttons through 15 classes. Blue asked it of
+    its own reference three times and found three claims the tree contradicted
+    — a `MTGLAB_FORGE_*` complaint fixed in Blue's own night a month ago and
+    re-read by four runs since, a goroutine census counted with one spelling
+    out of two (3 claimed, 8 real), a `sort.Slice` count short by one. Black
+    asked it of the money and found a price rise the world cancelled. This
+    lane asked it of the queue's own count recipe (fix 1). **Four colours, one
+    night, one question.**
+  - **What got past every checklist is this run's own subject again, and
+    mildly: two reference sentences describing an absence that another lane
+    had just filled** (fix 5). That is the 09-26 lesson repeating in a gentler
+    key — the run that reads the skill goes sixth, so a sentence the night's
+    own work falsified has a few hours to look true. There is no structural
+    fix available for *numbers* in a reference file; what there is, and what
+    09-26 built, is the test-citation guard, and it held tonight.
+  - **Dated and process prose in code added by tonight's three merged PRs:
+    zero.** `git diff a199cea..348e76e -- '*.go' '*.ts' '*.tsx' '*.css'`
+    grepped on the added side for `YYYY-MM-DD`, `#NNN`, `vNNN`, "tonight",
+    "today", "this run", "last night", "yesterday": **no hits.** Three lanes
+    writing comments at speed and none of them wrote a diary — the keep/cut
+    rule living in `datedcomments_test.go`'s const block rather than in a
+    reference file is the likeliest cause, since that is where a session is
+    already looking.
+  - **Reciting-risk verdict:** the relic sweep's passes are clean six runs
+    running and stay for the count habit — they are cheap and they are the
+    only thing that would catch a directory arriving — but part four should be
+    read as *maintaining a census*, not as hunting. The facet at risk of
+    reciting is part three's standing-items list, and the honest answer this
+    run is that it is not reciting because it keeps *shortening* (fix 5).
+- **Part three — the tooling.**
+  - **`animist verify`: 36 recipes, 36 held, exit 0** — run from the main tree
+    on this branch, which closes the gap the 09-26 lane had to leave open for
+    a structural reason. 34 on 09-19 and 09-26; two recipes added since.
+    Verdict about the *tool* rather than the assets: it refuses a zero-recipe
+    run by name, so it has no inert-pass hole, and it prints one line per
+    recipe with no total.
+  - **The record guards, `-count=1`, all PASS:** `daybreakrecord` (now three
+    tests), `skillrecord` (four), `licenserecord`, `datedcomments`,
+    `serialregister`, `coveragefloor`, `configrecord`, `hotlinkrecord`,
+    `shutdownrecord`, `spendrecord`. Re-run after every prose edit in this
+    diff.
+  - **The night's own tooling is four scratch files, three of them worth
+    promoting and one of them carrying the exact bug the skill forbids.** This
+    is the queued item below. `gowrap.sh` (5 lines: the Mac's three exports
+    with a literal `/Users/aaronsquier` prefix, a `cd` into `go/`, `exec
+    "$@"`) and `deploy.sh` (31 lines: sleep-30 poll of the `tests` run on
+    `main` by sha, then the deploy job's conclusions, then the machine image
+    tags, then `/api/health` and two public paths) are exactly the two
+    recipes `SKILL.md` already *describes* in prose and every night rewrites.
+    `LANE_BRIEF.md` is the condensed night rules plus the harness traps and
+    the known load-flakes. **`poll.sh` must not be promoted as written:** its
+    required-check set is a hard-coded literal of eight names, and `SKILL.md`
+    step 6 says in so many words to read that list back from the API *because
+    it has grown twice with no prose noticing*. Read tonight,
+    `gh api repos/aasquier/sylvan-library/branches/main/protection --jq
+    .required_status_checks.contexts` returns exactly those eight — so the
+    script is correct today, which is precisely what makes committing it
+    dangerous: it would be right on the day it landed and silently wrong on
+    the day the list grew.
+  - **The shelf's live question — what would a Go shelf measure that the stock
+    tools cannot?** Same answer as 09-26 and now with one fewer part: **run a
+    set of benchmarks as one thing and remember the answers.** The cache
+    counter half is built and read (fix 5). Nothing else proposed itself.
+- **Part four — the relic sweep (passes 1, 2, 4, 5, 6).**
+  - **Pass 1 — clean. 148 tracked directories** (flat against 09-26).
+    **52 Go packages, 52 with a package doc that argues, 0 without** (51 on
+    09-26; `library` is the new one, Black's deck-shelf memo).
+  - **Pass 2 — clean. 336 non-source files** (332 on 09-26): the migration
+    ladder, the tarot deck's plates, the scribe's GPL boundary, the docker
+    trio, `.env.example`, the two toolboxes' Python, the committed media, the
+    one committed executable.
+  - **Pass 4 — clean, 97 docs by title** (flat).
+  - **Pass 5 — not re-walked, deliberately.** Blue's lane read all 7 families
+    and all 35 commands tonight for its typo fix and recorded the census; a
+    second read is the same output from a less careful reader. Pass 5's
+    *existence* question is answered by that entry.
+  - **Pass 6 — 14 rows, all the migration ladder** (15 on 09-26; one fewer
+    because a migration gained a mention elsewhere). No finding.
+  - **The one thing that looks like a relic: two live worktrees that match no
+    lane.** `.claude/worktrees/agent-a033745369c1db585` (branch
+    `worktree-agent-a033745369c1db585`, `1d1e6ec`) and
+    `agent-ace54adcdc23122b3` (branch `white-pool-age`, `ee94542`). Tonight's
+    seven lanes all ran in the **main** working tree, so by the 09-26 rule —
+    *a clean worktree list is not the check, matching the lanes actually
+    running is* — neither is accounted for. Left in place and **not removed**:
+    a worktree may belong to a session this lane cannot see, and a relic is a
+    decision rather than a silent deletion. Not queue-class either; two stale
+    worktrees on a laptop are a chore, not a question. Recorded with the
+    recipe (`git worktree list`, read against the lanes the night actually
+    ran) so the next run can retire them if they are still there.
+- **Part five — the comments.** **No slice taken, and the reason is the diff
+  rather than the budget.** The ratchet reads `goDatedCommentCeiling = 94`
+  and `webDatedCommentCeiling = 269`, both green; the Go side's own grep
+  returns **93** (one under the ceiling, so the slack is being spent rather
+  than lost), and `web/src` is **362** by the reference's grep against a 269
+  ceiling, which is the two-definitions gap the reference already warns about
+  — the ratchet counts comment-*led* lines and the grep counts any comment
+  character. The densest untouched families the 09-26 entry named are
+  unchanged (`internal/prices` 10, `internal/claude` 13, `internal/night` 9),
+  and `web/src/index.css` — the densest file in the tree, and 09-26's deferred
+  slice — is **held by the Queen's unmerged #533**, which is the same blocker
+  that deferral has had twice now. Sweeping any of them tonight would mean
+  touching product files in a diff whose whole subject is the pass's own
+  surface, and the merged diffs carry zero dated prose to retire (part two).
+  **Slices done**, unchanged: `internal/sim/{cache,compile,curve,tier3}`
+  (08-24), `internal/api` non-test (09-05), `routes/Coliseum{,.test}.tsx`
+  (09-12), `components/board{,.test}.tsx` (09-19), `internal/sim/tier3` again
+  (09-26). **Not sweepable:** the five fingerprinted packages, unchanged.
+- **Measurements (2026-10-03, night, this Mac, serial lane, raw):**
+
+      queue on arrival, the file's own recipe       10
+      queue on arrival, daybreakrecord's extractor  10  (now held equal by a test)
+      queue after this lane                         11  (the one ruling below)
+      (open) markers by section, on arrival         White 2 · Blue 1 · Black 4 · Red 3 = 10
+      queue items by colour, on arrival             White 2 · Blue 1 · Black 4 · Red 3 = 10
+      (open) markers after this lane                the same, + Colorless 1 = 11
+      projected queue after the four open PRs       16  (#532 +1, #533 +0 rewrite, #534 +2, #535 +2)
+      two-places audit, tonight's merged lanes      3 of 3 clean
+      ledger-only questions found                   0
+      dated/process prose in code, a199cea..348e76e 0 hits
+      animist verify                                36 recipes / 36 held / exit 0   (34 on 09-26)
+      goDatedCommentCeiling                         94  (tree reads 93)
+      webDatedCommentCeiling                        269 (reference grep reads 362; different definition)
+      relic pass 1                                  148 dirs; 52 packages, 52 docs, 0 without
+      relic pass 2                                  336 non-source files
+      relic pass 4                                  97 docs by title
+      relic pass 6                                  14 rows, 0 findings
+      .claude/hooks                                 1 hook (+ an ignored __pycache__; trigger unfired)
+      live worktrees                                3 -- the main tree and TWO matching no lane
+      required checks, read from the API             8  (frontend, image, no-secrets-or-card-data,
+                                                        dependency-review, go (amd64), go (arm64),
+                                                        go-lint, tools)
+      Colorless 09-26 handoffs consumed             queued 2 of 2 answered 09-29 · deferred 2 of 4 fired
+      data/app.db                                   dated Sep 27 before and after; no server started
+
+- **(open) Queued for Aaron (2026-10-03): one — may the night's tooling live
+  in the repository instead of being rewritten every night?** Four files were
+  written in the scratchpad tonight and all four worked: `gowrap.sh`,
+  `deploy.sh`, `poll.sh` and `LANE_BRIEF.md`. Three of them are recipes
+  `SKILL.md` already describes in prose, which means every night pays to turn
+  prose into a working script before it can run a gauntlet or watch a deploy.
+  The proposal is `.claude/polish/` holding `gowrap.sh`, `deploy.sh` and the
+  lane brief, with `poll.sh` rewritten first so its required-check list is read
+  from `gh api … /branches/main/protection` rather than frozen as a literal —
+  the skill's own step 6 forbids the frozen form by name, and the list read
+  tonight matches it exactly, which is what makes the frozen version a trap
+  rather than an error. What it costs to leave: each night re-derives three
+  scripts and a brief, and the brief is where the harness traps and the
+  known load-flakes stop being learned one lane at a time. Recommendation is
+  on the queue.
+- **Deferred (2026-10-03), with triggers:**
+  - **A test that fails when `guard-git.py` goes inert.** *Trigger:* unchanged
+    — a second hook in `.claude/hooks/`, or the guard observed allowing a
+    spelling it documents refusing. Read tonight: one hook, plus an
+    `__pycache__` that `.gitignore` covers and `git ls-files` does not see.
+  - **`web/src/index.css` as a comment slice.** *Trigger:* the Queen's #533
+    merged. **Third cycle with the same blocker** — the sheet is the densest
+    file in the tree and it keeps being the file the Queen is rewriting, which
+    is not an accident and is worth saying rather than re-deferring silently:
+    the densest comment file is dense because it is the most-worked file.
+  - **Assigning the asset gate to a lane.** *Trigger:* the next **parallel**
+    wave. Unfired tonight (serial, main tree, gate run — fix 6), and the
+    mechanism it was waiting for now exists: lane files were written tonight,
+    so this is one line in one of them the moment the lanes are parallel again.
+  - **The reverse half of `daybreakrecord_test.go`.** *Consumed* — Aaron
+    answered "marker" on 09-29 and `TestTheLedgerAndTheQueueAgreeOnWhatIsOpen`
+    landed in #521. Recorded closed rather than deleted.
+- **Findings handed to other colours** (this run does not fix product code):
+  - **Red / the orchestrator:** `poll.sh`'s frozen required-check list, above.
+    It is Red's facet (CI) if the script is ever committed.
+  - **Nothing else.** No contradiction found between tonight's seven lanes;
+    the one adjacency was #533 and #534 both wanting the Coliseum's page, and
+    #534 stood down from `index.css` in writing (*"no CSS — the Queen's branch
+    holds `index.css` tonight"*), which is ownership working without a lane
+    file having to say it.
+- **Staleness, honestly stated** for the next bare `/polish`: every colour
+  carries a 2026-10-03 tag except **White**, whose last run is 2026-10-02 and
+  whose two owed items (the determinism replay, the per-version npm licence
+  re-read) are the oldest live work in the pass — though #535 is White's
+  coverage leg and lands tonight's tag on the section when it merges. Date
+  staleness is therefore near-nil and substance orders it: **Cleanup first**,
+  because the queue is eleven going on sixteen and five of those need only a
+  word; then **Green** (the authenticated phone sweep, still owed); then
+  **White** (the replay). One more note for the next night: tonight's lanes
+  split their own tag across two dates — Blue wrote `2026-10-02 (night)` and
+  Black and Red wrote `2026-10-03 (night)` for the same run — so `SKILL.md`'s
+  resume rule (*read which colours carry tonight's tag*) cannot answer "which
+  colours ran" for this night from the tag alone. Not corrected here, because
+  rewriting another colour's heading is exactly the overwrite this section
+  forbids; recorded so the next reader is not misled, and worth one sentence
+  in a lane brief: **the night's date is the date the orchestrator started,
+  and every lane writes that one.**
 
 ### 2026-09-26 (rainbow)
 
@@ -13516,6 +14259,166 @@ for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
 
+- **Last run:** 2026-10-03 (cleanup, night — the last lane of a serial night
+  that ran ten pull requests before it; entry directly below). Previous:
+  2026-09-29 (the rulings),
+  2026-09-28 (the fourth run), 2026-09-19, 2026-09-12, 2026-09-05, 2026-08-23
+  (the run Aaron asked this phase into existence on). This bullet is new on
+  2026-10-03: the other six sections have carried one since they were written
+  and this one never did, so "when did cleanup last run" was a question you
+  answered by reading dates off entry headings.
+
+### 2026-10-03 (cleanup, night) — one anchor that never existed
+
+The last lane of a serial night, run against `main` at `7c52d9c` with every
+mergeable pull request of the night already in it — **seven merged**: #528
+White, #529 Blue, #530 Black, #531 Red, #535 Coverage, #536 Colorless, #537
+Mutation — and **three held for Aaron's eye** because every line of them
+renders: #532 Green, #533 the Queen, #534 the Coliseum. **Queue depth: 13
+before, 13 after**, by
+the file's own recipe, which is the honest number and not a disappointing one:
+every one of the thirteen needs a click in a tab this pass has no account for,
+a dollar, a ruling, a watched deploy or a migration window. A cleanup whose
+input is a queue of *exactly the things a run may not do* empties nothing, and
+saying so is the phase's own rule.
+
+**One sentence the resume rule needs:** tonight's lanes split the night's tag
+across two dates — Blue's entry is `2026-10-02 (night)` and every other lane's
+is `2026-10-03 (night)` — and they are **one night**, the hours either side of
+midnight on 2026-10-02/03, not two runs. No heading was rewritten to say so;
+this sentence is where the next session reads it.
+
+**Untap — thirteen items re-checked against the code, oldest first.** None was
+*already done* and none was *gone stale*; what the re-reads bought was two
+corrections and one measurement.
+
+- *Still true and still needs Aaron — thirteen.* The reads, not the lines:
+  Dependabot is **9 open, 1 critical / 3 medium / 5 low, every one `pip/torch`
+  and `development`** (API, tonight — the fourth identical read); there is
+  still no snapshot step in any workflow (the only `snapshots` word in
+  `.github/workflows/` is a Forge release tag); `cache_creation_input_tokens`
+  still appears in exactly two test fixtures and nowhere in serving code;
+  `prices.CacheReadFraction` is still `0.1` for the whole family and
+  `claude-fable-5-1` is still absent from `Table`; Sonnet 5 still carries its
+  `Then`/`Until: "2026-08-31"` window and `prices.Source` still points at
+  `platform.claude.com/docs/en/pricing`; `/api/ocr/*` still answers
+  `max-age=31536000, immutable` on a URL with no stamp in it; `Settings.tsx`
+  still says the torches are unlit and no route answers whether a night is
+  scheduled, so the Blue item is still waiting on the thing it says it waits
+  for. `COVERAGE.md`'s deckread paragraph needed nothing: the coverage lane
+  had already written the re-queue into it.
+- *Still true and no longer needs him — none, and this is where a cleanup
+  normally earns its night.* The one candidate was Black's pricing item, whose
+  dead `Source` URL is a one-line fix needing no ruling — and it renders, on
+  the admin panel, as the link a person clicks to check the rates. Nothing a
+  user can see merges at night, and a link's destination is something a user
+  can see the moment they use it. It stays with the rest of its branch.
+
+**Upkeep — the queue itself, four edits.**
+
+1. **The merge-order note at the head of *a watched deploy* was reasoning;
+   it is now a reading, and the order it gave was wrong.** Live states:
+   **#534 `MERGEABLE` and only behind, #532 and #533 `CONFLICTING`.** For each
+   branch, the files changed on the branch and on `main` since that branch's
+   own merge base were intersected, and the answer for all three is **exactly
+   `DAYBREAK.md` and `LEDGER.md`** — so the disjoint-bundle argument
+   (`pentagram.js` · `DeckDetail.js` + `index.css` · `Coliseum.js`) is now
+   measured. The correction that matters: `gh pr update-branch` **refuses** a
+   branch whose merge is not clean, so it is the whole job on #534 and no help
+   at all on #532 and #533, which want a local `git merge origin/main` and a
+   two-minute resolve keeping both sides. And #534 opens a second
+   `## Open — a ruling` group a few lines above the existing
+   `## Open — a ruling, and nothing else`; the note now says to fold it in as
+   it lands.
+2. **The deploy-snapshot item had been sending readers to a file this
+   repository has never had.** It said the step was missing from deploy.yml.
+   There is no such file and `git log --all` has never known one: continuous
+   deployment is the `deploy` job inside `.github/workflows/ci.yml`, gated on
+   `tests`. Three cleanups re-verified the item's *claim* — still no snapshot
+   step, true every time — and not one of them opened the file it named,
+   because the name reads exactly like a file a repository would have. Fixed
+   in the queue line and in both ledger sentences that repeated it (Red's
+   2026-09-29 entry, the 2026-09-28 Cleanup entry).
+3. **The Dependabot item is four lines shorter.** Its own third carry already
+   produced the finding that an item waiting only on a click in a tab earns a
+   one-line ask rather than a paragraph re-verified each cleanup; this is that
+   finding acted on rather than restated. The paragraph's content lives where
+   it belongs — `tools/pyproject.toml`'s triage — and the line now carries the
+   number, the scope and the sentence to paste into the dismissal.
+4. **The prose-extractor item got the measurement it had been asking for since
+   2026-08-24** (see below).
+
+**Discard to hand size — one guard, and it is the one the night's own rot
+asked for.** `TestTheQueueNamesConfigurationFilesThatExist` holds every
+backticked `.yml` and `.toml` in `DAYBREAK.md` to a file in this checkout,
+resolving a path written relative to whatever directory the sentence stands in.
+It fails on `main` as written (the snapshot item's deploy.yml), and two
+mutations were run: with the suffix clause removed it fails on `ci.yml`,
+which proves the resolver is
+load-bearing rather than decorative, and its built-body leg fails if the
+extractor stops seeing either of the two anchors it is handed. Two shapes
+failed the test's own first run and both are now rules the comment states: a
+line that names a file *because it does not exist* writes it without backticks
+(the snapshot item does exactly that now), and so does a sentence about a bare
+extension. `cmd/mtglab` is not a fingerprinted package and the file is a test,
+so no Tier 1 cache moved.
+
+**What the extractor measured, which is the answer to the White prose item.**
+The question it has carried since 2026-08-24 was whether the wider prose is
+worth a third extractor. It is not, in that shape, and the numbers say why:
+pointed at `DAYBREAK.md`, `recordkit_test.go`'s existing `repoPaths` flags
+**five anchors and four of the five are the queue doing its job** —
+`gowrap.sh`, `deploy.sh`, `poll.sh` and `LANE_BRIEF.md` are named by the open
+Colorless item *because they live in a scratch directory and vanish with it* —
+and the fifth is a gitignored deck file. **A queue names what does not exist
+yet; a record names what does**, which is why the same extractor is honest on
+`NOTICE.md` and would cry wolf here. The *map* is the other case: `COVERAGE.md`
+names **41 anchors and 40 resolve**, the single miss being a gitignored
+`deck.yaml` — but only once the resolver allows a path written relative to
+`go/`, because that file speaks from inside the Go tree. Root-anchored
+resolution alone calls **19 of its 20** slashed paths broken. So the item's
+recommendation is now a suffix resolver in the kit plus a guard on the maps,
+never on this queue and never on `LEDGER.md`, which is history and is supposed
+to name files that were deleted.
+
+**Considered and rejected:**
+
+- **Merging Black's two dollar items into one.** They are one *shipment* — the
+  pricing correction over-reads by ~13.6% and the missing cache-write column
+  under-reads by 14–20%, so shipping either alone moves the headline figure the
+  wrong way, which the pricing item already says in its own recommendation.
+  They are not one *question*: one asks to re-record three frozen golden cases
+  deliberately, the other asks for a migration window. Merging them would have
+  taken the queue to 12 and bought the morning nothing, and it would have moved
+  a paragraph across the one file three held branches are already conflicting
+  in — turning #534's clean `update-branch` into a hand resolve. The pairing is
+  written where it belongs: in the pricing item's last sentence.
+- **A path guard over `docs/` wholesale**, for the reason the measurement
+  above gives.
+- **Landing the Colorless tooling item** (`.claude/polish/` for the night's
+  four scratch files). It is tooling and it would merge, but it is a ruling
+  about where this project keeps the pass's own instruments, asked tonight by
+  the lane that found it, and a cleanup answering a question Colorless raised
+  four hours earlier is the phase deciding for Aaron rather than for itself.
+- **The two live worktrees under `.claude/worktrees/`** that match no lane of
+  tonight (`agent-a033745369c1db585`, `agent-ace54adcdc23122b3`). Colorless
+  recorded them and left them; Cleanup left them too. A relic is a decision,
+  never a silent deletion.
+
+**What would have to be true for the next cleanup to land each of the
+thirteen.** The three waiting items say so themselves and are unchanged. For
+the rest: the two clicks and the dollar need Aaron in a browser he is signed
+into, and nothing else will ever do; the snapshot step, the `pool.Pool`
+connector, the OCR stamp and the pricing branch each need a morning he can
+watch a boot on, which is one morning for all four if they are ordered; the
+cache-write column needs a migration window; the coverage ruling and the
+tooling ruling need one sentence each. **The honest reading of this entry is
+that the queue is now made entirely of the four things a night run may not
+do** — which is a different state from the one the 09-28 regroup found, where
+half the file was work nobody had done. Sixty minutes of a seventh lane can
+correct the queue, measure a standing question and close a rotten anchor; it
+cannot click in the Security tab.
+
 ### 2026-09-29 (cleanup) — the rulings
 
 The morning after the fourth run, Aaron answered the whole *a ruling* group
@@ -13759,8 +14662,9 @@ alone), four-way, every classification re-made this afternoon:**
   merge queue (see the trigger note below). **A dollar:** the external
   monitor and the phone (`fly secrets list` and the instance's check config
   unchanged; on the queue since 09-19 only, in the ledger since 08-16).
-  **A watched deploy:** the deploy-time snapshot (`deploy.yml` re-read: no
-  snapshot step). **A migration window:** the cache-write tokens column
+  **A watched deploy:** the deploy-time snapshot (re-read: no snapshot step —
+  this said `deploy.yml`, and the deploy job is in
+  `.github/workflows/ci.yml`; corrected by Cleanup, 2026-10-03). **A migration window:** the cache-write tokens column
   (`cache_creation_input_tokens` still appears only in two test fixtures).
 - *Still true, deliberately waiting — three*: the Settings torches copy
   (`Settings.tsx:353` unchanged; `fly secrets list` shows no

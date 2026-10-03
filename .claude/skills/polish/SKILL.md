@@ -195,13 +195,19 @@ one you are running, and only that one; the others are for their own runs.
 
 ## The measuring shelf
 
-The shelf is thinner than it looks: there is no `bench` command, and the
-cache register is half-built — `mtglab sim cache` lists what the Tier 1 cache
-holds and can clear it, and the caches count their own use in-process (the
-door's ETag memo through `etagCounts` in `go/internal/door/static.go`, the
-Tier 1 store through `cache.Store.Counts` in `go/internal/sim/cache/store.go`
-— that pair is the pattern to copy for the next one), but nothing yet reads
-those counts out of a running instance.
+The shelf is thinner than it looks: there is no `bench` command. **The cache
+register is whole as of 2026-10-03 and this paragraph used to say it was
+half-built** — `mtglab sim cache` lists what the Tier 1 cache holds and can
+clear it, the caches count their own use in-process (the door's ETag memo
+through `etagCounts` in `go/internal/door/static.go`, the Tier 1 store through
+`cache.Store.Counts`, the deck shelf through `library.Memo.Counts`), and
+`GET /api/admin/stats/system` now reads all three off a *running* box as a
+`caches` object of `{hits, misses}` rows, `null` where a source is absent. A
+counter nobody reads out of a live process proves nothing about the process,
+which is why the route was the missing half rather than a nicety; the door's
+row is **handed in** (`api.Config.ETagCounts`) because `internal/door` imports
+`internal/api` and never the reverse, and that is the shape to copy for the
+next cache rather than reaching for a package-level hook.
 
 **Benchmarks are no longer only a kernel thing, and the open item is narrower
 than "there is no bench suite".** They live beside the code as
@@ -466,7 +472,30 @@ Orchestration:
   own ledger section**; colorless may correct another's, which is its job.
 - **Merge before advancing**, checks green. A green merge deploys itself
   (ADR 23), so a rainbow is up to seven deploys — one more reason schema
-  migrations stay queued. At night, the Nightbound merge rule governs instead.
+  migrations stay queued. At night, the Nightbound merge rule governs instead
+  — **and that rule voids this one for every lane whose work renders, which is
+  the serial night's own trap.** "Merge before advancing" is what makes serial
+  cheap: the conflicts never exist rather than getting resolved. A lane that
+  may not merge advances anyway, so a serial night with three rendering lanes
+  ends holding three overlapping branches — a parallel wave's integration cost,
+  arrived at by a shape chosen to avoid it, and paid by Aaron in the morning
+  rather than by the orchestrator at 3am. Two things follow, both of them
+  cheap: **assign `web_dist/` and the stylesheet in the lane files even when
+  the lanes run serially** (so the held branches rebuild disjoint files, which
+  is the difference between three two-minute resolves and a generated file
+  nobody can re-derive), and **write the morning's merge order into the
+  daybreak queue**, because the queue is the file he opens and a branch list in
+  a report has no address. Measured on the night of 2026-10-02: three held
+  branches, three disjoint files under `web_dist/assets/`, zero bundle
+  conflicts — and all three conflicting on `LEDGER.md` and `DAYBREAK.md`, which
+  is where a night's real integration cost sits.
+- **A lane file is worth writing serially too.** The subsection below asks for
+  one per colour because parallel lanes need ownership; the night of 2026-10-02
+  ran seven lanes serially off written lane files plus one shared brief, and
+  the brief is where the harness traps, the known load-flakes and the gauntlet
+  recipe stopped being re-derived by each lane in turn. Ownership is only half
+  of what a lane file is for; the other half is not paying for the same lesson
+  seven times.
 - A color with only queued findings and no safe fix opens **no PR**: carry its
   ledger text onto the next branch and move on.
 - **You are the collector.** A subagent's report never reaches Aaron, so relay
