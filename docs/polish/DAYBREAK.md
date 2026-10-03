@@ -39,20 +39,29 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > not hold near 85 MB and what it measured instead. The two walks the 09-29
 > pair owed are in Black under the same date.
 >
-> **2026-10-03, night: Black added two, and one of them is about money.** The
-> Sonnet 5 price rise this project's whole rate table was built around was
-> cancelled, which the table does not know; the other is a year-long
-> `immutable` on an unversioned URL. Both sit in the *watched deploy* group,
-> and the pricing one asks to travel with the cache-write column below it.
->
-> **2026-10-03, night: the coverage lane added two, and the first is a
-> question about the whole exercise.** The climb re-measured at 97.0% with
-> nothing left above two statements, so it asks whether 95.5 stops being a
-> target and becomes a regression guard with mutation testing as the
-> instrument — a ruling and nothing else, which is a group this re-opens. The
-> second is a ten-statement gap whose own item left this file during the 09-28
-> regroup without being answered, found because `docs/polish/COVERAGE.md`
-> still points at it.
+> **2026-10-03, night: seven lanes ran one after another — three merged, three
+> are held for your eye, and one of the night's questions is about money.**
+> Black added two: the Sonnet 5 price rise this project's whole rate table was
+> built around was cancelled, which the table does not know, and a year-long
+> `immutable` on an unversioned URL. Red added one: the press clause of
+> commandment 17, now a register, with the design pass it measures waiting on a
+> branch. All three are in the *watched deploy* group, and the pricing one asks
+> to travel with the cache-write column below it. **Green, the Queen and the
+> Coliseum each built a change that renders, took it to a green pull request
+> and stopped there** — nothing a person can see merges while you are asleep —
+> so the morning's first job is three walks and three merges, and the note at
+> the head of the *watched deploy* group is the order to take them in. Each of
+> those branches carries its own queue line onto this file as it lands, so this
+> paragraph's arithmetic is a reading of `main` and not a forecast. The
+> Colorless lane that wrote this paragraph added the eleventh item itself — one
+> ruling, at the foot, about where the night's own tooling should live. The
+> coverage lane, which landed after it, added two more: the climb re-measured
+> at 97.0% with nothing left above two statements, so it asks whether 95.5
+> stops being a target and becomes a regression guard with mutation testing
+> as the instrument — a ruling and nothing else — and a ten-statement gap
+> whose own item left this file during the 09-28 regroup without being
+> answered, found because `docs/polish/COVERAGE.md` still points at it. Count
+> with the recipe below, never with this paragraph.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -101,6 +110,30 @@ could be written `hi = x - y` with every frozen sequence still passing, and a
 generic-cost reader that answers *one* for `{9}`. Coverage was already 100% on
 all of it. Ledger: White, 2026-10-03 (both entries).
 
+**Colorless: every night rewrites the same four tooling files in a scratch
+directory, and three of them are recipes this project already describes in
+prose.** Tonight's seven lanes ran off `gowrap.sh` (five lines: this Mac's
+three Go exports, a `cd` into `go/`, `exec "$@"` — the wrapper the skill
+describes because the harness refuses the compound form), `deploy.sh` (poll
+the `tests` run on `main` by sha, then the deploy job, then the machine image
+tags, then `/api/health`), `poll.sh` (the same loop for a pull request's
+checks) and a shared `LANE_BRIEF.md` carrying the night rules, the harness
+traps and the two test families that fail on load rather than on truth. All
+four worked; all four vanish with the scratch directory. · *Cost of leaving
+it:* every night spends its first twenty minutes turning prose into scripts
+before it can run a gauntlet or watch a deploy, and the brief's traps get
+re-learned one lane at a time instead of read once. · **One of them must not
+be committed as written:** `poll.sh` freezes the eight required check names as
+a literal, and the skill's own landing step says to read that list back from
+the API *because it has grown twice with no prose noticing*. Read tonight, the
+API returns exactly those eight — so the script is correct today, which is
+what makes the frozen form a trap rather than an error. · **Recommendation:**
+yes — a new `.claude/polish/` holding `gowrap.sh`, `deploy.sh` and the lane
+brief, with `poll.sh` rewritten first to read its check list from
+`gh api repos/aasquier/sylvan-library/branches/main/protection`. Three small
+files and one rewrite, no dependency and nothing that ships. Ledger:
+Colorless, 2026-10-03.
+
 ## Open — a few clicks in the repository settings
 
 **White: the nine open torch Dependabot alerts are triaged in prose and never
@@ -135,6 +168,27 @@ besides 200. Ledger: Red, the queued list carried in the 2026-09-05 entry,
 items 1–2; answered as far as possible 2026-09-26.
 
 ## Open — a watched deploy
+
+> **Three branches are stacked behind your eye this morning, and the order is
+> cheaper than it looks.** `polish/green-2026-10-03` (#532, the colour wheel's
+> five discs), `polish/queen-2026-10-03` (#533, the press reply) and
+> `polish/coliseum-2026-10-03` (#534, the Forge match's remaining-time line).
+> Read as a bundle problem this is frightening and it is not one: the three
+> rebuilt **three disjoint files** under `web_dist/assets/` — `pentagram.js`,
+> `DeckDetail.js` plus `index.css`, and `Coliseum.js` — so no two of them touch
+> the same built file and the bundle cannot conflict between them. What
+> conflicts is `DAYBREAK.md` and `LEDGER.md`, which all three edit, which is why
+> #532 already reads *conflicting* before anything has merged. So: **merge one,
+> then `gh pr update-branch` the next and keep both sides of the two document
+> hunks** (nothing was reflowed; it is a two-minute resolve each). **Never
+> hand-resolve a file under `web_dist/`** — it is generated, and a hand-merged
+> bundle is a file no build can reproduce; if one ever does conflict, take
+> either side, run `npm --prefix web run build`, commit what that writes, and
+> then `go test -race -count=1 ./cmd/mtglab/`, because Go's test cache tracks
+> nothing outside `go/` and the guards that read the bundle will otherwise
+> answer a stale green. When the last one is in, one `npm --prefix web run
+> build` on `main` should write **no** diff — that is the proof the three
+> partial rebuilds compose, and it costs a minute.
 
 **Red: commandment 17 names three replies and the third one was never
 enforced by anything — fifteen classes answer the hover and take the click in
