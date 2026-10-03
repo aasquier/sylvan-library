@@ -132,6 +132,21 @@ func Authorization(secret string) string {
 	return "Bearer " + secret
 }
 
+// transport is how this panel asks: what it was handed, or real HTTP.
+//
+// **The seam's own default, named** (docs/polish/COVERAGE.md, lever 36). The
+// choice used to be two lines inside [Panel.Fetch], where every test drives the
+// injected half by construction and the line the deployed process runs -- the
+// one that reaches for [realTransport] -- ran nowhere else. A wrong default
+// here is invisible: a panel that answered `ok: false` forever, or one that
+// asked a mirror. `cmd_transportdefault_test.go` holds both answers.
+func (p *Panel) transport() Transport {
+	if p.Transport != nil {
+		return p.Transport
+	}
+	return realTransport
+}
+
 func realTransport(target string, headers map[string]string) (int, []byte, error) {
 	req, err := http.NewRequest(http.MethodGet, target, nil)
 	if err != nil {
@@ -179,10 +194,7 @@ func (p *Panel) Fetch() wire.OrderedMap {
 		}
 	}
 
-	get := p.Transport
-	if get == nil {
-		get = realTransport
-	}
+	get := p.transport()
 	headers := map[string]string{
 		"Authorization": Authorization(secret),
 		"Accept":        "application/json",
