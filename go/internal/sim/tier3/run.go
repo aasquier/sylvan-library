@@ -946,20 +946,31 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	}
 
 	// [RunOptions.Abort] kills the same way, and the watcher is wound up when
-	// the read loop ends so a finished match leaves no goroutine behind.
+	// the read loop ends so a finished match leaves no goroutine behind — and
+	// "leaves" is held at the return rather than eventually: the defer waits
+	// for the watcher to go, because a closed `done` and a ready `Abort` are
+	// two arms of one select, and a caller who sends an abort the instant a
+	// match returned would otherwise be heard by a watcher that is still
+	// packing up (a stop after the reap is a no-op, so nothing was ever
+	// wrong — but a goroutine that outlives its match is still a goroutine
+	// that outlives its match, and the test that asserts it may not now can).
 	// `abandoned` is kept apart from `expired` because they are different news:
 	// a match that ran out of clock is a result nobody got, and a match nobody
 	// was left to watch is not a failure at all.
 	done := make(chan struct{})
-	defer close(done)
+	var watcher sync.WaitGroup
+	defer func() {
+		close(done)
+		watcher.Wait()
+	}()
 	if opt.Abort != nil {
-		go func() {
+		watcher.Go(func() {
 			select {
 			case <-opt.Abort:
 				ends.stop(&ends.abandoned)
 			case <-done:
 			}
-		}()
+		})
 	}
 
 	var text []string
