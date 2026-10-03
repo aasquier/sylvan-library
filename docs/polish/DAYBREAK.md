@@ -93,7 +93,13 @@ ended on since it was written: *a LIVED mutant in code that reads as covered is
 worth more than the next tenth.* `gremlins` already runs report-only on pull
 requests, and `internal/sim/compile` got its first baseline on 2026-10-02 at
 85%. The next lane's mandate would be "find a LIVED mutant in covered code",
-not "close ten statements". Ledger: White, 2026-10-03.
+not "close ten statements". · **That mandate was then run the same night, and
+it is the evidence for this ruling:** four kernels baselined, fourteen real
+survivors killed by four tests and six proved equivalent in writing, `floats`
+**76.32% → 91.43%** efficacy — including a `Fsum` whose final accumulation
+could be written `hi = x - y` with every frozen sequence still passing, and a
+generic-cost reader that answers *one* for `{9}`. Coverage was already 100% on
+all of it. Ledger: White, 2026-10-03 (both entries).
 
 ## Open — a few clicks in the repository settings
 
