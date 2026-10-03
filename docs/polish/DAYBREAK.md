@@ -134,7 +134,49 @@ brief, with `poll.sh` rewritten first to read its check list from
 files and one rewrite, no dependency and nothing that ships. Ledger:
 Colorless, 2026-10-03.
 
+**Green: who may see which bouts? One answer unblocks both of the Coliseum's
+two missing rooms, and neither can be built without it.** ADR 46 names the
+night shelf as its own PR and deliberately leaves cross-account leaderboards to
+you, pointing at `ledger.Scope` as the one place that would widen. Today the
+scope is the narrow one — a match you were in, plus the house's own — and two
+separate features run straight into it: the **night shelf** (a night is a
+round-robin across accounts, so a shelf is either near-empty for everybody but
+you, or it is the widening the ADR reserved) and **a way back to the deck from
+the record** (the board prints a deck's slug and links nothing, because an
+opponent's deck is 404 by ADR 5 and a link that sometimes dead-ends is worse
+than none). · *Cost of leaving it:* the room keeps a record you cannot click
+and a night you cannot read, and every session that reaches for either
+re-derives this paragraph. Nothing is broken and nothing is urgent — the night
+has not run yet. · **Recommendation:** rule that **a deck appearing on the
+record is openable when it is the house's own or yours, and otherwise is not a
+link at all** — the narrow reading, no new sharing, and enough to make the
+record clickable this week; then rule separately on whether a night shelf shows
+only your own and the house's bouts (same rule, and buildable the moment the
+torches are lit) or the whole night (a sharing decision, and a bigger one). The
+shelf's full shape — the route, the join, the tab, the empty state — is written
+out in the ledger so it is not scoped twice. Ledger: Green, 2026-10-03 (night,
+the Coliseum).
+
 ## Open — a few clicks in the repository settings
+
+**Blue: the Coliseum has never fought a night, because the two switches that
+open it were never set on the instance — and this line spent a month reading
+as if it waited on something else.** `MTGLAB_NIGHT_WINDOW` and
+`MTGLAB_NIGHT_ZONE` are read at boot; unset means no scheduled nights, which is
+what `fly secrets list` has shown since ADR 46 landed (re-read 2026-10-03:
+zero `MTGLAB_NIGHT_*`, in secrets and in `fly.toml`). The earlier wording
+asked for the night shelf first; the shelf is a room to *read* the nights in,
+and nothing stops the nights running without it. · *Cost of leaving it:* the
+arena's record never moves, the Forge worker never wakes, and the Settings
+room's "the torches are not lit yet" stays true for the wrong reason. ·
+**Recommendation:** two minutes in your own session —
+`fly secrets set MTGLAB_NIGHT_WINDOW=01:00-04:00 MTGLAB_NIGHT_ZONE=America/Los_Angeles -a sylvan-library`
+(six bouts of ten games is about fifty minutes at the Forge's measured pace,
+so a three-hour window ends early rather than short; the other three switches
+keep their defaults) — then opt the decks that should fight into the arena
+after dark in the Settings room. After the first night, that Settings line
+becomes the untruth and the follow-up — the room reading the schedule off the
+wire — is real work for the next Blue run. Ledger: Blue, 2026-09-05.
 
 **White: nine Dependabot alerts, all `pip/torch`, all `development`, triaged in
 prose since 09-12 and never dismissed — two minutes in the Security tab.**
@@ -193,10 +235,8 @@ items 1–2; answered as far as possible 2026-09-26.
 > first, and when it refuses (it declines a branch whose merge is not clean),
 > the resolve is a local `git merge origin/main` on the branch, **keep both
 > sides of the two document hunks**, push. Nothing was reflowed; it is a
-> two-minute resolve each. One more thing #534 carries: it opens a second `## Open — a ruling`
-> group a few lines above the existing `## Open — a ruling, and nothing else`.
-> Fold the new item into the existing group as it lands — two groups asking for
-> the same kind of answer is how a reader stops trusting the grouping. **Never
+> two-minute resolve each. (#534's own ruling item was folded into the existing `## Open — a
+> ruling, and nothing else` group on its branch, so no second group lands.) **Never
 > hand-resolve a file under `web_dist/`** — it is generated, and a hand-merged
 > bundle is a file no build can reproduce; if one ever does conflict, take
 > either side, run `npm --prefix web run build`, commit what that writes, and
@@ -345,6 +385,28 @@ cheaper alternative is to drop to the door's own `no-cache`-plus-ETag and pay
 one revalidation per visit. It moves a served route and the committed bundle
 together, so it wants a deploy you are watching. Ledger: Black, 2026-10-03.
 
+**Green: a Forge match now tells you how much longer it has to run, and it is
+waiting for your eye.** The longest wait in the application — ten whole games
+of Commander — showed how far in you were and never how much was left; the
+sentence under the feed spanned a factor of twenty, which is the difference
+between forty seconds and twenty minutes. The stage now says *"6 more games to
+fight — about 5m 6s, at the pace of the ones already fought"*, measured off
+the match's own games (median, never a mean; silent until two have landed,
+because a first game is the slowest of the match). No CSS — the Queen's branch
+holds `index.css` tonight — and no Go, no route, no schema. · *Cost of leaving
+it:* nothing breaks, and every person who sends two decks in goes on guessing
+whether to wait; the branch goes stale against the bundle. · **Where to look:**
+`mtglab-ui` in `.claude/launch.json` (the Go server on 8765 serves the
+committed bundle, auth is off locally), then **the Coliseum** (`/coliseum`) —
+pick two decks, *Send them in*, and read the line under the feed once the
+second game lands. There is no Forge on this Mac, so the cheap version is the
+room's own fixture route: open `/coliseum`, patch `window.fetch` to answer
+`/api/jobs/fixture` with a running job carrying four `partial.rows`, then go to
+`/coliseum?m=fixture` — the recipe is in the ledger entry. Nothing here
+animates on a loop, so there is no cycle time to wait out; the hero video on
+that page is an 11-second loop and is not part of this. · **Recommendation:**
+merge it. Ledger: Green, 2026-10-03 (night, the Coliseum).
+
 ## Open — a migration window
 
 **Black: prompt-cache *writes* are invisible in both usage ledgers, so the
@@ -363,18 +425,6 @@ question of its own. Ledger: Black, 2026-08-24 (the carried list); re-checked
 2026-09-19 and 2026-09-28.
 
 ## Open — deliberately waiting, nothing to do yet
-
-**Blue: the Settings room says "the torches are not lit yet", and the only
-thing keeping that true is that you have not flipped the switch.** The line is
-hand-written into the bundle (`web/src/routes/Settings.tsx`) and true today,
-but the evening you set the five night secrets changes no code and rebuilds
-nothing, so the room would keep telling people the arena is dark while it
-fights. · *Cost of leaving it:* a small untruth on the one page where a person
-decides to enter their decks. · **What would have to be true:** the Coliseum's
-night shelf lands (ADR 46 names it as its own PR) and the settings room reads
-whether a night is scheduled off the wire. · **Recommendation:** unchanged —
-the copy becomes a fact the server owns when the shelf gives it something to
-read. Ledger: Blue, 2026-09-05.
 
 **Black: the cache-read price is one constant for the whole family, and the
 family stopped agreeing — but nothing is mispriced yet.**

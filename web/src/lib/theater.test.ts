@@ -8,6 +8,12 @@
  *   pre-theater worker streaming counts — the skew `worker.run_match`
  *   tolerates on purpose), and as the real payload. All three are "no rows
  *   yet" and none of them may throw.
+ * - **`spell` is a duration in a person's units**, and `whatIsLeft` is the
+ *   only thing on the stage that makes a claim about the future: how much of
+ *   a match is still to come, measured off the games it has already fought.
+ *   Its properties are all about refusing to overpromise — a median rather
+ *   than a mean, the slow half of an even sample, and silence until there are
+ *   two games to measure.
  * - **`shortName` is how a deck is referred to out loud** — the general's
  *   name, which is what fits in a feed row. The cases below are mostly about
  *   when it must *not* shorten: it decides by looking the general up rather
@@ -23,7 +29,9 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ForgeBeat, ForgeGameRow } from './api'
-import { beatLine, legendName, shortName, theaterRows } from './theater'
+import {
+  beatLine, legendName, shortName, spell, theaterRows, whatIsLeft,
+} from './theater'
 
 function row(over: Partial<ForgeGameRow> = {}): ForgeGameRow {
   return {
@@ -31,6 +39,79 @@ function row(over: Partial<ForgeGameRow> = {}): ForgeGameRow {
     timed_out: false, ...over,
   }
 }
+
+describe('spell', () => {
+  // A unit a machine chose, turned into one a person uses — and the only
+  // interesting case is the boundary, because "0m 47s" is a worse sentence
+  // than "47s" and "5m 0s" is a worse one than "5m".
+  it('stays in seconds under a minute and loses an empty remainder', () => {
+    expect(spell(47)).toBe('47s')
+    expect(spell(59.4)).toBe('59s')
+    expect(spell(60)).toBe('1m')
+    expect(spell(300)).toBe('5m')
+    expect(spell(312)).toBe('5m 12s')
+  })
+
+  it('never spells a negative stretch of time', () => {
+    expect(spell(-5)).toBe('0s')
+  })
+})
+
+describe('whatIsLeft', () => {
+  // The headline property: the figure is this match's own pace, so it is the
+  // median of the games already fought multiplied by the games still to come.
+  it('measures the rest of the match off the games already fought', () => {
+    const fought = [row({ game: 1, seconds: 30 }), row({ game: 2, seconds: 30 }),
+      row({ game: 3, seconds: 30 })]
+    expect(whatIsLeft(fought, 10)).toEqual({ games: 7, seconds: 210 })
+  })
+
+  // **The median, never the mean**, which is the house's rule for Forge's
+  // numbers and here is what stops one wide board where a pilot thought for
+  // two minutes from doubling the figure for the quick games around it. The
+  // mean of these five is 54s and would have said 162s.
+  it('is not dragged by one long board', () => {
+    const fought = [row({ seconds: 10 }), row({ seconds: 10 }),
+      row({ seconds: 20 }), row({ seconds: 10 }), row({ seconds: 220 })]
+    // Five fought of eight: three to come at a median of 10s is 30s. The mean
+    // of the same five is 54s and would have promised 162s.
+    expect(whatIsLeft(fought, 8)?.seconds).toBe(30)
+  })
+
+  // On an even sample it takes the upper of the two middles rather than
+  // averaging them: deliberately pessimistic, because a wait that outlives
+  // its own estimate reads as a broken page and one that comes in early
+  // costs nobody anything.
+  it('rounds an even sample the slow way', () => {
+    expect(whatIsLeft([row({ seconds: 10 }), row({ seconds: 40 })], 3))
+      .toEqual({ games: 1, seconds: 40 })
+  })
+
+  // A draw and a clock-out are not wins, but they are minutes somebody sat
+  // through — and the question here is time rather than score.
+  it('counts a draw and a clock-out toward the pace', () => {
+    const fought = [row({ seconds: 100, winner: null, draw: true }),
+      row({ seconds: 100, winner: null, timed_out: true })]
+    expect(whatIsLeft(fought, 4)?.seconds).toBe(200)
+  })
+
+  // Two is the floor and it is a real decision: a first game is the slowest
+  // of the match because the forge lights from cold, so an estimate drawn
+  // from it alone promises a wait about double the truth. Nothing is better
+  // than a figure like that.
+  it('says nothing from a sample of one', () => {
+    expect(whatIsLeft([row({ seconds: 180 })], 10)).toBeNull()
+    expect(whatIsLeft([], 10)).toBeNull()
+  })
+
+  it('says nothing once the last game has landed', () => {
+    const fought = [row({ game: 1 }), row({ game: 2 })]
+    expect(whatIsLeft(fought, 2)).toBeNull()
+    // And nothing on a match that somehow reported more games than it was
+    // asked for, rather than a negative count of bouts to come.
+    expect(whatIsLeft(fought, 1)).toBeNull()
+  })
+})
 
 describe('theaterRows', () => {
   it('reads the rows out of a real partial', () => {
