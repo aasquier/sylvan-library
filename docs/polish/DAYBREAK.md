@@ -134,6 +134,29 @@ brief, with `poll.sh` rewritten first to read its check list from
 files and one rewrite, no dependency and nothing that ships. Ledger:
 Colorless, 2026-10-03.
 
+**Green: who may see which bouts? One answer unblocks both of the Coliseum's
+two missing rooms, and neither can be built without it.** ADR 46 names the
+night shelf as its own PR and deliberately leaves cross-account leaderboards to
+you, pointing at `ledger.Scope` as the one place that would widen. Today the
+scope is the narrow one — a match you were in, plus the house's own — and two
+separate features run straight into it: the **night shelf** (a night is a
+round-robin across accounts, so a shelf is either near-empty for everybody but
+you, or it is the widening the ADR reserved) and **a way back to the deck from
+the record** (the board prints a deck's slug and links nothing, because an
+opponent's deck is 404 by ADR 5 and a link that sometimes dead-ends is worse
+than none). · *Cost of leaving it:* the room keeps a record you cannot click
+and a night you cannot read, and every session that reaches for either
+re-derives this paragraph. Nothing is broken and nothing is urgent — the night
+has not run yet. · **Recommendation:** rule that **a deck appearing on the
+record is openable when it is the house's own or yours, and otherwise is not a
+link at all** — the narrow reading, no new sharing, and enough to make the
+record clickable this week; then rule separately on whether a night shelf shows
+only your own and the house's bouts (same rule, and buildable the moment the
+torches are lit) or the whole night (a sharing decision, and a bigger one). The
+shelf's full shape — the route, the join, the tab, the empty state — is written
+out in the ledger so it is not scoped twice. Ledger: Green, 2026-10-03 (night,
+the Coliseum).
+
 ## Open — a few clicks in the repository settings
 
 **White: nine Dependabot alerts, all `pip/torch`, all `development`, triaged in
@@ -186,18 +209,15 @@ items 1–2; answered as far as possible 2026-09-26.
 > files changed on the branch and changed on `main` since that branch's own
 > merge base were intersected, and for all three the answer is **exactly those
 > two documents and nothing else** — so the disjoint-bundle claim is now
-> measured rather than argued. The live states: **#534 `MERGEABLE`, only
-> behind; #532 and #533 `CONFLICTING`.** That changes the order. Take **#534
-> first** — `gh pr update-branch` is the whole job on it, because nothing it
-> edits overlaps what merged tonight. `update-branch` then **refuses** #532 and
-> #533 (it declines to update a branch whose merge is not clean, which is the
-> one thing the first draft of this note got wrong), so each of those is a
-> local `git merge origin/main` on the branch, **keep both sides of the two
-> document hunks**, push. Nothing was reflowed; it is a two-minute resolve
-> each. One more thing #534 carries: it opens a second `## Open — a ruling`
-> group a few lines above the existing `## Open — a ruling, and nothing else`.
-> Fold the new item into the existing group as it lands — two groups asking for
-> the same kind of answer is how a reader stops trusting the grouping. **Never
+> measured rather than argued. **All three were brought up to `main` at the
+> end of the night and read `MERGEABLE`** — the orchestrator did the two
+> document resolves so the morning would not. Merging any one of them puts the
+> other two behind again, on these same two files: try `gh pr update-branch`
+> first, and when it refuses (it declines a branch whose merge is not clean),
+> the resolve is a local `git merge origin/main` on the branch, **keep both
+> sides of the two document hunks**, push. Nothing was reflowed; it is a
+> two-minute resolve each. (#534's own ruling item was folded into the existing `## Open — a
+> ruling, and nothing else` group on its branch, so no second group lands.) **Never
 > hand-resolve a file under `web_dist/`** — it is generated, and a hand-merged
 > bundle is a file no build can reproduce; if one ever does conflict, take
 > either side, run `npm --prefix web run build`, commit what that writes, and
@@ -335,31 +355,6 @@ room's own fixture route: open `/coliseum`, patch `window.fetch` to answer
 animates on a loop, so there is no cycle time to wait out; the hero video on
 that page is an 11-second loop and is not part of this. · **Recommendation:**
 merge it. Ledger: Green, 2026-10-03 (night, the Coliseum).
-
-## Open — a ruling
-
-**Green: who may see which bouts? One answer unblocks both of the Coliseum's
-two missing rooms, and neither can be built without it.** ADR 46 names the
-night shelf as its own PR and deliberately leaves cross-account leaderboards to
-you, pointing at `ledger.Scope` as the one place that would widen. Today the
-scope is the narrow one — a match you were in, plus the house's own — and two
-separate features run straight into it: the **night shelf** (a night is a
-round-robin across accounts, so a shelf is either near-empty for everybody but
-you, or it is the widening the ADR reserved) and **a way back to the deck from
-the record** (the board prints a deck's slug and links nothing, because an
-opponent's deck is 404 by ADR 5 and a link that sometimes dead-ends is worse
-than none). · *Cost of leaving it:* the room keeps a record you cannot click
-and a night you cannot read, and every session that reaches for either
-re-derives this paragraph. Nothing is broken and nothing is urgent — the night
-has not run yet. · **Recommendation:** rule that **a deck appearing on the
-record is openable when it is the house's own or yours, and otherwise is not a
-link at all** — the narrow reading, no new sharing, and enough to make the
-record clickable this week; then rule separately on whether a night shelf shows
-only your own and the house's bouts (same rule, and buildable the moment the
-torches are lit) or the whole night (a sharing decision, and a bigger one). The
-shelf's full shape — the route, the join, the tab, the empty state — is written
-out in the ledger so it is not scoped twice. Ledger: Green, 2026-10-03 (night,
-the Coliseum).
 
 ## Open — a migration window
 
