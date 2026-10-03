@@ -31,6 +31,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"strings"
 
@@ -212,9 +213,17 @@ type Reading struct {
 // about whether THIS loop calls it — the mutation survives, which was
 // measured rather than guessed. Handing the totals back is the smallest change that lets a test
 // drive the real path instead of a re-implementation of it.
-func weightedSample(rng *mt19937.Random, k int) ([]Card, []float64) {
-	pool := make([]Card, len(FullDeck))
-	copy(pool, FullDeck)
+//
+// **The deck is handed in rather than read off the package.** `Deal` passes
+// `FullDeck` and nothing else ever will, so no reading changes — what a
+// parameter buys is the one branch below that the real deck cannot reach. A
+// pool whose weights are all zero draws against a total of zero, `mark` is
+// zero, and `mark < acc` is never true for any card, so `picked` stays -1 and
+// the fall-through is the answer. That is the same shape as the float hair the
+// branch exists for, reachable on purpose instead of once in 10^14 deals.
+func weightedSample(rng *mt19937.Random, deck []Card, k int) ([]Card, []float64) {
+	pool := make([]Card, len(deck))
+	copy(pool, deck)
 	out := make([]Card, 0, k)
 	totals := make([]float64, 0, k)
 	for range k {
@@ -259,10 +268,10 @@ func weightedSample(rng *mt19937.Random, k int) ([]Card, []float64) {
 func Deal(seed *big.Int) Reading {
 	used := seed
 	if used == nil {
-		used = big.NewInt(mintSeed())
+		used = big.NewInt(mintSeed(cryptorand.Reader))
 	}
 	rng := mt19937.NewFromBig(used)
-	drawn, _ := weightedSample(rng, len(Spread))
+	drawn, _ := weightedSample(rng, FullDeck, len(Spread))
 	cards := make([]Drawn, len(drawn))
 	for i, card := range drawn {
 		// Order matters: the recorded stream rolls every reversal after
@@ -372,9 +381,16 @@ func joinAnd(names []string) string { return strings.Join(names, " and ") }
 // millisecond cannot hand two people the same reading. It cannot fail on any
 // platform this runs on; if it ever did, a fixed seed would silently give
 // every visitor the same spread, so the failure is loud.
-func mintSeed() int64 {
+//
+// **Where the bytes come from is a parameter**, which is the tree's standing
+// move for a source only the composition root should name: `Deal` passes
+// `cryptorand.Reader` and that is the only caller there is, so a dealt reading
+// is unchanged. What it buys is that the loud failure can be heard — a reader
+// that refuses is three lines in a test, where a platform with no entropy is
+// not something anybody can arrange.
+func mintSeed(entropy io.Reader) int64 {
 	var b [8]byte
-	if _, err := cryptorand.Read(b[:]); err != nil {
+	if _, err := io.ReadFull(entropy, b[:]); err != nil {
 		panic(fmt.Sprintf("tarot: no entropy to deal from: %v", err))
 	}
 	// Masked to 31 bits — the minted range has always been [0, 2**31): the

@@ -208,10 +208,7 @@ func TestEveryPostCallResolutionReportsAFailingPool(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mode, err := themeMode(ModeThemeProposal, who)
-			if err != nil {
-				t.Fatal(err)
-			}
+			mode := themeMode(ModeThemeProposal, who)
 			if _, err := readProposal(ctx, broken, plan, who, mode.Name,
 				row.Turn.turn(mode.Name)); err != nil {
 				refused++

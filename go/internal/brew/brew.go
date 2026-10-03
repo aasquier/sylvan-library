@@ -59,6 +59,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"strings"
 
@@ -234,7 +235,7 @@ type Pot struct {
 func Deal(seed *big.Int) Pot {
 	used := seed
 	if used == nil {
-		used = big.NewInt(mintSeed())
+		used = big.NewInt(mintSeed(cryptorand.Reader))
 	}
 	rng := mt19937.NewFromBig(used)
 	chosen := make([]Chosen, len(Order))
@@ -292,9 +293,13 @@ func (p Pot) Describe() string {
 // same millisecond cannot hand two people the same brew. It cannot fail on
 // any platform this runs on; if it ever did, a fixed seed would silently give
 // every visitor the same pot, so the failure is loud.
-func mintSeed() int64 {
+// Where the bytes come from is a parameter, for the reason `tarot.mintSeed`
+// gives at greater length: `Deal` passes `cryptorand.Reader` and is the only
+// caller, so no pot changes, and the loud failure becomes a failure a test can
+// hear rather than one that needs a platform with no entropy left.
+func mintSeed(entropy io.Reader) int64 {
 	var b [8]byte
-	if _, err := cryptorand.Read(b[:]); err != nil {
+	if _, err := io.ReadFull(entropy, b[:]); err != nil {
 		panic(fmt.Sprintf("brew: no entropy to draw from: %v", err))
 	}
 	// Masked to 31 bits, the same range the deck mints in: the seed is

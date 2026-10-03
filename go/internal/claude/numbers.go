@@ -49,16 +49,20 @@ var digitsFile []byte
 // is **wrong for 36 code points**: the mathematical digit blocks from U+1D7CE
 // are four runs of ten butted together with no gap, so walking back off a
 // bold `4` lands in the previous run and reads it as fourteen.
-var digitZeros []rune
+// A var built by a function that takes its bytes, rather than an `init` reading
+// the embed: the refusal below is a damaged build speaking, and until the bytes
+// came from a caller it was a line nothing could enter and nobody could prove
+// still said anything useful. `digitsFile` is the only document ever passed.
+var digitZeros = loadDigitZeros(digitsFile)
 
-func init() {
+func loadDigitZeros(raw []byte) []rune {
 	var payload struct {
 		Zeros []rune `json:"zeros"`
 	}
-	if err := json.Unmarshal(digitsFile, &payload); err != nil {
+	if err := json.Unmarshal(raw, &payload); err != nil {
 		panic(fmt.Sprintf("claude: digits.json will not parse: %v", err))
 	}
-	digitZeros = payload.Zeros
+	return payload.Zeros
 }
 
 // digitValue is the decimal value of one Unicode digit, and whether it is
@@ -194,9 +198,15 @@ func intFromString(s string) (*big.Int, error) {
 			if i == 0 || i == len(runes)-1 {
 				return nil, errNotAnInt
 			}
-			if _, ok := digitValue(runes[i-1]); !ok {
-				return nil, errNotAnInt
-			}
+			// Only the rune AFTER is checked, and the one before is not: it
+			// cannot be anything but a digit by the time this runs. Reaching
+			// rune i at all means every earlier rune passed, so rune i-1 was
+			// either a digit or a separator -- and a separator at i-1 would have
+			// refused here on its own `i+1` check, because rune i is this `_`
+			// rather than a digit. A non-digit that is not a separator never
+			// gets past the `digitValue` refusal below. So the left-hand guard
+			// this used to carry was a second question about an answer already
+			// given, and nothing could enter it.
 			if _, ok := digitValue(runes[i+1]); !ok {
 				return nil, errNotAnInt
 			}
@@ -208,10 +218,11 @@ func intFromString(s string) (*big.Int, error) {
 		}
 		digits.WriteByte(asciiDigits[value])
 	}
-	out, ok := new(big.Int).SetString(digits.String(), 10)
-	if !ok {
-		return nil, errNotAnInt
-	}
+	// The error is dropped on purpose: `digits` holds nothing but the ASCII
+	// digits this loop wrote, and at least one of them, since the first rune of
+	// `body` cannot be a separator. A non-empty run of decimal digits is a
+	// base-10 integer, so there is no second answer here to carry.
+	out, _ := new(big.Int).SetString(digits.String(), 10)
 	if negative {
 		out.Neg(out)
 	}
