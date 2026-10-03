@@ -212,6 +212,81 @@ func TestTheLedgerAndTheQueueAgreeOnWhatIsOpen(t *testing.T) {
 	}
 }
 
+// queueCountRecipe pulls the `grep -cE '<pattern>'` that DAYBREAK.md's own
+// prose tells a reader to count open items with, out of the fenced block it
+// is written in. The pattern is read rather than restated on purpose: a test
+// that repeats the recipe cannot tell you the recipe is wrong, and the recipe
+// is the half that has actually been wrong.
+func queueCountRecipe(t *testing.T, root string) *regexp.Regexp {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(root, "docs", "polish", "DAYBREAK.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		_, rest, ok := strings.Cut(line, "grep -cE '")
+		if !ok {
+			continue
+		}
+		pattern, _, ok := strings.Cut(rest, "'")
+		if !ok || pattern == "" {
+			continue
+		}
+		expr, err := regexp.Compile("(?m)" + pattern)
+		if err != nil {
+			t.Fatalf("DAYBREAK.md's own count recipe does not compile as a Go "+
+				"regexp (%q): %v -- the recipe is what the morning counts with, "+
+				"so a broken one is a broken count", pattern, err)
+		}
+		return expr
+	}
+	t.Fatal("DAYBREAK.md carries no `grep -cE '…'` recipe; without one this " +
+		"guard has nothing to hold the extractor against and would pass on " +
+		"anything")
+	return nil
+}
+
+// TestTheQueuesOwnCountRecipeSeesEveryItem holds the morning's count to the
+// morning's items. The queue is counted by a grep over item headings and
+// acted on through the extractor above, and the two definitions can disagree
+// in both directions: a heading the recipe cannot see is an item missing from
+// every count ever quoted (measured once: a `**White (leg two):` heading and
+// one sibling hid for a week), and a recipe hit inside an item's body is a
+// phantom item the count invents. Nothing held them equal, which is the shape
+// of claim this pass's standing question exists to find -- the convention
+// "every heading starts `**Colour:`" was prose, and prose drifts.
+func TestTheQueuesOwnCountRecipeSeesEveryItem(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	recipe := queueCountRecipe(t, root)
+	body, err := os.ReadFile(filepath.Join(root, "docs", "polish", "DAYBREAK.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counted := len(recipe.FindAllStringIndex(string(body), -1))
+	items := openDaybreakItems(t, root)
+	if len(items) == 0 {
+		t.Fatal("DAYBREAK.md has no open items; see the guard above -- an empty " +
+			"queue reads exactly like a broken extractor")
+	}
+	// Name the offender rather than only the arithmetic: a bare "9 != 10" sends
+	// the next session counting paragraphs by hand.
+	for _, item := range items {
+		head, _, _ := strings.Cut(item, "\n")
+		if !recipe.MatchString(head) {
+			t.Errorf("an open daybreak item's heading is invisible to the file's "+
+				"own count recipe (%s), so every count quoted of this queue is "+
+				"short by one; the heading is: %s", recipe, head)
+		}
+	}
+	if counted != len(items) {
+		t.Errorf("DAYBREAK.md's own recipe counts %d open items and the queue "+
+			"holds %d; a recipe hit outside an item heading is a phantom the "+
+			"morning count invents, and a heading the recipe misses is an item "+
+			"nobody counts", counted, len(items))
+	}
+}
+
 // namesALedgerSection looks for a known section name within a few words of
 // any mention of the ledger, either side, which covers every pointer shape
 // the queue actually writes.
