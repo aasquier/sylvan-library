@@ -54,10 +54,8 @@ import (
 // match) come back as plain errors, printed by the root as
 // `mtglab: <message>` -- the recorded sentence, never a stack.
 func simCommand(cfg config.Config, forge tier3.Settings) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "sim",
-		Short: "The simulator: goldfish runs, the closed form, keep rules, Forge",
-	}
+	cmd := family("sim",
+		"The simulator: goldfish runs, the closed form, keep rules, Forge")
 	cmd.AddCommand(
 		simManaCommand(cfg),
 		simLandsCommand(cfg),

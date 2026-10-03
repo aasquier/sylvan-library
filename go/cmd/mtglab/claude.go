@@ -26,10 +26,7 @@ import (
 // the integration broke or the key simply lapsed (docs/HOSTING.md); and
 // `usage`, what it has all cost.
 func claudeCommand(cfg config.Config, pipe claude.Endpoint) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "claude",
-		Short: "The Claude pipe",
-	}
+	cmd := family("claude", "The Claude pipe")
 	cmd.AddCommand(claudeCheckCommand(pipe), claudeUsageCommand(cfg))
 	return cmd
 }

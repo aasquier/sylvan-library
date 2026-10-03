@@ -54,10 +54,8 @@ var errFailedGate = errors.New("the gate found errors")
 
 // decksCommand is the `mtglab decks` family: the library on disk.
 func decksCommand(cfg config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "decks",
-		Short: "The library: list decks, run the gate, build artifacts, read the history",
-	}
+	cmd := family("decks",
+		"The library: list decks, run the gate, build artifacts, read the history")
 	cmd.AddCommand(decksListCommand(cfg))
 	cmd.AddCommand(decksValidateCommand(cfg))
 	cmd.AddCommand(decksBuildCommand(cfg))
