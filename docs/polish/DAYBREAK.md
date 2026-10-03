@@ -38,6 +38,12 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > Green's 2026-10-02 entry has the read-back, including a pool file that did
 > not hold near 85 MB and what it measured instead. The two walks the 09-29
 > pair owed are in Black under the same date.
+>
+> **2026-10-03, night: Black added two, and one of them is about money.** The
+> Sonnet 5 price rise this project's whole rate table was built around was
+> cancelled, which the table does not know; the other is a year-long
+> `immutable` on an unversioned URL. Both sit in the *watched deploy* group,
+> and the pricing one asks to travel with the cache-write column below it.
 
 **How many are open right now is a question for the file, not for this
 paragraph.** Count them with the colour, never with the bold — and every item
@@ -123,6 +129,46 @@ snapshots create` step ahead of `flyctl deploy` in the deploy job, non-fatal
 on failure, once the deploy token's scope is checked — a workflow change only
 CI can prove, so it lands as its own PR on a morning you can watch the deploy.
 Ledger: Red, the queued list carried in the 2026-09-05 entry, item 6.
+
+**Black: the Sonnet 5 price increase was cancelled, the price table still
+applies it from September 1st, and the "go and check the rates" link on your
+own admin panel answers 404.** The pricing page now says the $2/$10 launch
+pricing *is* the standard price and the scheduled rise to $3/$15 "will not
+occur" — so every recorded conversation dated on or after 2026-09-01 is
+priced 50% high. Tonight's read of the instance is $9.0034; priced flat at
+$2/$10 the same tokens come to about $7.78, which puts roughly 31% of the
+figure inside the window that never happened and makes the panel **over-read
+by about $1.22, some 13.6%**. That is almost exactly the size of the
+cache-write **under**-read queued below, pointing the other way, which is why
+neither ever looked like a wrong number. · *Cost of leaving it:* the one
+dollar figure this project reports about itself is wrong in both directions
+at once, and the pointer to the page that would settle it is dead. · **The
+reason it is not already fixed:** three of the seven cases in
+`prices/testdata/prices.json` exist to pin that boundary, so removing the
+window re-records a frozen golden — not a thing a night run does. ·
+**Recommendation:** yes to all three in one branch — drop Sonnet 5's
+`Until`/`Then` window, re-record those three golden cases deliberately, and
+point `prices.Source` at
+`https://platform.claude.com/docs/en/about-claude/pricing`; land it alongside
+the cache-write column below, since the two corrections cancel and shipping
+one alone moves the headline figure the wrong way. Ledger: Black,
+2026-10-03.
+
+**Black: the card reader's files promise a browser a year of immutability on
+a URL with no version in it, so the next engine upgrade quietly breaks the
+camera for anyone who visited before.** `/api/ocr/*` answers
+`max-age=31536000, immutable`; the version stamp is in the path on the
+volume, not in the URL a browser keys on. The worker and the engine core are
+version-coupled, so a returning visitor who still has one of them cached and
+fetches the other fresh gets a mismatched pair and a reader that fails with
+no error. · *Cost of leaving it:* nothing at all until somebody bumps the
+reading engine — and then it is invisible, because it only affects people who
+used the camera before. · **Recommendation:** put the stamp the shelf already
+computes into the URL (`/api/ocr/<stamp>/<name>`), which makes `immutable`
+honest and costs one route pattern and the three paths in `reader.ts`; the
+cheaper alternative is to drop to the door's own `no-cache`-plus-ETag and pay
+one revalidation per visit. It moves a served route and the committed bundle
+together, so it wants a deploy you are watching. Ledger: Black, 2026-10-03.
 
 ## Open — a migration window
 

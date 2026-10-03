@@ -4408,7 +4408,8 @@ is where the last run is now and the next reader looks there first.
 
 *Claude API spend · static assets · performance*
 
-- **Last run:** 2026-10-02 (the two walks, the owed lines). Previous:
+- **Last run:** 2026-10-03 (night). Previous: 2026-10-02 (the two walks, the
+  owed lines),
   2026-09-29 (the shelf memo, its own watched PR), 2026-09-26 (rainbow),
   2026-09-19 (rainbow),
   2026-09-19 (cleanup), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
@@ -4420,6 +4421,154 @@ is where the last run is now and the next reader looks there first.
   hold and several are why this run went where it went; **no number, path or
   command name in them is a current fact.** This run re-baselines the whole
   facet in Go.
+
+### 2026-10-03 (night) — the register is read out of a running box, and the price rise that never came
+
+A night leg. One fix landed — the half of the cache register this section has
+carried as "rendered nowhere" since 2026-09-19 — and the facet's money half
+produced the sharpest finding it has had: **the Sonnet 5 price increase this
+whole table is built around was cancelled, and nothing in the tree knows.**
+
+- **Fixed this run: the three cache counters are read out of a running
+  instance.** `GET /api/admin/stats/system` grew a `caches` object with three
+  rows, each `{hits, misses}` or `null`: `tier1` from
+  `cache.Store.Counts()`, `shelf` from `library.Memo.Counts()`, `etag` from
+  the door's `staticSite.etagCounts`. The counters have existed since
+  2026-08-13, 2026-09-19 and 2026-09-29 respectively and nothing has ever
+  read one off the live box, which is precisely the half that proves the
+  rule: a counter nobody reads out of a *running* process proves nothing
+  about the process. In-process counters cannot be read by a CLI in a second
+  process, so the route is the only instrument there is.
+  - **The door's is handed in, not reached for, and that is the doctrine
+    rather than a workaround.** `internal/door` imports `internal/api` and
+    never the reverse (`layering_test.go` holds it), *and* the door builds
+    its static site at `door.go:176` before it calls `api.New` at
+    `door.go:211` — so even inside the door there is nothing to point at
+    until the composition root ties the two together. `api.Config.ETagCounts
+    func() (hits, misses int)` is the reader; `door.New` sets it to
+    `site.etagCounts`. Exactly the shape the testing section's first bullet
+    describes: a reader of the process becomes a lookup handed in.
+  - **A row is `null`, never `{0, 0}`, when its source is absent.** Zeros
+    read as "this cache exists and has never once answered", which is a bug
+    worth a night; absence reads as "there is no such cache here", which is
+    an ordinary state — an API built without a door, an instance with no
+    `app.db`. Rendering one as the other would make the register lie in the
+    only direction that matters, so the distinction is what the api-level
+    test pins first.
+  - **Tests, and all three mutations run:** `api/cacheregister_test.go`
+    drives the real admin route twice over one rig — once with two sources
+    genuinely absent, once after a real `cache.Store` miss-then-hit and a
+    handed-in ETag reader — and `door/cacheregister_test.go` serves one asset
+    twice and then reads the `etag` row off the route. Deleting the one line
+    in `door.go` fails `TestTheDoorHandsItsETagRegisterToTheStatsRoute` by
+    name (*"the door never handed its reader down"*); dropping the nil guard
+    fails with *"caches.tier1 is map[hits:0 misses:0] … want null"*; wiring
+    `shelf` to `simCache.Counts` fails with *"caches.shelf.hits is 1 … want
+    0"*. The admin gate needed nothing new:
+    `/api/admin/stats/system` is already in `admin_test.go`'s `adminRoutes`
+    sweep, so a non-admin gets 403 before routing and again at
+    `requireAdmin`.
+  - **Nothing renders it.** `web/src/lib/api.ts`'s `AdminSystem` was left
+    alone — the frontend reads the keys it needs and extra ones are inert —
+    and the Admin panel draws no tile. Three comments that claimed the
+    counts were "rendered nowhere (commandment 10)" were corrected rather
+    than left to mislead the next session: the numbers now surface behind
+    the admin prefix, beside the schema rung and the resident set, and
+    nothing a player can see renders them.
+- **(open) The Sonnet 5 price rise was cancelled, `prices.Table` still
+  applies it, and the re-check link 404s.** The pricing page has moved to
+  `https://platform.claude.com/docs/en/about-claude/pricing`;
+  `prices.Source` still points at `.../docs/en/pricing`, which answers 404
+  (and is rendered on `GET /api/admin/stats/claude` as `source`, so the
+  admin panel's one "go and check" pointer is dead). Read tonight, the page's
+  own footnote on the Sonnet 5 row: the $2/$10 introductory pricing *"is now
+  the standard price. The previously scheduled increase to $3/$15 per million
+  input/output tokens on September 1, 2026 will not occur."* `Table` carries
+  `Until: "2026-08-31", Then: &Rate{3.00, 15.00}`, so **every Sonnet 5 row
+  dated on or after 2026-09-01 is priced 50% high** — which is this package's
+  own stated hazard (its doc comment argues the window shape) firing in the
+  direction nobody modelled: not a rate that moved un-noticed, a rate that
+  *failed to move*.
+  - **The size of it, from tonight's read.** 213 conversations, 332 requests,
+    `claude-sonnet-5` on every row, in 78,590 / out 567,368 / cached
+    9,748,735, rendered **$9.0034** "at the rates in force when it was
+    spent". Priced flat at $2/$10 with the 0.1 cache-read fraction those
+    totals come to **≈$7.7806** (0.15718 + 5.67368 + 1.949747, by hand rather
+    than through `Segments`, so the last digit is an estimate); at $3/$15
+    flat, ≈$11.6709. Solving the recorded figure between them puts **≈31% of
+    the dollar total inside the post-boundary window**, so the panel
+    **over-reads by ≈$1.22, about 13.6%**.
+  - **And that is almost exactly the queued under-read, in the other
+    direction.** The cache-write column item (2026-08-24, still open) put
+    the unrecorded write premium at **$1.22–$1.84 against a recorded
+    $9.0034, 14–20% low**. Two errors of nearly the same size pointing
+    opposite ways, which is why neither was ever visible as a wrong-looking
+    number — and why the write column and this correction want to land
+    together rather than one at a time.
+  - **Not touched tonight, deliberately.** `prices/testdata/prices.json` is a
+    frozen golden and three of its seven cases exist to pin the boundary
+    ("one sonnet before the changeover", "the same sonnet after it", "the
+    boundary day itself"). Removing the window re-records all three. That is
+    a corpus change and the night rule refuses it; queued with the numbers.
+- **Verified, not re-derived: the spend has not moved by a token in a week.**
+  The read above is identical to 2026-09-26's — same conversations, same
+  requests, same cents, `commander-dossier` still the largest row (20
+  conversations, 54 requests, 5,558,181 cached) and
+  `theme-conversation:fortune-teller` the most *used* (84 conversations, 84
+  requests). Seven days, zero spend. The trend point is a flat line, which
+  for a free site with a seated audience of two is the right shape.
+- **Verified: the reading engine's CDN override is total, and the assets are
+  not hotlinks at all.** tesseract.js 7.0.0 has exactly three CDN fallbacks
+  in its source, each an `X || <jsdelivr>`: `workerPath`
+  (`src/worker/browser/defaultOptions.js:11`), `corePath`
+  (`src/worker-script/browser/getCore.js:14`) and `langPath`
+  (`src/worker-script/index.js:130`). `web/src/lib/reader.ts` sets all three.
+  `getCore` takes `corePath` verbatim when it ends in `js` — ours does — so
+  the SIMD-detect branch that would append a filename is never reached, and
+  `langPath: '/api/ocr'` resolves to `/api/ocr/eng.traineddata.gz`. No fourth
+  hole: a grep for `https://` across `tesseract.js/src` finds only those
+  three and doc comments. The string in `web_dist/assets/reader.js` is the
+  dead default, as measured. **Better than that**: the four files are not
+  hotlinked by the browser at all — `reference/data/shelves.json`'s `ocr`
+  shelf fetches them server-side, digest-pinned by sha256 under a 16 MiB cap,
+  and `/api/ocr/{name}` serves them off the volume behind an allowlist. No
+  visitor's IP ever reaches jsdelivr. `cards.scryfall.io` remains the one
+  licence-bound runtime hotlink and stays (White wins that collision).
+- **(open) `/api/ocr/*` promises a year of immutability on a URL that has no
+  version in it.** `shelves.go`'s `ocrAsset` answers
+  `Cache-Control: public, max-age=31536000, immutable`, and its comment says
+  "the cache path carries the pinned versions" — which is true of the
+  *disk* path (`cache_stamp` is `6.1.2-7.0.0-4.0.0_fast`) and false of the
+  URL. The worker and the core are version-coupled by construction: the
+  worker reads its own `package.json`'s `tesseract.js-core` version, so a
+  bump that leaves a returning visitor holding one file from cache and
+  fetching the other fresh is a mismatched pair and a reader that fails
+  silently. Nothing is wrong today, which is exactly why it is queued rather
+  than fixed at 3am: the fix is either the stamp in the URL (making
+  `immutable` honest) or the door's own `no-cache`-plus-ETag, and both move
+  a served route and the bundle's three paths together.
+- **Re-deferred, with the trigger that would make each worth doing.** The
+  2026-09-29 pair is unchanged and the numbers say why. *No single-flight on
+  a stampede*: a parse is 1.6 ms, the misses are bounded by the people at
+  the door, and the deployed shelf's warm floor is 118 ms — a stampede needs
+  concurrent cold visitors, and the instance's audience is two. The trigger
+  is a measured burst of simultaneous first-visits, which the visitor ledger
+  would show before any code did. *The SQL tier is not remembered*: its rows
+  are one query and carry no stamp, so remembering them needs an
+  invalidation signal that does not exist; the trigger is a deck living
+  there that a route reads repeatedly, and today nothing does. Neither is a
+  question for Aaron — they are decisions with no evidence yet, which is a
+  different thing from a decision waiting on a ruling.
+- **Not re-litigated: the mode prompts' drift** (queued 2026-09-26, Aaron's
+  call by standing rule). Its daybreak line is still accurate; nothing about
+  the roster read tonight changes it. Two things the `claude-api` table did
+  add, neither an error: **Opus 5.5** ($4/$20) and **Sonnet 5.5** ($2/$10)
+  are now published and absent from `Table`, which is the designed answer
+  (unpriced and *counted*, never silently zero) since the instance runs
+  Sonnet 5 on every row; and Opus 5.5 prices cache reads at **0.05×** input,
+  making it the **second** model to disagree with `CacheReadFraction = 0.1`
+  after Claude Fable 5.1's 0.025×. That is the already-open deferred item
+  getting more true, not a new one.
 
 ### 2026-10-02 — the two walks, and the fixture that rotted on schedule
 
