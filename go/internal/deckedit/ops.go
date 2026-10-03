@@ -4,8 +4,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/aasquier/sylvan-library/go/internal/yamlemit"
 )
 
 // The operations -- ten in this file since ADR 41 added `DraftRationale`, and
@@ -53,11 +51,7 @@ func ReplaceCard(text, oldName, newName, why string, category *string) (string, 
 	changes["mana_cost"] = drop()
 	changes["scryfall_id"] = drop()
 
-	rebuilt, err := rewriteEntry(lines, e, changes, order)
-	if err != nil {
-		return "", err
-	}
-	updated := joinAround(lines, e.start, e.end, rebuilt)
+	updated := joinAround(lines, e.start, e.end, rewriteEntry(lines, e, changes, order))
 
 	expected := copyDoc(doc)
 	item := cardAt(listOf(expected, listKey), position)
@@ -143,11 +137,10 @@ func AddCard(text, name, category, why string, qty int, listKey string) (string,
 	var shape entry
 	if len(spans) == 0 {
 		// An empty list is written `swap_board: []`, which cannot carry block
-		// items beneath it. Reopen the block before filling it.
-		header, err := blockHeader(lines, listKey)
-		if err != nil {
-			return "", err
-		}
+		// items beneath it. Reopen the block before filling it. The header is
+		// the line above the span `blockSpan` just answered with, rather than a
+		// second search for a block that has already been found.
+		header := start - 1
 		lines = replaceLine(lines, header, listKey+":")
 		position, at = 0, header+1
 		shape = entry{start: at, end: at, dashIndent: 2, keyIndent: 4}
@@ -164,11 +157,8 @@ func AddCard(text, name, category, why string, qty int, listKey string) (string,
 		position, at = anchor+1, shape.start+len(content)
 	}
 
-	rendered, err := cardLines(shape, name, category, strings.TrimSpace(why), qty)
-	if err != nil {
-		return "", err
-	}
-	updated := joinAround(lines, at, at, rendered)
+	updated := joinAround(lines, at, at,
+		cardLines(shape, name, category, strings.TrimSpace(why), qty))
 
 	added := map[string]any{"name": name, "category": category}
 	if qty != 1 {
@@ -204,11 +194,9 @@ func RemoveCard(text, name string) (string, error) {
 	if len(listOf(expected, listKey)) == 0 {
 		// A block key with nothing under it parses to None, not to an empty
 		// list, and `Deck.from_text` would iterate it. Say `[]` explicitly.
-		header, err := blockHeader(lines, listKey)
-		if err != nil {
-			return "", err
-		}
-		lines = replaceLine(lines, header, listKey+": []")
+		// The entry carries its list's header line, so this is not a second
+		// search for the block the lookup has already found.
+		lines = replaceLine(lines, e.header, listKey+": []")
 	}
 
 	updated := strings.Join(append(slices.Clone(lines[:e.start]), lines[cut:]...), "\n")
@@ -249,11 +237,9 @@ func EntombCard(text, name string) (string, error) {
 
 	remaining := append(slices.Clone(lines[:e.start]), lines[cut:]...)
 	if len(listOf(expected, "cards")) == 0 {
-		header, err := blockHeader(remaining, "cards")
-		if err != nil {
-			return "", err
-		}
-		remaining = replaceLine(remaining, header, "cards: []")
+		// The `cards:` line sits above the entry that was just cut, so its
+		// index survives the cut and the entry already carries it.
+		remaining = replaceLine(remaining, e.header, "cards: []")
 	}
 
 	header, err := blockHeader(remaining, Graveyard)
@@ -323,10 +309,7 @@ func ReturnCard(text, name string) (string, error) {
 		// absent is the field's normal state, and six curated decks should not
 		// keep an empty coffin at the bottom of the file.
 		delete(expected, Graveyard)
-		remaining, err = dropBlockHeader(remaining, Graveyard)
-		if err != nil {
-			return "", err
-		}
+		remaining = dropBlockHeaderAt(remaining, e.header)
 	}
 
 	start, stop, err := blockSpan(remaining, "cards")
@@ -341,10 +324,9 @@ func ReturnCard(text, name string) (string, error) {
 
 	var insertAtIndex, at int
 	if len(spans) == 0 {
-		header, err := blockHeader(remaining, "cards")
-		if err != nil {
-			return "", err
-		}
+		// The line above the body `blockSpan` just answered with -- the 99's
+		// own `cards:`, which it has already been found by finding the span.
+		header := start - 1
 		remaining = replaceLine(remaining, header, "cards:")
 		insertAtIndex, at = 0, header+1
 	} else {
@@ -388,10 +370,7 @@ func ExileCard(text, name string) (string, error) {
 	remaining := append(slices.Clone(lines[:e.start]), lines[cut:]...)
 	if len(listOf(expected, Graveyard)) == 0 {
 		delete(expected, Graveyard)
-		remaining, err = dropBlockHeader(remaining, Graveyard)
-		if err != nil {
-			return "", err
-		}
+		remaining = dropBlockHeaderAt(remaining, e.header)
 	}
 	return verified(strings.Join(remaining, "\n"), expected)
 }
@@ -475,11 +454,7 @@ func SetCardField(text, name, field string, value any) (string, error) {
 		changes["why_by"] = drop()
 		order = append(order, "why_by")
 	}
-	rebuilt, err := rewriteEntry(lines, e, changes, order)
-	if err != nil {
-		return "", err
-	}
-	updated := joinAround(lines, e.start, e.end, rebuilt)
+	updated := joinAround(lines, e.start, e.end, rewriteEntry(lines, e, changes, order))
 
 	expected := copyDoc(doc)
 	item := cardAt(listOf(expected, listKey), position)
@@ -542,11 +517,7 @@ func DraftRationale(text, name, why string) (string, error) {
 
 	changes := map[string]change{"why": set(why), "why_by": set(DraftedBy)}
 	order := []string{"why", "why_by"}
-	rebuilt, err := rewriteEntry(lines, e, changes, order)
-	if err != nil {
-		return "", err
-	}
-	updated := joinAround(lines, e.start, e.end, rebuilt)
+	updated := joinAround(lines, e.start, e.end, rewriteEntry(lines, e, changes, order))
 
 	expected := copyDoc(doc)
 	item := cardAt(listOf(expected, listKey), position)
@@ -608,17 +579,10 @@ func SetDeckField(text, field string, value any) (string, error) {
 		// 13. Place it where `Deck.dump` would rather than at the end of the
 		// file.
 		at := placeAfter(lines, field)
-		rendered, err := render(field, written, 0)
-		if err != nil {
-			return "", err
-		}
-		updated = joinAround(lines, at, at, rendered)
+		updated = joinAround(lines, at, at, render(field, written, 0))
 	} else {
 		_, tail := splitTail(lines[start:end], 0)
-		rendered, err := render(field, written, 0)
-		if err != nil {
-			return "", err
-		}
+		rendered := render(field, written, 0)
 		if match := scalarLine.FindStringSubmatch(lines[start]); match != nil &&
 			match[3] != "" && len(rendered) == 1 {
 			rendered = []string{rendered[0] + "  " + match[3]}
@@ -691,10 +655,7 @@ func SetShared(text string, shared bool) (string, error) {
 	}
 
 	expected["shared"] = false
-	rendered, err := render("shared", false, 0)
-	if err != nil {
-		return "", err
-	}
+	rendered := render("shared", false, 0)
 	if !found {
 		// Placed where `Deck.dump` would put it -- after the commander,
 		// before the pilot -- rather than at the end of the file, which is
@@ -758,10 +719,7 @@ func SetNote(text, key, value string) (string, error) {
 		for anchor > 0 && strings.TrimSpace(lines[anchor-1]) == "" {
 			anchor--
 		}
-		body, err := yamlemit.Render(key, value, 2, yamlemit.ProseWidth, true)
-		if err != nil {
-			return "", err
-		}
+		body := renderProse(key, value, 2)
 		updated = joinAround(lines, anchor, anchor, append([]string{"", "notes:"}, body...))
 	} else {
 		indent := 2
@@ -786,10 +744,7 @@ func SetNote(text, key, value string) (string, error) {
 			}
 			break
 		}
-		rendered, err := yamlemit.Render(key, value, indent, yamlemit.ProseWidth, true)
-		if err != nil {
-			return "", err
-		}
+		rendered := renderProse(key, value, indent)
 		if start < 0 {
 			body, _ := splitTail(lines[spanStart:spanEnd], indent)
 			at := spanStart + len(body)
@@ -838,18 +793,19 @@ func entryCut(lines []string, e entry, position, total int, respectBanners bool)
 	return content, cut
 }
 
-// dropBlockHeader removes an emptied block's own line, and the blank line that
-// led to it.
-func dropBlockHeader(lines []string, key string) ([]string, error) {
-	header, err := blockHeader(lines, key)
-	if err != nil {
-		return nil, err
-	}
+// dropBlockHeaderAt removes an emptied block's own line, and the blank line
+// that led to it.
+//
+// Takes the header's index rather than its key, because both callers already
+// have it: the entry they just cut out of the block carries it. Asking for the
+// key meant searching for a block that had, by then, certainly been found --
+// and answering an error that nothing could ever be handed.
+func dropBlockHeaderAt(lines []string, header int) []string {
 	start := header
 	for start > 0 && strings.TrimSpace(lines[start-1]) == "" {
 		start--
 	}
-	return append(slices.Clone(lines[:start]), lines[header+1:]...), nil
+	return append(slices.Clone(lines[:start]), lines[header+1:]...)
 }
 
 // joinAround splices `body` in place of lines[start:end] and joins the result.

@@ -265,10 +265,11 @@ func PlanBulk(text string, wanted []BulkCard) (*BulkPlan, error) {
 
 	named := map[string]bool{}
 	for _, card := range mergeBulk(wanted, plan) {
+		// No blank-name guard here, and that is deliberate: `mergeBulk` keys
+		// its fold on this same `foldName` and drops every name that folds to
+		// nothing, so a nameless line is gone before this loop sees it. A
+		// second guard for it was dead code pretending to be depth.
 		key := foldName(card.Name)
-		if key == "" {
-			continue
-		}
 		if reason, ok := outside[key]; ok {
 			plan.Left = append(plan.Left, BulkLeft{Name: card.Name, Reason: reason})
 			continue

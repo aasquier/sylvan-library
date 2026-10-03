@@ -27,25 +27,20 @@ import (
 func Render(key string, value any, indent int, width int, fold bool) ([]string, error) {
 	// A fold request wraps the string, so the request travels with the value.
 	payload := value
+	prose := ""
 	if fold {
-		text, ok := value.(string)
+		s, ok := value.(string)
 		if !ok {
 			return nil, fmt.Errorf("yamlemit: only a string folds, not %T", value)
 		}
-		payload = folded(text)
+		prose, payload = s, folded(s)
 	}
 	text, err := dump(key, payload, max(20, width-indent))
 	if err != nil {
 		return nil, err
 	}
-	if fold {
-		ok, err := roundTrips(text, key, value)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return Render(key, value, indent, width, false)
-		}
+	if fold && !roundTrips(text, key, prose) {
+		return Render(key, value, indent, width, false)
 	}
 	pad := ""
 	if indent > 0 {
@@ -181,33 +176,35 @@ func scalarOf(value any) (scalar, error) {
 func Folded(s string) any { return folded(s) }
 
 // roundTrips answers whether the folded
-// form still reads back as what was handed in.
-func roundTrips(text, key string, value any) (bool, error) {
+// form still reads back as the prose it was handed.
+//
+// `value` is a string rather than an `any`, and that is the whole of what used
+// to be a second error path here: only a string folds, `Render` has already
+// refused anything else, and a string's own spelling is itself -- so nothing
+// asks `scalarOf` for a spelling it cannot fail to give, and the answer is a
+// plain yes or no.
+func roundTrips(text, key, value string) bool {
 	doc, err := deckyaml.Parse([]byte(text))
 	if err != nil {
 		// Unparseable is the strongest possible "no". A parse failure inside
 		// the round-trip check is answered as "fall back", which is both safe
 		// and what the next attempt will prove or refuse.
-		return false, nil //nolint:nilerr // an unreadable fold is a failed fold
+		return false
 	}
 	if len(doc) != 1 {
-		return false, nil
+		return false
 	}
 	got, ok := doc[key]
 	if !ok {
-		return false, nil
-	}
-	want, err := scalarOf(value)
-	if err != nil {
-		return false, err
+		return false
 	}
 	// Every folded value is a string; the parse gives one back or the fold
 	// changed the type, which is a failed fold either way.
-	text, isString := got.(string)
+	read, isString := got.(string)
 	if !isString {
-		return false, nil
+		return false
 	}
-	return text == want.text, nil
+	return read == value
 }
 
 func spaces(n int) string {

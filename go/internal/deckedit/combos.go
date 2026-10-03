@@ -219,16 +219,14 @@ func carryMarks(doc map[string]any, combos []deck.Combo) {
 // somebody pressing Save are the same bytes rather than the same block wrapped
 // two ways.
 func comboBlock(combos []deck.Combo) []string {
+	// Unreachable through `comboValue`, which admits only strings and refuses
+	// the empty list -- so the refusal comes back as a line the verification
+	// will refuse rather than as an error or a panic, because this package's
+	// promise is that a failed edit changes nothing. `emitted` in edit.go is
+	// the same answer to the same question, and gives the whole argument.
 	text, err := yamlemit.Dump(
 		yamlemit.Map{{Key: combosKey, Value: deck.ComboList(combos)}}, deck.DumpWidth)
-	if err != nil {
-		// Unreachable through `comboValue`, which admits only strings and
-		// refuses the empty list. Returned as a line the verification will
-		// refuse rather than as a panic, because this package's promise is that
-		// a failed edit changes nothing.
-		return []string{combosKey + ": !"}
-	}
-	return strings.Split(strings.TrimRight(text, "\n"), "\n")
+	return emitted(strings.Split(strings.TrimRight(text, "\n"), "\n"), err, combosKey, 0)
 }
 
 // comboDocument is one entry as `deckyaml.Parse` will hand it back, which is
