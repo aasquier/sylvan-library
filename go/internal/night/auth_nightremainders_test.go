@@ -44,10 +44,7 @@ func poisonableNight(t *testing.T) (*night.Store, *ticking, func(string)) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	clock := &ticking{at: time.Date(2026, 9, 6, 22, 0, 0, 0, time.UTC)}
 	poison := func(statement string) {

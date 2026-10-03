@@ -141,14 +141,8 @@ func newAccountRig(t *testing.T, requireAuth bool) *accountRig {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reader, err := auth.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
+	reader := auth.Open(path)
 	sender := &recordedSender{}
 	a := New(Config{DecksDir: t.TempDir(), AppDB: reader, AppWriteDB: db,
 		AppDBPath: path, RequireAuth: requireAuth, EmailSender: sender})

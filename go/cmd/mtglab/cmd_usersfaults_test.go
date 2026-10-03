@@ -76,10 +76,7 @@ func columnRemoved(t *testing.T, d deployment) {
 // sessions have something to end and a number to report.
 func signedIn(t *testing.T, d deployment, username string, sessions int) {
 	t.Helper()
-	db, err := auth.OpenReadWrite(d.AppDBPath())
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(d.AppDBPath())
 	defer func() { _ = db.Close() }()
 	ctx := context.Background()
 	user, err := auth.Get(ctx, db, username)

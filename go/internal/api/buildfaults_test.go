@@ -36,10 +36,7 @@ func TestABuildThatCannotWriteItsArtifactsSaysSoRatherThanListingThem(t *testing
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o750) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: db})
@@ -80,10 +77,7 @@ func TestAnUnreadableArtifactsDirectoryIsAFaultRatherThanAnUnbuiltDeck(t *testin
 	}
 	t.Cleanup(func() { _ = os.Chmod(arts, 0o750) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: db})
@@ -146,10 +140,7 @@ cards:
     category: ramp
     why: Two mana on turn one.
 `)
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db})

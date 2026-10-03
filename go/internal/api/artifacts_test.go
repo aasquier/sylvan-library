@@ -572,10 +572,7 @@ func TestWithNoPoolTheBuildAndTheGateAgree(t *testing.T) {
 	decks := decksDir(t)
 	// An app.db, because the owner segment is resolved through it -- but no
 	// Pool, which is the state a fresh instance is in before `data refresh`.
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer db.Close()
 	a := New(Config{DecksDir: decks, AdminEmail: "alice@example.com", AppDB: db})
 	scope := alice

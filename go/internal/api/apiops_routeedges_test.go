@@ -54,10 +54,7 @@ func TestASuggestionAgainstADeckNobodyHoldsIsPlainRatherThanRefused(t *testing.T
 	// A real `app.db`, so the library assembles and alice's own shelf resolves:
 	// the only thing that must fail is the deck lookup itself, which is the arm
 	// this is about.
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = db.Close() })
 	a := New(Config{Logger: quietLogger(), Pool: pooltest.Open(t),
 		DecksDir: decksDir(t), AdminEmail: "alice@example.com", AppDB: db})

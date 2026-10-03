@@ -101,14 +101,15 @@ func (a *API) accountsDB() (*sql.DB, bool) {
 	// which is exactly where `auth.PingWritable`'s own comment says a failure
 	// must not be discovered. One statement, once, on the lazy path only: the
 	// handle the door opened at start has already been pinged at boot.
-	db, err := auth.OpenReadWrite(a.dbPath)
-	if err == nil {
-		err = auth.PingWritable(context.Background(), db)
-	}
-	if err != nil {
-		if db != nil {
-			_ = db.Close()
-		}
+	//
+	// The ping is now the *only* thing asked, because the open no longer
+	// offers a failure to fold in beside it: an `if err == nil` over an error
+	// that is always nil, and an `if db != nil` over a handle that is never
+	// nil, read as two guards and were two statements that could not do
+	// anything. `auth.Open`'s own comment carries the argument.
+	db := auth.OpenReadWrite(a.dbPath)
+	if err := auth.PingWritable(context.Background(), db); err != nil {
+		_ = db.Close()
 		a.log.Warn("app.db exists but does not answer as an accounts database",
 			"error", err)
 		return nil, false

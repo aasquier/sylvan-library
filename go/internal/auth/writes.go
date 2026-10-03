@@ -44,9 +44,10 @@ import (
 // `auth_tokens` declare ON DELETE CASCADE, and with the pragma off those
 // clauses are a comment and a deleted account leaves its sessions live.
 // Like [Open], it cannot fail -- [sql.Open] records a DSN and names a driver
-// -- and the error it offers is not asked for; the argument is written out at
-// [Open].
-func OpenReadWrite(path string) (*sql.DB, error) {
+// -- so like [Open] it is one value, and the argument for dropping the error
+// is written out there. [PingWritable] is how a caller asks whether the file
+// is really there.
+func OpenReadWrite(path string) *sql.DB {
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
 	db, _ := sql.Open("sqlite", dsn)
@@ -54,7 +55,7 @@ func OpenReadWrite(path string) (*sql.DB, error) {
 	// convert waiting-in-Go into waiting-on-the-file lock. It also makes
 	// `exclusive` cheap: the connection it pins is the only one there is.
 	db.SetMaxOpenConns(1)
-	return db, nil
+	return db
 }
 
 // PingWritable proves the file opens and `users` is there. `sql.Open` only

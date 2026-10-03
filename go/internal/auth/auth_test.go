@@ -86,10 +86,7 @@ func fixtureDB(t *testing.T) (*sql.DB, *sql.DB) {
 			t.Fatal(err)
 		}
 	}
-	reader, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reader := Open(path)
 	t.Cleanup(func() { reader.Close() })
 	return writer, reader
 }
@@ -220,10 +217,7 @@ func TestTheReaderCannotWrite(t *testing.T) {
 func TestOpenDoesNotCreateAMissingFile(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "absent.db")
-	db, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := Open(path)
 	defer db.Close()
 	if err := Ping(context.Background(), db); err == nil {
 		t.Fatal("Ping succeeded against a file that does not exist")

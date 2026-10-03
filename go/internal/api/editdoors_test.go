@@ -62,10 +62,7 @@ cards:
     why: Two mana on turn one.
 `)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -276,10 +273,7 @@ func TestTheComboListStillWritesWhenThereIsNoPoolToCanonicaliseAgainst(t *testin
 	t.Parallel()
 	decks := decksDir(t)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)

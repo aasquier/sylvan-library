@@ -36,10 +36,7 @@ func writeDeck(t *testing.T, decks, slug, body string) {
 // sentence has to send somebody to the refresh rather than to their deck.
 func noPoolWriteRig(t *testing.T) *API {
 	t.Helper()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = db.Close() })
 	return New(Config{DecksDir: decksDir(t), AdminEmail: "alice@example.com", AppDB: db})
 }
@@ -283,10 +280,7 @@ func TestABuildTreatsAnUnparseableSnapshotAsNoneAndAnUnreadableOneAsAFault(t *te
 // would tell somebody their library was gone.
 func TestTheShelfRefusesRatherThanEmptyingWhenTheAccountsHaveGone(t *testing.T) {
 	t.Parallel()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	// No AdminEmail: the maintainer lookup is skipped entirely, so the failure
 	// lands one layer in rather than on the resolve.
 	a := New(Config{DecksDir: decksDir(t), Pool: pooltest.Open(t), AppDB: db})
@@ -314,10 +308,7 @@ func TestTheShelfRefusesRatherThanEmptyingWhenTheAccountsHaveGone(t *testing.T) 
 // could resolve is not.
 func TestASimulationRefusesWhenTheLibraryCannotBeResolved(t *testing.T) {
 	t.Parallel()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	a := New(Config{DecksDir: decksDir(t), Pool: pooltest.Open(t),
 		AdminEmail: "alice@example.com", AppDB: db})
 	if err := db.Close(); err != nil {
@@ -414,10 +405,7 @@ func TestATokenSheetRefusesWhenThePrintingsHaveGone(t *testing.T) {
 	p := pool.New(path, nil)
 	t.Cleanup(p.Close)
 
-	appdb, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	appdb := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = appdb.Close() })
 	decks := decksDir(t)
 	// Terastodon is the fixture card that makes a token, so this is the deck
