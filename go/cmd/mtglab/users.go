@@ -44,10 +44,12 @@ func connectUsers(ctx context.Context, cfg config.Config) (*sql.DB, error) {
 	if err := auth.Migrate(path); err != nil {
 		return nil, err
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		return nil, err
-	}
+	// No error asked for: `OpenReadWrite` is `sql.Open`, which for a
+	// registered driver records a DSN and returns. The argument is made in
+	// full at [openAppDB]; the file's real state is discovered by
+	// `EnsureMaintainer` on the next line, which is where an unreadable
+	// `app.db` already refuses.
+	db, _ := auth.OpenReadWrite(path)
 	if err := auth.EnsureMaintainer(ctx, db, cfg); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -78,12 +80,45 @@ type prompt struct {
 	in    io.Reader
 	err   io.Writer
 	lines *bufio.Reader
+	// tty is the terminal this prompt hides a password at. The zero value is
+	// no terminal at all, which reads in the clear and says so; [newPrompt]
+	// hands over the process's own.
+	tty terminal
+}
+
+// terminal is the pair of calls that make a typed password invisible: the test
+// for a terminal, and the hidden read itself.
+//
+// **A value, and the second time of asking.** This branch was once closed by
+// argument: a real pty needs platform-specific test code nobody had argued
+// for, and a seam was rejected because *its own default* would still call
+// [term.ReadPassword], moving the unreachable lines rather than removing them.
+// What reopened it is that the default turns out to be drivable.
+// [term.ReadPassword] handed a descriptor that is not a terminal asks the
+// kernel for its termios and is refused -- nothing read, nothing echoed, no
+// pty, no clock -- so the real pair can be held to the promise this branch
+// exists to keep: a hidden read never quietly degrades into an echoed one.
+// Both halves run in `cmd_usersecret_test.go`, which carries the dates.
+type terminal struct {
+	// is answers whether this descriptor is a terminal; a nil `is` is a
+	// process with none, so the zero value falls to the clear-text read.
+	is func(fd int) bool
+	// read takes one line from that terminal without echoing it.
+	read func(fd int) ([]byte, error)
+}
+
+// realTerminal is the process's own terminal, and the only pair production
+// uses. Named rather than inlined so a test can drive the line the deployed
+// binary runs (docs/polish/COVERAGE.md, lever 36).
+func realTerminal() terminal {
+	return terminal{is: term.IsTerminal, read: term.ReadPassword}
 }
 
 // newPrompt reads from this command's input and prompts on its error stream.
 func newPrompt(cmd *cobra.Command) *prompt {
 	in := cmd.InOrStdin()
-	return &prompt{in: in, err: cmd.ErrOrStderr(), lines: bufio.NewReader(in)}
+	return &prompt{in: in, err: cmd.ErrOrStderr(), lines: bufio.NewReader(in),
+		tty: realTerminal()}
 }
 
 func (p *prompt) line() (string, error) {
@@ -102,8 +137,8 @@ func (p *prompt) secret(text string) (string, error) {
 	fmt.Fprint(p.err, text)
 	// Only a real file can be a terminal; a pipe or a buffer never is, which
 	// is the test's shape and the shape a script piping a password has.
-	if f, ok := p.in.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
-		raw, err := term.ReadPassword(int(f.Fd()))
+	if f, ok := p.in.(*os.File); ok && p.tty.is != nil && p.tty.is(int(f.Fd())) {
+		raw, err := p.tty.read(int(f.Fd()))
 		fmt.Fprintln(p.err)
 		if err != nil {
 			return "", err

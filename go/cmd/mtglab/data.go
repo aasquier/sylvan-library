@@ -74,7 +74,23 @@ func dataBackupCommand(cfg config.Config) *cobra.Command {
 // The line only appears when there is something to wait for, so an ordinary
 // refresh on a quiet instance looks exactly as it always has.
 func openTheWriter(ctx context.Context, out io.Writer, path string) (*sql.DB, error) {
-	return pool.OpenWriterWaiting(ctx, path, pool.WriterWait, func() { sayWaiting(out) })
+	return pool.OpenWriterWaiting(ctx, path, pool.WriterWait, waitingOn(out))
+}
+
+// waitingOn is that notice as a value: the callback both `refresh` and
+// `snapshot` hand over, built in one place rather than written as a closure at
+// each of them.
+//
+// **Named because a closure at the call site is a line nothing can run.** It
+// fires only while another process is holding the pool's lease, which is a
+// second process and a copied file away from any test -- so two identical
+// one-line closures sat uncovered in two commands, each the only place this
+// sentence could go wrong. The pool's own tests prove the watcher is *called*
+// when the file is locked (`internal/pool`'s `writerlock_test.go`, with a
+// holder in a child process); what was never checked is what it then says, and
+// that is this function.
+func waitingOn(out io.Writer) func() {
+	return func() { sayWaiting(out) }
 }
 
 // sayWaiting is that line, in one place, because `refresh` now reaches it
@@ -145,7 +161,7 @@ func dataRefreshCommand(cfg config.Config, index string) *cobra.Command {
 				OracleOnly:  oracleOnly,
 				IndexURL:    index,
 			}, pool.RefreshWatcher{
-				Waiting: func() { sayWaiting(out) },
+				Waiting: waitingOn(out),
 				Gathering: func(kind string) {
 					fmt.Fprintf(out, "downloading %s ...\n", bulkLabel(kind))
 				},
