@@ -1,6 +1,6 @@
 # storyteller assets -- provenance
 
-The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the delivered file. And the exception is the séance room's (`assets/seance/PROVENANCE.md`, its last section): these files were authored on Aaron's own machine and not fetched through the animist gate, so the record is hand-written and says so. The accounting sweep (`go/cmd/mtglab/mediaprovenance_test.go`) reads this file by stem.
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the delivered file. And the exception is the séance room's (`web/src/assets/seance/PROVENANCE.md`, its last section): these files were authored on Aaron's own machine and not fetched through the animist gate, so the record is hand-written and says so. The accounting sweep (`go/cmd/mtglab/mediaprovenance_test.go`) reads this file by stem.
 
 <!-- authored: no recipe, no gate. -->
 ## storyteller-camp-loop.webm / .mp4 / storyteller-camp-still.webp / storyteller-camp-tone.m4a
@@ -15,5 +15,5 @@ The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transfor
   - Made seamless the séance way: the last 12 frames cross-dissolved into the first 12 (`blend=all_expr='A*(1-N/12)+B*(N/12)'`), leaving 281 frames (11.71 s).
   - Encoded twice from a lossless intermediate: VP9 `-crf 36 -b:v 0` (1.28 MB) and H.264 `-crf 27 -preset slow -profile:v high` (1.33 MB), both `yuv420p`, the mp4 with `+faststart`. Video only. Three times the séance clip's weight for half again its length -- snow, stars, sparks and an aurora are all noise to an encoder -- and accepted as the cost of the room; revisit the CRF if the bundle budget ever minds.
   - `storyteller-camp-still.webp` is frame 150 at quality 80 -- the reduced-motion floor and the ambience-off picture.
-  - `storyteller-camp-tone.m4a` is the clip's whole track, looped in numpy: the last 0.5 s equal-power cross-faded into the first 0.5 s; 14.57 s, AAC 96 kb/s. Measured RMS -37.0 dBFS, peak -1.6 dBFS -- the peak is a crackle. Plays only behind the table-sound switch (`components/roomtone.tsx`).
+  - `storyteller-camp-tone.m4a` is the clip's whole track, looped in numpy: the last 0.5 s equal-power cross-faded into the first 0.5 s; 14.57 s, AAC 96 kb/s. Measured RMS -37.0 dBFS, peak -1.6 dBFS -- the peak is a crackle. Plays only behind the table-sound switch (`web/src/components/roomtone.tsx`).
 - **Measured** (ITU-R 601 luma of the delivered frames): mean 40.8, drifting from 42.6 to 39.3 over the clip as the aurora moves. Just under the house's dark cluster (mean 48-64); the firelight carries the frame.

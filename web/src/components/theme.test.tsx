@@ -522,3 +522,64 @@ describe('who a fun fact is credited to', () => {
     expect(screen.queryByText(/colour reference data/)).toBeNull()
   })
 })
+
+describe('the aside', () => {
+  it('is folded until asked for, with the count on the fold and the action outside it',
+     async () => {
+    renderRoom()
+    const fold = await screen.findByRole('button', { name: /What it has picked up/ })
+    // Commandment 20: it changes what is in front of you, so it says which
+    // state it is in. Closed by default (the footage walk's ruling).
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+    expect(fold.textContent).toContain('0 of 3')
+    expect(screen.queryByLabelText(/Budget for the deck/)).toBeNull()
+    // The room's own action is never behind the fold.
+    expect(screen.getByRole('button', { name: 'Suggest my colours' })).toBeTruthy()
+    fireEvent.click(fold)
+    expect(fold.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByLabelText(/Budget for the deck/)).toBeTruthy()
+    expect(screen.getByText(/Nothing yet/)).toBeTruthy()
+    fireEvent.click(fold)
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByLabelText(/Budget for the deck/)).toBeNull()
+  })
+})
+
+describe('a room that is footage', () => {
+  it('wears the fireside and keeps to the foot of the window', async () => {
+    render(<ThemeInterview onPick={() => {}} onLeave={() => {}} persona="barkeep" />)
+    const box = await screen.findByLabelText('Your answer')
+    // The costume's own classes, not the plain room's inline paint.
+    expect(box.className).toContain('fireside-pen')
+    expect(box.getAttribute('style')).toBeNull()
+    expect(document.querySelector('.persona-room.is-footage')).not.toBeNull()
+    expect(document.querySelector('.persona-room.is-footage .room-floor')).not.toBeNull()
+    expect(document.querySelector('.fireside-card')).not.toBeNull()
+  })
+})
+
+describe('a footage room’s controls', () => {
+  it('go to the corner they are given, and the top row goes with them', async () => {
+    const host = document.createElement('span')
+    document.body.appendChild(host)
+    try {
+      render(<ThemeInterview onPick={() => {}} onLeave={() => {}}
+                             persona="barkeep" controlsHost={host} />)
+      await screen.findByLabelText('Your answer')
+      // The way out is in the host, not in the room.
+      const leave = screen.getByRole('button', { name: '← Pick colours myself' })
+      expect(host.contains(leave)).toBe(true)
+      // And the row that used to hold it is not rendered at all.
+      expect(document.querySelector('.persona-room > .flex.flex-wrap')).toBeNull()
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('stay in the room when nobody offers a corner', async () => {
+    render(<ThemeInterview onPick={() => {}} onLeave={() => {}} persona="barkeep" />)
+    await screen.findByLabelText('Your answer')
+    const leave = screen.getByRole('button', { name: '← Pick colours myself' })
+    expect(document.querySelector('.persona-room')!.contains(leave)).toBe(true)
+  })
+})

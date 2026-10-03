@@ -1,9 +1,15 @@
 /**
  * Card-table sounds, synthesised.
  *
- * Web Audio, not audio files: the repo ships no recordings, pays no licence
+ * Web Audio, not audio files: the table ships no recordings, pays no licence
  * questions and adds nothing to the bundle — a riffle is a run of short
  * bursts of band-passed noise, which is very nearly what a riffle *is*.
+ *
+ * **One exception, and it is argued rather than slipped in.** A room that is footage ships the sound its render came with
+ * (`components/roomtone.tsx` plays the bed; `clip()` below plays a reaction's
+ * own second of it). Those are Aaron's own output, like the picture, so the
+ * licence question is the one the picture already answered; what they cost is
+ * bytes, and each is a few seconds of AAC rather than a track.
  *
  * Two rules, both structural:
  *
@@ -259,6 +265,28 @@ export function wheelTurn(degrees: number, durMs: number): void {
  * scheduled from a timer finds a context already running — and answers with
  * two soft taps so the switch is heard flipping.
  */
+/**
+ * One recorded sound, once — a reaction's own audio in a room that is
+ * footage (`components/cauldron.tsx`). Gated like everything here: nothing
+ * plays, and nothing is fetched, unless the switch is on. Plain `Audio`
+ * rather than the synth graph, because a decoded file has nothing to shape;
+ * the browser's own autoplay rule applies, and a refusal is silence rather
+ * than an error anybody sees.
+ */
+export function clip(url: string, volume = 1): void {
+  if (!soundOn()) return
+  if (typeof Audio === 'undefined') return
+  const a = new Audio(url)
+  a.volume = volume
+  let p: Promise<void> | undefined
+  try {
+    p = a.play() as Promise<void> | undefined
+  } catch {
+    return
+  }
+  if (p && typeof p.catch === 'function') p.catch(() => undefined)
+}
+
 export function wake(): void {
   play((c) => {
     const t = c.currentTime

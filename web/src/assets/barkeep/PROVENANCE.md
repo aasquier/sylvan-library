@@ -1,6 +1,6 @@
 # barkeep assets -- provenance
 
-The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the delivered file. And the exception is the séance room's (`assets/seance/PROVENANCE.md`, its last section): these files were authored on Aaron's own machine and not fetched through the animist gate, so the record is hand-written and says so. The accounting sweep (`go/cmd/mtglab/mediaprovenance_test.go`) reads this file by stem.
+The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transformation applied is written down, so the derivation is reproducible from the delivered file. And the exception is the séance room's (`web/src/assets/seance/PROVENANCE.md`, its last section): these files were authored on Aaron's own machine and not fetched through the animist gate, so the record is hand-written and says so. The accounting sweep (`go/cmd/mtglab/mediaprovenance_test.go`) reads this file by stem.
 
 <!-- authored: no recipe, no gate. -->
 ## barkeep-room-loop.webm / .mp4 / barkeep-room-still.webp / barkeep-room-tone.m4a
@@ -15,5 +15,5 @@ The rule here is the tarot deck's (`assets/tarot/PROVENANCE.md`): every transfor
   - Made seamless the séance way: the last 12 frames cross-dissolved into the first 12 (`blend=all_expr='A*(1-N/12)+B*(N/12)'`), leaving the 349 frames (14.54 s) that survive.
   - Encoded twice from a lossless intermediate: VP9 `-crf 36 -b:v 0` (403 KB) and H.264 `-crf 27 -preset slow -profile:v high` (584 KB), both `yuv420p`, the mp4 with `+faststart`. Video only.
   - `barkeep-room-still.webp` is frame 100 at quality 80 -- the reduced-motion floor and the ambience-off picture.
-  - `barkeep-room-tone.m4a` is the clip's whole track, looped in numpy: the last 0.5 s equal-power cross-faded into the first 0.5 s, so the seam is silent about itself; 14.57 s, AAC 96 kb/s. Measured RMS -38.5 dBFS, peak -14.2 dBFS -- a quiet bed, which is what it is for. Plays only behind the table-sound switch (`components/roomtone.tsx`).
+  - `barkeep-room-tone.m4a` is the clip's whole track, looped in numpy: the last 0.5 s equal-power cross-faded into the first 0.5 s, so the seam is silent about itself; 14.57 s, AAC 96 kb/s. Measured RMS -38.5 dBFS, peak -14.2 dBFS -- a quiet bed, which is what it is for. Plays only behind the table-sound switch (`web/src/components/roomtone.tsx`).
 - **Measured** (ITU-R 601 luma of the delivered frames): mean 25.8, steady to within 0.4 across the clip. Under the house's dark cluster (mean 48-64), and accepted on Aaron's eye: it is a tavern at the quiet hour lit by candles, and the words in the room sit on their own surfaces.

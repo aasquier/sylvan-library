@@ -23,9 +23,33 @@ describe('the room’s costume', () => {
   })
 
   it('leaves every undressed room in the plain chrome', () => {
-    for (const key of ['therapist', 'scientist', 'chef',
-                       'storyteller', 'barkeep']) {
+    for (const key of ['therapist', 'scientist', 'chef']) {
       expect(costumeFor(key)).toBe(PLAIN)
+    }
+  })
+
+  it('dresses the two firelit footage rooms in one material, each in its own words', () => {
+    const bar = costumeFor('barkeep')
+    const fire = costumeFor('storyteller')
+    for (const room of [bar, fire]) {
+      expect(room).not.toBe(PLAIN)
+      // The fireside (`index.css`): the same glass, rule, serif and lit line
+      // for both, because the hearth and the campfire are the same light and
+      // `--room-accent` is what tells them apart.
+      expect(room.scroll).toBe('fireside-card')
+      expect(room.question).toBe('fireside-question')
+      expect(room.bubble).toBe('fireside-said')
+      expect(room.note).toBe('fireside-note')
+      expect(room.quill).toBe('fireside-pen')
+      // Neither writes: the wet-ink reveal stays the fortune-teller's.
+      expect(room.ink).toBe(false)
+    }
+    // The words are each room's own, never shared.
+    for (const field of ['placeholder', 'thinking', 'emptyReply', 'reading',
+                         'ready', 'readyAction'] as const) {
+      expect(bar[field]).not.toBe(fire[field])
+      expect(bar[field]).not.toBe('')
+      expect(fire[field]).not.toBe('')
     }
   })
 

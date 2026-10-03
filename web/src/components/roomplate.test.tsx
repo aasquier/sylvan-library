@@ -37,6 +37,13 @@ describe('RoomPlate', () => {
     expect(plate.querySelector('audio')?.getAttribute('src')).toBe(FOOTAGE.tone)
   })
 
+  it('asks the forest to step out while it is open, and lets it back in after', () => {
+    const { unmount } = render(<RoomPlate footage={FOOTAGE} />)
+    expect(document.body.classList.contains('in-footage-room')).toBe(true)
+    unmount()
+    expect(document.body.classList.contains('in-footage-room')).toBe(false)
+  })
+
   it('is the still when ambience is off: a room removed is a void', () => {
     localStorage.setItem('mtglab-ambience', '0')
     render(<RoomPlate footage={FOOTAGE} />)

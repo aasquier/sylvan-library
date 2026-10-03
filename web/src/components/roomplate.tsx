@@ -18,14 +18,19 @@
  * `art` mode, so reduced motion and the ambience switch both fall back to the
  * still: a room removed is a conversation held in a void, and the still is
  * the picture the room always was.
+ *
+ * **The site's own weather steps out while the room is open** —
+ * `lib/forestfloor.ts` says why, and the hut does the same.
  */
 
 import { createPortal } from 'react-dom'
+import { useForestStepsOut } from '../lib/forestfloor'
 import type { RoomFootage } from '../lib/roomfootage'
 import { RoomTone } from './roomtone'
 import { VideoBackdrop } from './videofx'
 
 export function RoomPlate({ footage }: { footage: RoomFootage }) {
+  useForestStepsOut()
   if (typeof document === 'undefined') return null
   return createPortal(
     <div className="room-plate" aria-hidden="true">

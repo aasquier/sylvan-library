@@ -593,14 +593,21 @@ describe('the theme conversation', () => {
     // invisible: somebody should be able to see the interview being held to
     // what they actually said.
     await enterTheme()
+    // The ledger lives behind the aside's fold now (the footage walk's
+    // ruling), so a person opens it; what they then read is unchanged.
+    fireEvent.click(screen.getByRole('button', { name: /What it has picked up/ }))
     expect(screen.getByText(/because you said “Dune, easily”/)).toBeTruthy()
   })
 
   it('reports readings that matched nothing they said', async () => {
     await enterTheme()
-    // Twice: printed in the sidebar, and said in the live region — the same
-    // sentence from one place, so the count somebody hears is the count they
-    // can then go and read.
+    // Said in the live region whether or not the fold is open...
+    expect(screen.getAllByText(/1 reading did not match anything you said/i))
+      .toHaveLength(1)
+    // ...and printed in the aside once it is: the same sentence from one
+    // place, so the count somebody hears is the count they can then go and
+    // read.
+    fireEvent.click(screen.getByRole('button', { name: /What it has picked up/ }))
     expect(screen.getAllByText(/1 reading did not match anything you said/i))
       .toHaveLength(2)
   })
