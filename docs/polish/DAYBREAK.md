@@ -136,17 +136,20 @@ Colorless, 2026-10-03.
 
 ## Open — a few clicks in the repository settings
 
-**White: the nine open torch Dependabot alerts are triaged in prose and never
-dismissed on GitHub, so the security tab re-asks a settled question forever.**
-The triage lives in `tools/pyproject.toml` (containment: dev-Mac only, never
-ships, safetensors-only snapshot — pinned by real code since #463). Re-read
-from the API 2026-09-28: still exactly 9, all `pip/torch`, all `development`
-scope. They stay open because dismissing needs repo-admin, which the pass does
-not have and should not. · *Cost of leaving it:* every future security read
-spends the hour re-deriving this paragraph. · **Recommendation:** dismiss all
-nine as "tolerable risk — see tools/pyproject.toml's depth-extra triage" (two
-minutes in the Security tab). Ledger: White, 2026-09-12; carried by Cleanup on
-09-12, 09-19 and 09-28 for the same stated reason: the pass cannot click this.
+**White: nine Dependabot alerts, all `pip/torch`, all `development`, triaged in
+prose since 09-12 and never dismissed — two minutes in the Security tab.**
+Re-read from the API tonight: **9 open, 1 critical / 3 medium / 5 low, every
+one `pip/torch`, every one `development` scope** — the same nine. · *Cost of
+leaving it:* the security tab re-asks a settled question forever and every
+security read pays to re-derive the answer. · **Recommendation:** dismiss all
+nine as "tolerable risk — see `tools/pyproject.toml`'s depth-extra triage"
+(dev-Mac only, never ships, safetensors-only, pinned by real code since #463).
+· **Shorter than it was, on purpose:** the 09-28 Cleanup entry found that an
+item carried only because *the pass cannot click in the Security tab* earns a
+one-line ask rather than a paragraph re-verified each cleanup, and this is that
+finding acted on instead of restated. Carried 09-12, 09-19, 09-28 and 10-03 for
+that one reason; a fifth carry should stop re-reading the API. Ledger: White,
+2026-09-12.
 
 ## Open — a dollar and an account
 
@@ -177,10 +180,24 @@ items 1–2; answered as far as possible 2026-09-26.
 > rebuilt **three disjoint files** under `web_dist/assets/` — `pentagram.js`,
 > `DeckDetail.js` plus `index.css`, and `Coliseum.js` — so no two of them touch
 > the same built file and the bundle cannot conflict between them. What
-> conflicts is `DAYBREAK.md` and `LEDGER.md`, which all three edit, which is why
-> #532 already reads *conflicting* before anything has merged. So: **merge one,
-> then `gh pr update-branch` the next and keep both sides of the two document
-> hunks** (nothing was reflowed; it is a two-minute resolve each). **Never
+> conflicts is `DAYBREAK.md` and `LEDGER.md`, which all three edit.
+>
+> **That paragraph was reasoning; this one is a reading.** For each branch, the
+> files changed on the branch and changed on `main` since that branch's own
+> merge base were intersected, and for all three the answer is **exactly those
+> two documents and nothing else** — so the disjoint-bundle claim is now
+> measured rather than argued. The live states: **#534 `MERGEABLE`, only
+> behind; #532 and #533 `CONFLICTING`.** That changes the order. Take **#534
+> first** — `gh pr update-branch` is the whole job on it, because nothing it
+> edits overlaps what merged tonight. `update-branch` then **refuses** #532 and
+> #533 (it declines to update a branch whose merge is not clean, which is the
+> one thing the first draft of this note got wrong), so each of those is a
+> local `git merge origin/main` on the branch, **keep both sides of the two
+> document hunks**, push. Nothing was reflowed; it is a two-minute resolve
+> each. One more thing #534 carries: it opens a second `## Open — a ruling`
+> group a few lines above the existing `## Open — a ruling, and nothing else`.
+> Fold the new item into the existing group as it lands — two groups asking for
+> the same kind of answer is how a reader stops trusting the grouping. **Never
 > hand-resolve a file under `web_dist/`** — it is generated, and a hand-merged
 > bundle is a file no build can reproduce; if one ever does conflict, take
 > either side, run `npm --prefix web run build`, commit what that writes, and
@@ -217,13 +234,20 @@ and a lift may be wrong on a card tile. Ledger: Red, 2026-10-03.
 
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
-is forward-only and applies unwatched, and `deploy.yml` still has no snapshot
-step. · *Cost of leaving it:* the one deploy that needs a rollback point is the
+is forward-only and applies unwatched, and the `deploy` job in
+`.github/workflows/ci.yml` still has no snapshot step — re-read tonight: the
+only `snapshots` word anywhere in the workflows is a Forge release tag. **This
+line said deploy.yml for a month and there has never been such a file in this
+repository** (`git log --all` knows nothing of it), so three carries sent a
+reader to a path that does not exist; continuous deployment lives in `ci.yml`'s
+own `deploy` job, gated on the `tests` job, and that is where the step goes. ·
+*Cost of leaving it:* the one deploy that needs a rollback point is the
 one guaranteed not to have a fresh one. · **Recommendation:** a `fly volumes
-snapshots create` step ahead of `flyctl deploy` in the deploy job, non-fatal
-on failure, once the deploy token's scope is checked — a workflow change only
-CI can prove, so it lands as its own PR on a morning you can watch the deploy.
-Ledger: Red, the queued list carried in the 2026-09-05 entry, item 6.
+snapshots create` step ahead of the `flyctl deploy --local-only` call in that
+job, non-fatal on failure, once the deploy token's scope is checked — a
+workflow change only CI can prove, so it lands as its own PR on a morning you
+can watch the deploy. Ledger: Red, the queued list carried in the 2026-09-05
+entry, item 6; the filename corrected by Cleanup, 2026-10-03.
 
 **White: `internal/deckread`'s commander dossier has ten unreachable
 statements, the fixture that would reach them already exists, and the item
@@ -342,8 +366,25 @@ path and `mtglab` verb the licensing record names, `skillrecord_test.go` holds
 reads is `docs/`, `web/README.md` and the package comments — and the 09-13
 morning found two rot instances there, both fixed, neither caught by anything
 but a person reading. · *Cost of leaving it:* nothing legal; this is tidiness
-with a mechanism. · **What would have to be true:** somebody decides the wider
-prose is worth a third extractor — the kit exists now, so it would be reused
-rather than rewritten. · **Recommendation:** one more cycle of measured rot
-and it stops being tidiness; until then this line is the reminder. Ledger:
-White, 2026-08-24; narrowed Cleanup, 2026-09-05.
+with a mechanism — and the mechanism bit this month: the snapshot item above
+sent three readers to a deploy.yml that has never existed in this repository.
+· **The cycle of measured rot arrived, and it also measured why the extractor
+cannot simply be pointed at `docs/`.** Run tonight over the two files of this
+pass, the existing `repoPaths` rule flags **5 anchors in `DAYBREAK.md`, and 4
+of the 5 are the queue doing its job** — `gowrap.sh`, `deploy.sh`, `poll.sh`
+and `LANE_BRIEF.md` are named by the Colorless item *because they are not in
+the tree*; the fifth is a gitignored deck file. A queue names what does not
+exist yet; a record names what does, which is why the same extractor is honest
+on `NOTICE.md` and would cry wolf here. The map is the other case:
+`COVERAGE.md` names **41 anchors and 40 resolve**, the one miss being a
+gitignored `deck.yaml` — but only once the resolver allows a path written
+relative to `go/`, because that file speaks from inside the Go tree.
+Root-anchored resolution alone calls 19 of its 20 slashed paths broken. ·
+**Recommendation:** not a third extractor over `docs/` wholesale — a **suffix
+resolver** added to the kit plus a guard on the *maps* (`COVERAGE.md`,
+`web/README.md`), never on this queue, and never on `LEDGER.md`, which is
+history and is supposed to name files that were deleted. The first increment
+landed with this measurement (Cleanup, 2026-10-03: this queue's workflow and
+manifest anchors are held, which is the one slice with no false alarms in it).
+Ledger: White, 2026-08-24; narrowed Cleanup, 2026-09-05; measured Cleanup,
+2026-10-03.
