@@ -124,12 +124,7 @@ func QuestionKey(question string) string {
 // question box. Somebody typing a question has asked for a call.
 func ResearchStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := ceilingOr(limit)
-		preset, err := Preset(ResearchDefaultPreset)
-		if err != nil {
-			return Stance{}, err
-		}
-		return Clamp(preset, ceil), nil
+		return defaultStance(ResearchDefaultPreset, limit), nil
 	}
 	return Resolve(requested, nil, limit)
 }
@@ -280,10 +275,7 @@ func RunResearch(ctx context.Context, conn *pool.Conn, plan *ResearchPlan, run R
 	if plan.Answer != nil {
 		return *plan.Answer, nil
 	}
-	mode, err := GetMode(ModeResearch)
-	if err != nil {
-		return ResearchReport{}, err
-	}
+	mode := modeOf(ModeResearch)
 	turn, err := Converse(ctx, mode, Request{
 		Endpoint: plan.Endpoint,
 		Messages: []anthropic.MessageParam{

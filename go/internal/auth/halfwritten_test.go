@@ -892,7 +892,7 @@ func TestALadderThatStopsPartwayNamesWhereItStopped(t *testing.T) {
 			if tc.rows >= 0 {
 				fault.RowsAfter(tc.rows)
 			}
-			err = migrate(context.Background(), conn)
+			err = migrate(context.Background(), conn, migrationFS)
 			fault.Heal()
 			if err == nil {
 				t.Fatalf("the ladder climbed past %s over a database that had gone", tc.name)
@@ -915,7 +915,7 @@ func TestALadderThatStopsPartwayNamesWhereItStopped(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = conn.Close() })
-		if err := migrate(context.Background(), conn); err != nil {
+		if err := migrate(context.Background(), conn, migrationFS); err != nil {
 			t.Fatal(err)
 		}
 		var version int
@@ -928,7 +928,7 @@ func TestALadderThatStopsPartwayNamesWhereItStopped(t *testing.T) {
 		}
 		// Idempotent: a file already at the top costs one pragma read and
 		// changes nothing.
-		if err := migrate(context.Background(), conn); err != nil {
+		if err := migrate(context.Background(), conn, migrationFS); err != nil {
 			t.Fatal(err)
 		}
 	})

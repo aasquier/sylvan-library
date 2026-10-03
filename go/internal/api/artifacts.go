@@ -51,7 +51,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 	}
 	force := truthy(body["force"])
 
-	src, d, ok := a.writeTarget(w, r)
+	src, writer, d, ok := a.writeTargetWith(w, r)
 	if !ok {
 		return
 	}
@@ -122,10 +122,6 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writer, err := library.WriterFor(src, slug)
-	if a.refuseWrite(w, "build", err) {
-		return
-	}
 	if _, err := writer.WriteArtifacts(r.Context(), slug, files); a.refuseWrite(w, "build", err) {
 		return
 	}
@@ -140,11 +136,7 @@ func (a *API) buildArtifacts(w http.ResponseWriter, r *http.Request) {
 		// overrode something, so a clean build never claims to have been
 		// forced.
 		wire.KV{Key: "forced", Value: failing > 0 && force})
-	raw, err := wire.MarshalOrdered(shelf)
-	if a.refuse(w, "build", err) {
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "build", shelf)
 }
 
 // baselineDeck is the snapshot the last build stashed, parsed -- or nothing.

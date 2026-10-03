@@ -1319,9 +1319,11 @@ func shapeForge(decks []*deck.Deck, addresses []string, games, clock int,
 		max := floats.Float(seconds[len(seconds)-1])
 		out.MaxSeconds = &max
 	}
-	if out.Rows == nil {
-		out.Rows = []forgeRow{}
-	}
+	// `out.Rows` needs no guard against being null on the wire: `rows` above is
+	// `make([]forgeRow, 0, …)`, which is empty and never nil however many games
+	// the run holds. The `if out.Rows == nil` that used to stand here could not
+	// be entered by any run, and a match with no games at all is driven through
+	// this shaper and answers `[]` without it.
 	return out
 }
 

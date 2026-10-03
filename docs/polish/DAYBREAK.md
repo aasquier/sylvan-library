@@ -39,6 +39,16 @@ Each item: what it is · what it costs to leave it · **the recommendation.**
 > not hold near 85 MB and what it measured instead. The two walks the 09-29
 > pair owed are in Black under the same date.
 >
+> **2026-10-03, daylight: the climb to 99 — two White items answered by the
+> ask itself.** Aaron ruled the opposite of the regression-guard
+> recommendation: *"get our test coverage up to 99%, rewrite stubborn code to
+> be more testable"*. Eight Opus lanes ran in parallel on disjoint package
+> groups and landed through one integration pull request: 652 → 136
+> missing, **97.0 → 99.4**. The `pool.Pool` connector field the second item
+> asked for is in (`pool.NewOver`, reached through `pooltest.OpenFaultyPool`),
+> and the dossier's ten statements are closed with it. COVERAGE.md's *Left
+> deliberately* carries the record, entry by entry. Ledger: White, 2026-10-03.
+>
 > **2026-10-03, night: seven lanes ran one after another — three merged, three
 > are held for your eye, and one of the night's questions is about money.**
 > Black added two: the Sonnet 5 price rise this project's whole rate table was
@@ -79,36 +89,6 @@ line, and so is the recipe for checking it. Run the recipe; re-read the recipe.
 ---
 
 ## Open — a ruling, and nothing else
-
-**White: the coverage climb has no lever left bigger than two statements, and
-the floor's next click asks for a number the tree cannot reach by grinding.**
-Re-measured tonight with ci.yml's own formula, either side of this run's own
-nine statements: **97.0%, 646 missing of 21,814, spread over 387 functions —
-1.7 each** (655 over 391 before it). The largest single gap in
-the tree is ten statements and it is blocked (the item below); the next is a
-pair of six that this run took four of; everything after that is singletons,
-and every *class* they fall into is already named in COVERAGE.md's *Left
-deliberately* — a scan into `*any` cannot fail, `RowsAffected` after a
-successful `Exec` cannot fail, `sql.Open` never fails for a registered driver.
-The ratchet rule in `ci.yml` says the next click is 96.0 "once a merged main
-prints 97.5 or better, never sooner", and 0.5 points is 109 statements at 1.7
-per function: sixty-four more bespoke fixtures. · *Cost of leaving it:* every
-future coverage lane spends its night on singletons, each one honest and none
-of them the thing worth knowing, and the floor sits where it is forever anyway.
-· **Recommendation:** rule that 95.5 is now a **regression guard rather than a
-target** — it stays, it never drops, and nobody grinds toward 96.0 — and that
-the climb's instrument becomes mutation testing, which is what COVERAGE.md has
-ended on since it was written: *a LIVED mutant in code that reads as covered is
-worth more than the next tenth.* `gremlins` already runs report-only on pull
-requests, and `internal/sim/compile` got its first baseline on 2026-10-02 at
-85%. The next lane's mandate would be "find a LIVED mutant in covered code",
-not "close ten statements". · **That mandate was then run the same night, and
-it is the evidence for this ruling:** four kernels baselined, fourteen real
-survivors killed by four tests and six proved equivalent in writing, `floats`
-**76.32% → 91.43%** efficacy — including a `Fsum` whose final accumulation
-could be written `hi = x - y` with every frozen sequence still passing, and a
-generic-cost reader that answers *one* for `{9}`. Coverage was already 100% on
-all of it. Ledger: White, 2026-10-03 (both entries).
 
 **Colorless: every night rewrites the same four tooling files in a scratch
 directory, and three of them are recipes this project already describes in
@@ -319,31 +299,6 @@ job, non-fatal on failure, once the deploy token's scope is checked — a
 workflow change only CI can prove, so it lands as its own PR on a morning you
 can watch the deploy. Ledger: Red, the queued list carried in the 2026-09-05
 entry, item 6; the filename corrected by Cleanup, 2026-10-03.
-
-**White: `internal/deckread`'s commander dossier has ten unreachable
-statements, the fixture that would reach them already exists, and the item
-asking whether to plug it in fell out of this queue without being answered.**
-`pooltest.OpenFaulty` is a real card pool behind a connector that refuses
-after a budget — it is what made `probeStaleness` refusable at each of its six
-statements — but `deckread` reaches the pool through a `*pool.Pool`, and a
-`Pool` opens its own file inside `acquire`, so there is no way to hand it a
-handle that fails on purpose. One field on `pool.Pool` closes this and the
-equivalents in three other packages; it is the tree's own standing move (a
-reader of the process became a lookup handed in; `tier3.Settings.Java`,
-`api.Config.BulkIndex`), applied one layer further in. COVERAGE.md still
-records it as "a daybreak item (White, 2026-09-26)" and **it is not in this
-file** — it left during the 09-28 regroup without a ruling, which is the rot
-that section of COVERAGE.md warns about, found in COVERAGE.md. · *Cost of
-leaving it:* ten statements in `deckread` plus the three siblings stay
-unreachable, and this is the single largest non-deliberate gap in the tree —
-it is 1.5% of everything still missing, in one function. · **Recommendation:**
-yes to a `connector driver.Connector` field on `pool.Pool` whose zero value is
-today's `sql.Open`, test-reachable only, with `export_test.go`'s existing
-`ConnOver` argument as the precedent for why the door belongs in production
-code this time rather than in a test file. It is a change to the serving hot
-path, so it lands as its own PR on a morning you can watch the deploy — and if
-the answer is no, COVERAGE.md's *Left deliberately* gets the entry and no lane
-re-derives it. Ledger: White, 2026-10-03.
 
 **Black: the Sonnet 5 price increase was cancelled, the price table still
 applies it from September 1st, and the "go and check the rates" link on your

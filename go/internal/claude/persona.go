@@ -104,17 +104,27 @@ var (
 	DefaultPersona string
 )
 
-func init() {
-	var doc struct {
-		Default  string        `json:"default"`
-		Personas []Persona     `json:"personas"`
-		Roster   []RosterEntry `json:"roster"`
-	}
-	// The embedded file is generated and checked in, so a failure here is a
-	// broken build rather than a bad request: panic is the honest response.
-	if err := json.Unmarshal(personaJSON, &doc); err != nil {
+type personaDoc struct {
+	Default  string        `json:"default"`
+	Personas []Persona     `json:"personas"`
+	Roster   []RosterEntry `json:"roster"`
+}
+
+// parseRoster reads the recorded personas. The embedded file is generated and
+// checked in, so a failure is a broken build rather than a bad request and panic
+// is the honest response -- and the bytes are a parameter so that the honest
+// response is one a test can hear. `personaJSON` is the only document the app
+// ever passes.
+func parseRoster(raw []byte) personaDoc {
+	var doc personaDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
 		panic(fmt.Sprintf("claude: the embedded persona roster is unreadable: %v", err))
 	}
+	return doc
+}
+
+func init() {
+	doc := parseRoster(personaJSON)
 	DefaultPersona = doc.Default
 	personas = make(map[string]Persona, len(doc.Personas))
 	for _, p := range doc.Personas {

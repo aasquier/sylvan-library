@@ -383,14 +383,27 @@ func (s *SQLSource) Slugs(ctx context.Context) ([]string, error) {
 	}
 	defer rows.Close()
 	out := []string{}
+	// **The scan's refusal joins the walk's rather than branching per row, and
+	// the reason is the schema.** Every destination a loop over `user_decks`
+	// or `user_deck_artifacts` scans into is typed, and every column it reads
+	// is declared NOT NULL in `app.db` -- so the one refusal
+	// `database/sql`'s converter makes over a typed destination, a NULL it
+	// cannot represent, has nothing in this database that could produce it.
+	// What *can* fail is the iteration: a mount that goes between two rows,
+	// which `authtest.Fault.RowsAfter` is, and which hands back a shelf two
+	// decks short unless `rows.Err()` is asked. Joining the two drops nothing
+	// -- the scan's error is still reported, once, where the walk reports its
+	// own.
+	var scanned error
 	for rows.Next() {
 		var slug string
-		if err := rows.Scan(&slug); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&slug))
 		out = append(out, slug)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 type row struct {
@@ -468,18 +481,23 @@ func (s *SQLSource) All(ctx context.Context) ([]*deck.Deck, error) {
 	}
 	defer rows.Close()
 	out := []*deck.Deck{}
+	// See [SQLSource.Slugs] for why the scan's verdict is joined rather than
+	// branched on. A row that somehow failed to scan is the zero row, which
+	// `parse` refuses on its own two lines down; either way a caller is told.
+	var scanned error
 	for rows.Next() {
 		r, err := scanRow(rows)
-		if err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, err)
 		d, err := parse(r)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, d)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *SQLSource) ReadText(ctx context.Context, slug string) (string, error) {
@@ -502,19 +520,18 @@ func (s *SQLSource) Artifacts(ctx context.Context, slug string) ([]Artifact, err
 	}
 	defer rows.Close()
 	held := map[string]Artifact{}
+	var scanned error // see [SQLSource.Slugs]
 	for rows.Next() {
 		var a Artifact
 		var built string
-		if err := rows.Scan(&a.Name, &a.Size, &built); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&a.Name, &a.Size, &built))
 		a.BuiltAt, err = parseISO(built)
 		if err != nil {
 			return nil, err
 		}
 		held[a.Name] = a
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, err
 	}
 	out := []Artifact{}

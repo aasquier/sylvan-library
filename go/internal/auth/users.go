@@ -267,15 +267,23 @@ func Create(ctx context.Context, db *sql.DB, username, email string, isAdmin boo
 		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
-	}
+	// The id comes back without an error to check: this driver's result
+	// carries the rowid the INSERT above just assigned, and asking it for one
+	// is asking for a failure that cannot arrive -- the same reading as the
+	// `n, _ := res.RowsAffected()` this file already spells twice below. If a
+	// future driver ever had one to give, the guard that follows is the one
+	// that catches it: a zero id finds no row, and an account that was not
+	// created is refused rather than returned.
+	id, _ := res.LastInsertId()
 	fetched, err := GetByID(ctx, db, id)
 	if err != nil {
 		return nil, err
 	}
-	if fetched == nil { // unreachable in practice
+	// The row this just inserted is gone already. A healthy file never does
+	// this; a file whose `users` table carries a trigger, or a second writer
+	// deleting underneath, does -- and the answer is a refusal rather than a
+	// nil account handed back with no error for the caller to dereference.
+	if fetched == nil {
 		return nil, failf("%w: %s", ErrNoSuchUser, name)
 	}
 	return fetched, nil

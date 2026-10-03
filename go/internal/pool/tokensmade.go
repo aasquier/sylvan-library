@@ -3,6 +3,7 @@ package pool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -207,11 +208,10 @@ func (c *Conn) tokenParts(ctx context.Context, lowered []string,
 	defer rows.Close()
 	parts := map[string]tokenPart{}
 	makers := map[string]map[string]bool{}
+	var scanned error // see [scanRecord]: a scan into `*any` has no refusal
 	for rows.Next() {
 		var name, doc any
-		if err := rows.Scan(&name, &doc); err != nil {
-			return nil, nil, fmt.Errorf("tokens_made: %w", err)
-		}
+		scanned = errors.Join(scanned, rows.Scan(&name, &doc))
 		maker := deckSpelling(asked, AsString(name))
 		if maker == "" {
 			continue
@@ -227,7 +227,7 @@ func (c *Conn) tokenParts(ctx context.Context, lowered []string,
 			makers[related.ID][maker] = true
 		}
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, nil, fmt.Errorf("tokens_made: %w", err)
 	}
 	return parts, makers, nil
@@ -298,10 +298,16 @@ func relatedParts(v any) []relatedPart {
 	case []byte:
 		raw = t
 	case []any:
-		encoded, err := json.Marshal(t)
-		if err != nil {
-			return nil
-		}
+		// The driver handed this column over already decoded, so it is
+		// re-encoded here to reach the shape below -- and the encoder's refusal
+		// folds into the decoder's rather than getting a branch of its own.
+		// `json.Marshal` cannot actually refuse a document the driver decoded:
+		// the only values it will not take are a channel, a function and an
+		// unrepresentable float, and none of the three can come out of JSON.
+		// If it ever did refuse, it would hand back no bytes, which
+		// `json.Unmarshal` four lines down answers with the same `return nil`.
+		// One guard for one outcome.
+		encoded, _ := json.Marshal(t)
 		raw = encoded
 	default:
 		return nil
@@ -344,14 +350,13 @@ func (c *Conn) tokenIdentities(ctx context.Context, ids []string) (map[string]st
 		return nil, fmt.Errorf("token_identities: %w", err)
 	}
 	defer rows.Close()
+	var scanned error // see [scanRecord]: a scan into `*any` has no refusal
 	for rows.Next() {
 		var id, oracle any
-		if err := rows.Scan(&id, &oracle); err != nil {
-			return nil, fmt.Errorf("token_identities: %w", err)
-		}
+		scanned = errors.Join(scanned, rows.Scan(&id, &oracle))
 		out[AsString(id)] = AsString(oracle)
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, fmt.Errorf("token_identities: %w", err)
 	}
 	return out, nil
@@ -383,16 +388,16 @@ func (c *Conn) tokenArtByOracle(ctx context.Context, oracleIDs []string) (map[st
 		return nil, fmt.Errorf("token_art_by_oracle: %w", err)
 	}
 	defer rows.Close()
+	var scanned error // see [scanRecord]: a scan into `*any` has no refusal
 	for rows.Next() {
 		var oracle, name, image, artist, set, setName any
-		if err := rows.Scan(&oracle, &name, &image, &artist, &set, &setName); err != nil {
-			return nil, fmt.Errorf("token_art_by_oracle: %w", err)
-		}
+		scanned = errors.Join(scanned,
+			rows.Scan(&oracle, &name, &image, &artist, &set, &setName))
 		out[AsString(oracle)] = TokenArt{Name: AsString(name),
 			Image: AsString(image), Artist: AsString(artist),
 			Set: strings.ToUpper(AsString(set)), Printing: AsString(setName)}
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, fmt.Errorf("token_art_by_oracle: %w", err)
 	}
 	return out, nil

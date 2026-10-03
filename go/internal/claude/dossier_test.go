@@ -193,10 +193,7 @@ func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 	t.Parallel()
 	corpus := loadDossierCorpus(t)
 	for _, row := range corpus.Keys {
-		got, err := CacheKey(noOverrides, row.OracleID, row.Tier)
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := CacheKey(noOverrides, row.OracleID, row.Tier)
 		if got != row.Key {
 			t.Errorf("CacheKey(%q, %q) = %q, corpus %q", row.OracleID, row.Tier, got, row.Key)
 		}
@@ -204,10 +201,7 @@ func TestTheDossierCacheKeyIsTheRecordedOneByteForByte(t *testing.T) {
 	// The override wins over every tier, so two seats get one key.
 	overridden := noOverrides.WithModel("claude-test-1")
 	for _, row := range corpus.KeysWithModelOverride {
-		got, err := CacheKey(overridden, row.OracleID, row.Tier)
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := CacheKey(overridden, row.OracleID, row.Tier)
 		if got != row.Key {
 			t.Errorf("with the model override, CacheKey(%q, %q) = %q, corpus %q",
 				row.OracleID, row.Tier, got, row.Key)
@@ -240,7 +234,7 @@ func TestTheFingerprintsPartsAreEachTheRecordedOnes(t *testing.T) {
 	if got := noOverrides.ModelFor(""); got != corpus.Fingerprint.Model {
 		t.Errorf("the default model is %q, corpus %q", got, corpus.Fingerprint.Model)
 	}
-	if got, _ := Fingerprint(noOverrides, ""); got != corpus.Fingerprint.Fingerprint {
+	if got := Fingerprint(noOverrides, ""); got != corpus.Fingerprint.Fingerprint {
 		t.Errorf("the fingerprint is %q, corpus %q", got, corpus.Fingerprint.Fingerprint)
 	}
 }
@@ -307,7 +301,7 @@ func TestTheCachedGetShapesAreTheRecordedOnes(t *testing.T) {
 
 		// The stored row is the corpus's own bytes, served raw -- under the
 		// default tier's key, which is the GET's wart.
-		key, _ := CacheKey(noOverrides, corpus.Brief.OracleID, "")
+		key := CacheKey(noOverrides, corpus.Brief.OracleID, "")
 		if key != corpus.Stored.Key {
 			t.Fatalf("the default key is %q, the corpus stored under %q", key, corpus.Stored.Key)
 		}

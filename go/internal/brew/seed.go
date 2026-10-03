@@ -71,10 +71,15 @@ func ParseSeed(raw string) (*big.Int, bool) {
 			return nil, false
 		}
 	}
-	out, ok := new(big.Int).SetString(digits.String(), 10)
-	if !ok {
-		return nil, false
-	}
+	// The error is dropped on purpose, and the argument is arithmetic rather
+	// than optimism: `digits` holds nothing but ASCII `0`-`9`, and it holds at
+	// least one of them -- the first byte of `body` cannot be a separator (that
+	// is the `i == 0` refusal above) and anything that is not a digit or a
+	// separator has already returned. A non-empty run of decimal digits is a
+	// base-10 integer, so there is no second way for this to answer and no
+	// `false` for a test to reach. `tarot.ParseSeed` says the same of its own
+	// copy.
+	out, _ := new(big.Int).SetString(digits.String(), 10)
 	if text[0] == '-' {
 		out.Neg(out)
 	}

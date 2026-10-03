@@ -25,8 +25,14 @@ type op struct {
 	run  func(text string) (string, error)
 }
 
-// everyOperation is all ten writes, each with arguments that would be valid
-// against a readable file.
+// everyOperation is every write in the package, each with arguments that would
+// be valid against a readable file.
+//
+// It said "all ten" and held ten while the package grew to twelve: the eleventh
+// (`DraftRationale`, ADR 41) and the twelfth (`AddToBoard`) arrived after the
+// sweep was written and never joined it. Both are in now -- and the sweep is
+// the reason the count is no longer written down here, because a number in a
+// comment is a claim that rots while the list beside it changes.
 var everyOperation = []op{
 	{"swap", func(t string) (string, error) {
 		return ReplaceCard(t, "Sol Ring", "Arcane Signet", "a reason", nil)
@@ -44,6 +50,15 @@ var everyOperation = []op{
 	{"set-deck", func(t string) (string, error) { return SetDeckField(t, "stage", "draft") }},
 	{"share", func(t string) (string, error) { return SetShared(t, false) }},
 	{"note", func(t string) (string, error) { return SetNote(t, "plan", "a note") }},
+	{"draft", func(t string) (string, error) {
+		return DraftRationale(t, "Sol Ring", "a drafted reason")
+	}},
+	// The twelfth changes the file's *shape* before it writes a card, so it
+	// reads the text twice -- which is exactly why it belongs in a sweep about
+	// files that cannot be read.
+	{"board", func(t string) (string, error) {
+		return AddToBoard(t, "Sol Ring", "ramp", "a reason", 1)
+	}},
 }
 
 // **An edit that cannot understand the file changes nothing.** Every

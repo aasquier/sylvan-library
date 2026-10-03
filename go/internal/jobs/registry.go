@@ -133,11 +133,12 @@ func New(cfg Config) *Registry {
 
 // defaultCPUWorkers is the machine's answer, floored at one so a runtime that
 // reported nonsense still runs work.
+// The floor is stated as a floor rather than as a branch: [runtime.GOMAXPROCS]
+// is documented to return a positive number, so an `if n > 0` beside it has a
+// second arm nothing can enter, while `max` keeps exactly the same promise in
+// one statement.
 func defaultCPUWorkers() int {
-	if n := runtime.GOMAXPROCS(0); n > 0 {
-		return n
-	}
-	return 1
+	return max(runtime.GOMAXPROCS(0), 1)
 }
 
 // Width is how many jobs a lane runs at once. Exported because it is the

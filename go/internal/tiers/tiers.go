@@ -81,9 +81,19 @@ var All = []Tier{
 	},
 }
 
-var byKey = func() map[string]Tier {
-	m := make(map[string]Tier, len(All))
-	for _, t := range All {
+var byKey = indexTiers(All)
+
+// indexTiers keys a roster, and refuses one the default tier is not in.
+//
+// **A function over a roster rather than an anonymous `init`**, for the reason
+// the reference packages' loaders are (docs/polish/COVERAGE.md, lever 23): the
+// guard below is the interesting line in this file and an `init` body that runs
+// once, before any test, over a table no test can change is a guard nothing can
+// ever see fire. Handed a roster, it can be shown refusing one — and `All` is
+// untouched either way.
+func indexTiers(roster []Tier) map[string]Tier {
+	m := make(map[string]Tier, len(roster))
+	for _, t := range roster {
 		m[t.Key] = t
 	}
 	// Stated rather than trusted: Get falling through to a key that is not
@@ -93,7 +103,7 @@ var byKey = func() map[string]Tier {
 		panic("tiers: the default tier is not in the roster")
 	}
 	return m
-}()
+}
 
 // Get is the tier key names, or the default for anything else -- including
 // the empty string, which is how a NULL column arrives here.

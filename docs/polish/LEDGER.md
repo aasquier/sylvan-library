@@ -34,6 +34,57 @@ state, never checklists.
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
 
+### 2026-10-03 (daylight, the climb to 99) — eight lanes, one landing, and a list of unreachable branches that mostly were not
+
+Aaron's ask, in the morning: *"get our test coverage up to 99% … you might
+have to rewrite some stubborn code to be more testable."* That answered the
+night's White ruling (regression guard, stop grinding) the other way, and
+reopened *Left deliberately* as a worklist.
+
+- **The numbers.** `-func` **97.0% → 99.4%**; **652 → 136 missing of
+  21,694**, **388 → 85 functions** with a gap. Measured with `ci.yml`'s
+  own formula on the integration branch before the merge; the arm64 leg's
+  print on `main` is the authority.
+- **How it ran.** One `-coverpkg` profile merged by block and attributed to
+  functions (`covfunc`, a Go program in the session scratch); eight Opus lanes
+  by package group — two for `internal/api` split by file, `sim`, `cmd`,
+  `claude`, `deck`, `pool`, `auth` — each handed its BY FUNCTION table and a
+  shared brief; foreground, in worktrees, 55–110 minutes and 330k–550k tokens
+  each, load average past 390; eight pull requests (#541–#548) merged into one
+  integration branch with zero conflicts, gated once, landed once. Each lane's
+  own PR body carries its per-function record and was closed unmerged
+  pointing here.
+- **Three honest ways, in order.** Reach (a fixture that produces the fault),
+  seam (a value handed in, default tested), delete (dead by a fact about the
+  code, argued at the site). Every lane said which it used per function; the
+  deletions are the `sql.Open`, `*any`-scan, `RowsAffected`, embedded-data
+  and second-read classes COVERAGE.md had named, now smaller truer programs.
+- **The pool seam** (`pool.NewOver`, `pooltest.OpenFaultyPool`) closed the
+  dossier's ten and `deckread` to 100%; `loadInto`'s deferred `ROLLBACK` ran
+  on the caller's cancelled context and left half-appended rows standing — a
+  real bug, fixed with `context.WithoutCancel`, test failing against the old
+  code.
+- **Bugs and behaviour changes found on the way, each argued in its PR and
+  flagged for Aaron:** two `raw, _ :=` marshals in `api` were a 200 with an
+  empty body, now a refusal; `Worker.api`'s raw error reached a player as a
+  500 instead of "Forge is not available here"; `api.accountsDB` pings the
+  lazily-opened `app.db` and degrades like an absent one; `wheel.Spin` panics
+  rather than erroring with no entropy (matching `tarot`/`brew`); `deckedit`
+  answers a render refusal with a poison line `verified` refuses, after
+  `comboBlock`'s precedent; `decklist.digitValue` is wrong for the
+  mathematical digits (NOT fixed — a frozen grammar); `cache.Stats` says
+  `enabled: yes` over a store it could not open (wave two); `intakeFailed`
+  hands a filesystem error's path to the player through `claude.Explain`
+  (commandment 10, named in a comment, copy not invented).
+- **Two new committed executables** beside `testdata/fakejava`:
+  `fakejava-ancient` and `fakejava-unreadable`, because a test minting its own
+  races the probe ([[a-minted-executable-races-the-probe]]).
+- **Left for wave two**, running as this is written: the `needs-pool-seam`
+  branches in `api` and `claude` (≈21), the `sql.Open` callers' arms once
+  `auth.Open` drops its error (≈8), the `crypto/rand.Read` guards the stdlib
+  documents as dead (≈6, not in the fingerprinted `tier1.go`), the floor's
+  ratchet against `main`'s own print.
+
 ### 2026-10-03 (night, mutation) — the instrument the coverage lane asked for, pointed at four kernels: fourteen real survivors, six proofs of equivalence, and the digit bound again
 
 The mutation lane of the same serial night run, taken on the question the
@@ -375,7 +426,7 @@ hard way.
     anybody ever wants it is doubling the quote, one line, with the ATTACH test
     above already in place beside it.
 
-- **(open) `internal/deckread`'s commander dossier is the largest
+- **`internal/deckread`'s commander dossier is the largest
   non-deliberate gap in the tree — ten statements, 1.5% of everything still
   missing, in one function — the fixture that would reach it exists, and the
   item asking whether to plug it in left this queue without being answered.**
@@ -389,7 +440,7 @@ hard way.
   warning happening inside the map whose job is to carry it. Queued under *a watched deploy* (it is a change to the serving
   hot path); COVERAGE.md's claim corrected in the same diff to say the item is
   re-queued rather than still queued.
-- **(open) The climb has no lever left bigger than two statements, and the
+- **The climb has no lever left bigger than two statements, and the
   floor's next click asks for a number the tree cannot reach by grinding.**
   646 missing over 387 functions, every remaining *class* already named in
   *Left deliberately*, and 0.5 points is 109 statements — sixty-four more

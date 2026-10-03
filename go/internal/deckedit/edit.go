@@ -176,6 +176,14 @@ var deckKeyOrder = []string{
 
 // entry is one card's place in the file, in both encodings at once.
 type entry struct {
+	// header is the index of the list's own `cards:` / `swap_board:` /
+	// `graveyard:` line. Carried along rather than looked up again, because an
+	// operation that empties a list needs that line and had been searching for
+	// it a second time -- a search that cannot fail once the first one found
+	// the block, and so a refusal no deck file could reach and no test could
+	// drive. `entrySpans` is only ever handed a block's *body* range, which is
+	// what makes `spanStart - 1` the header.
+	header     int
 	start      int // index of the `- name:` line
 	end        int // index one past the entry's last line
 	dashIndent int // columns before the `-`
@@ -263,6 +271,8 @@ func topLevelSpan(lines []string, key string) (start, end int, ok bool) {
 }
 
 // entrySpans finds every item in a sequence's line range, in document order.
+// The range is a block's body -- what `blockSpan` answers -- so the line above
+// it is the block's own header, which every entry carries.
 //
 // An entry runs to the start of the next one, so anything between two cards --
 // Goreclaw's `# ---- RAMP 14` banners, blank lines -- lands in the earlier
@@ -302,7 +312,8 @@ func entrySpans(lines []string, spanStart, spanStop int) []entry {
 				break
 			}
 		}
-		out = append(out, entry{start: i, end: end, dashIndent: dashIndent, keyIndent: keyIndent})
+		out = append(out, entry{header: spanStart - 1, start: i, end: end,
+			dashIndent: dashIndent, keyIndent: keyIndent})
 	}
 	return out
 }
@@ -382,40 +393,59 @@ func countMismatch(key string, items, spans int) error {
 // ------------------------------------------------------------------ writing
 
 // render is `_render` at the deck files' own width.
-func render(key string, value any, indent int) ([]string, error) {
-	return yamlemit.Render(key, value, indent, yamlemit.RenderWidth, false)
+//
+// **It cannot be refused, and that is a decision rather than an oversight.**
+// `yamlemit.Render` says no to exactly one thing: a value whose Go type has no
+// spelling in the recorded style. Every value this package renders is a string,
+// an int, a bool or a list of strings, and each is chosen by the operation
+// rather than typed by anybody -- `deckFieldValue` returns those shapes and no
+// others, a card's fields are `string` and `int` at the signature, and `shared`
+// is the literal `false`. So no deck file could ever produce the refusal and no
+// caller could pass one on, and threading it back left eleven `if err != nil`
+// arms that said nothing and that no test could reach. What comes back instead
+// of an error is a line no parser accepts -- `comboBlock` already answers the
+// same question the same way next door, and both rest on the same promise: a
+// failed edit changes nothing, because `verified` re-reads every edit before it
+// is handed back.
+func render(key string, value any, indent int) []string {
+	lines, err := yamlemit.Render(key, value, indent, yamlemit.RenderWidth, false)
+	return emitted(lines, err, key, indent)
+}
+
+// renderProse is `render` for a value written as a folded block -- a deck's
+// notes, at the width the hand-written ones sit at. Only a string folds, which
+// is why this one takes one.
+func renderProse(key, value string, indent int) []string {
+	lines, err := yamlemit.Render(key, value, indent, yamlemit.ProseWidth, true)
+	return emitted(lines, err, key, indent)
+}
+
+// emitted is the one place a rendering refusal is answered here.
+//
+// Poison on purpose, and never a guess: an unparseable line makes `verified`
+// refuse the whole edit with nothing written, where a plausible substitute
+// would make a deck file say something nobody asked it to say. See `render`
+// above for why nothing can reach it.
+func emitted(lines []string, err error, key string, indent int) []string {
+	if err != nil {
+		return []string{spaces(indent) + key + ": ["}
+	}
+	return lines
 }
 
 // cardLines writes a whole card entry, in the key order the deck files use.
-func cardLines(shape entry, name, category, why string, qty int) ([]string, error) {
-	rendered, err := render("name", name, shape.keyIndent)
-	if err != nil {
-		return nil, err
-	}
+func cardLines(shape entry, name, category, why string, qty int) []string {
+	rendered := render("name", name, shape.keyIndent)
 	out := []string{spaces(shape.dashIndent) + "- " + strings.TrimLeft(rendered[0], " ")}
 	out = append(out, rendered[1:]...)
-
-	block, err := render("category", category, shape.keyIndent)
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, block...)
-
+	out = append(out, render("category", category, shape.keyIndent)...)
 	if qty != 1 {
-		block, err = render("qty", qty, shape.keyIndent)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, block...)
+		out = append(out, render("qty", qty, shape.keyIndent)...)
 	}
 	// Always written, even blank. In a draft the empty `why:` is the to-do
 	// list recorded in the file itself, which is how `decks import` writes one
 	// and where ADR 13 wants the outstanding work to be visible.
-	block, err = render("why", why, shape.keyIndent)
-	if err != nil {
-		return nil, err
-	}
-	return append(out, block...), nil
+	return append(out, render("why", why, shape.keyIndent)...)
 }
 
 // change is one instruction for rewriteEntry: drop the key, or write a value.
@@ -443,7 +473,9 @@ func drop() change         { return change{drop: true} }
 // `order` is the changed keys in the order they must be appended when absent,
 // because Go maps do not keep one and a deck file's key order is part of what
 // an edit must not disturb.
-func rewriteEntry(lines []string, e entry, changes map[string]change, order []string) ([]string, error) {
+// Infallible for the same reason `render` is: a change's value is one of the
+// four shapes the recorded style always has a spelling for.
+func rewriteEntry(lines []string, e entry, changes map[string]change, order []string) []string {
 	body, tail := splitTail(lines[e.start:e.end], e.keyIndent)
 	var rebuilt []string
 	seen := map[string]bool{}
@@ -460,10 +492,7 @@ func rewriteEntry(lines []string, e entry, changes map[string]change, order []st
 				rebuilt = append(rebuilt, line)
 				continue
 			}
-			rendered, err := render("name", c.value, e.keyIndent)
-			if err != nil {
-				return nil, err
-			}
+			rendered := render("name", c.value, e.keyIndent)
 			// Re-attach the dash, which the renderer knows nothing about.
 			rebuilt = append(rebuilt, spaces(e.dashIndent)+"- "+strings.TrimLeft(rendered[0], " "))
 			rebuilt = append(rebuilt, rendered[1:]...)
@@ -482,11 +511,7 @@ func rewriteEntry(lines []string, e entry, changes map[string]change, order []st
 			case c.drop:
 				dropping = true
 			default:
-				rendered, err := render(key, c.value, e.keyIndent)
-				if err != nil {
-					return nil, err
-				}
-				rebuilt = append(rebuilt, rendered...)
+				rebuilt = append(rebuilt, render(key, c.value, e.keyIndent)...)
 				dropping = true
 			}
 			continue
@@ -507,14 +532,10 @@ func rewriteEntry(lines []string, e entry, changes map[string]change, order []st
 		if seen[key] || c.drop {
 			continue
 		}
-		rendered, err := render(key, c.value, e.keyIndent)
-		if err != nil {
-			return nil, err
-		}
-		rebuilt = append(rebuilt, rendered...)
+		rebuilt = append(rebuilt, render(key, c.value, e.keyIndent)...)
 	}
 
-	return append(rebuilt, tail...), nil
+	return append(rebuilt, tail...)
 }
 
 // ------------------------------------------------------------- verification

@@ -142,31 +142,32 @@ func dossierOpening(facts wire.OrderedMap) string {
 // the model id -- so editing the instructions misses every stored row, and
 // two tiers never share a commander's dossier. See the package note on why
 // these bytes are exact and recorded.
-func Fingerprint(e Endpoint, tier string) (string, error) {
-	mode, err := GetMode(ModeCommanderDossier)
-	if err != nil {
-		return "", err
-	}
+//
+// **It answers one value.** Four of the recorded bytes come from a mode this
+// package names by constant and the rest are a version, a hash and a model id,
+// so there was never a second outcome -- and the error it used to return
+// travelled: `CacheKey` carried it, then `CheckDossier` and the free GET each
+// handed it on, four statements across three files for a refusal no fixture
+// could produce. The fingerprint is arithmetic over bytes this binary was built
+// with.
+func Fingerprint(e Endpoint, tier string) string {
+	mode := modeOf(ModeCommanderDossier)
 	digest := sha256.New()
 	digest.Write([]byte(strconv.Itoa(DossierVersion)))
 	digest.Write([]byte(mode.Instructions))
 	digest.Write([]byte(dumpJSON(mode.ResponseSchema, dumpOptions{SortKeys: true})))
 	digest.Write([]byte(e.ModelFor(tier)))
-	return hex.EncodeToString(digest.Sum(nil))[:16], nil
+	return hex.EncodeToString(digest.Sum(nil))[:16]
 }
 
 // CacheKey is the key for one commander's dossier, or ""
 // when there is no oracle id -- which disables caching for that deck rather
 // than colliding every uncatalogued commander onto one row.
-func CacheKey(e Endpoint, oracleID, tier string) (string, error) {
+func CacheKey(e Endpoint, oracleID, tier string) string {
 	if oracleID == "" {
-		return "", nil
+		return ""
 	}
-	fp, err := Fingerprint(e, tier)
-	if err != nil {
-		return "", err
-	}
-	return oracleID + ":" + fp, nil
+	return oracleID + ":" + Fingerprint(e, tier)
 }
 
 // DossierStore is the `dossier_cache` table: one row per commander and
@@ -437,10 +438,7 @@ func CheckDossier(ctx context.Context, conn *pool.Conn, slug string, d *deck.Dec
 	if err != nil {
 		return nil, err
 	}
-	key, err := CacheKey(req.Endpoint, oracleID, req.Tier)
-	if err != nil {
-		return nil, err
-	}
+	key := CacheKey(req.Endpoint, oracleID, req.Tier)
 	plan := &DossierPlan{Endpoint: req.Endpoint, Slug: slug, Facts: facts, Commander: name, OracleID: oracleID,
 		Key: key, Effective: effective, Tier: req.Tier, Store: req.Store, Clock: req.Clock}
 
@@ -483,10 +481,7 @@ func RunDossier(ctx context.Context, conn *pool.Conn, plan *DossierPlan, run Dos
 	if plan.Answer != nil {
 		return *plan.Answer, nil
 	}
-	mode, err := GetMode(ModeCommanderDossier)
-	if err != nil {
-		return DossierReport{}, err
-	}
+	mode := modeOf(ModeCommanderDossier)
 	turn, err := Converse(ctx, mode, Request{
 		Endpoint: plan.Endpoint,
 		Messages: []anthropic.MessageParam{
@@ -630,10 +625,7 @@ func ReadCachedDossier(ctx context.Context, conn *pool.Conn, slug string, d *dec
 	if id, ok := kv(card, "oracle_id").(*string); ok && id != nil {
 		oracleID = *id
 	}
-	key, err := CacheKey(e, oracleID, "")
-	if err != nil {
-		return nil, err
-	}
+	key := CacheKey(e, oracleID, "")
 	hit := store.Get(ctx, key)
 	out := CachedDossier{Slug: slug, Commander: name, Dossier: emptyObject}
 	if hit != nil {

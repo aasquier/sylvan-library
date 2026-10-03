@@ -286,7 +286,15 @@ func (w *Worker) api(ctx context.Context, method, path string,
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, MachinesAPI+path, body)
 	if err != nil {
-		return nil, err
+		// **A refusal, like every other answer here**, because the app name and
+		// the machine name are environment values and a stray line break in one
+		// makes a URL nobody can ask for. Handed back raw, this was the one
+		// answer in this method that did not satisfy the contract its doc
+		// states — so `/api/forge` met it as a 500 rather than as "Forge is not
+		// available here", which is the same shape as the permission error
+		// [Settings.DesktopJar] records.
+		return nil, NotInstalled("forge worker: %s %s cannot be asked: %v",
+			method, path, err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")

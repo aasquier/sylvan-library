@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -193,16 +194,33 @@ func (c *Conn) selectClause(ctx context.Context) (string, error) {
 }
 
 // scanRecord reads one row of `selectClause` into a record.
+//
+// **It always hands back a record, and its error goes to the walk rather than
+// to a branch of its own.** That is this package's standing shape for a read
+// whose destinations are all `*any`, and the argument is a fact about
+// `database/sql` rather than about today's pool: `convertAssign` ends
+// `case *any: *d = src; return nil`, so there is no driver value it refuses
+// and no NULL it cannot take, and the destination count is `readColumns`'
+// own — which is also what built the SELECT. The per-row refusal both callers
+// used to branch on therefore had nothing in the world that could produce it.
+//
+// What *can* fail is the iteration: a pool that answers two rows and then goes
+// away, which is a volume detaching mid-read and which
+// `pooltest.Fault.RowsAfter` is. `rows.Err()` is the question that catches it,
+// both callers already ask it, and joining the scan's verdict into theirs drops
+// nothing — the error is still reported, once, in the place the walk reports
+// its own.
 func scanRecord(rows *sql.Rows) (*CardRecord, error) {
 	vals := make([]any, len(readColumns))
 	ptrs := make([]any, len(readColumns))
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
-	if err := rows.Scan(ptrs...); err != nil {
-		return nil, err
-	}
-	return toRecord(vals), nil
+	// A failed scan leaves `vals` as it was, and a record of nothing is
+	// returned beside the error rather than a nil the caller would have to
+	// guard: the caller is about to report the error either way.
+	err := rows.Scan(ptrs...)
+	return toRecord(vals), err
 }
 
 // toRecord is `_to_record`, over the driver's Go values: VARCHAR -> string,
@@ -420,11 +438,10 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 	defer rows.Close()
 	byLower := map[string]*CardRecord{}
 	faces := map[string]*CardRecord{}
+	var scanned error // see [scanRecord]
 	for rows.Next() {
 		rec, err := scanRecord(rows)
-		if err != nil {
-			return nil, fmt.Errorf("get_cards: %w", err)
-		}
+		scanned = errors.Join(scanned, err)
 		low := strings.ToLower(rec.Name)
 		byLower[low] = rec
 		for _, face := range strings.Split(low, " // ") {
@@ -433,7 +450,7 @@ func (c *Conn) GetCards(ctx context.Context, names []string) (map[string]*CardRe
 			}
 		}
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, fmt.Errorf("get_cards: %w", err)
 	}
 	out := make(map[string]*CardRecord, len(names))
@@ -476,14 +493,16 @@ func (c *Conn) Search(ctx context.Context, where string, args []any, limit int, 
 	}
 	defer rows.Close()
 	out := []*CardRecord{}
+	var scanned error // see [scanRecord]
 	for rows.Next() {
 		rec, err := scanRecord(rows)
-		if err != nil {
-			return nil, fmt.Errorf("search: %w", err)
-		}
+		scanned = errors.Join(scanned, err)
 		out = append(out, rec)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, fmt.Errorf("search: %w", err)
+	}
+	return out, nil
 }
 
 // ArtCropFrom is the art_crop URL for a
