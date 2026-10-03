@@ -9688,8 +9688,10 @@ written blind, at the top row (flush, the rail alight) and at the bottom
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-10-03 (night) — the wheel's five discs get a thumb.
-  Previous: 2026-10-02 (the library gathered again), 2026-09-26 (rainbow),
+- **Last run:** 2026-10-03 (night) — two lanes the same night, both entries
+  below: the wheel's five discs get a thumb (and, on the morning walk, the
+  official symbols), and the Coliseum's remaining-time line. Previous:
+  2026-10-02 (the library gathered again), 2026-09-26 (rainbow),
   2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
   2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-16 (rainbow).
 
@@ -9824,6 +9826,130 @@ scratch deck older than this session, nothing for a local server to be holding.
 themes, and the authenticated phone walk through the seat — the seat's tab was
 borrowed for one read on another lane's behalf and the walk wants the whole
 tab. The deployed surface this lane did touch answered 200 on both reads.
+
+### 2026-10-03 (night, the Coliseum)
+
+*Aaron's ask, verbatim: "Coliseum features even if they are not spelled out
+and you see their necessity." One lane, one necessity, one held PR. The
+arena's growth is Green's, which is why a feature run is filed here.*
+
+- **(open) Landed and held for your eye: a match now says how much longer.**
+  A Forge match is the longest wait this application asks anybody for — ten
+  whole games of Commander, minutes each — and the stage told you how far in
+  you were (`4 / 10`, a heat bar, a progressbar) and never how much was left.
+  The sentence under the feed spanned a factor of twenty — *"a typical game
+  takes a few seconds, and a wide board can take two minutes"* — over a match
+  of ten, which is the difference between forty seconds and twenty minutes
+  and therefore the difference between waiting and going to make tea. The
+  comment above that sentence has said *"what a person waiting is owed: how
+  long this is going to take"* since the stage was written; this is the half
+  of it that was never said.
+  - **The figure is this match's own pace** — `whatIsLeft` in
+    `web/src/lib/theater.ts`: the median of the games already fought,
+    multiplied by the games still to come, rendered through `spell`. Reads
+    *"6 more games to fight — about 5m 6s, at the pace of the ones already
+    fought. A wide board takes longer while the pilot thinks, so it is a
+    guide and not a promise."*
+  - **Three refusals to overpromise, each a test.** The **median, never the
+    mean** (the house's own rule for Forge's numbers, and here it is what
+    stops one wide board dragging the figure — measured in the test: five
+    games of 10/10/20/10/220s give 30s for the three to come, where the mean
+    would have promised 162s). On an **even sample the upper of the two
+    middles**, deliberately pessimistic. And **silence below two games**,
+    because a sample of one is the first game of the match and the first game
+    is the slowest of them — the forge lights from cold — so an estimate off
+    it alone promises roughly double the truth. The room falls back to its
+    general words in that state rather than guessing. This file's own history
+    is the reason: a *"within half a minute"* promise was removed from this
+    exact paragraph for expiring before anything happened, and a wait that
+    outlives its estimate reads as a broken page.
+  - **`role="status"`, so the wait is audible.** The text changes once per
+    game landed — at most twenty times across a whole match — and that is
+    exactly the news somebody who cannot see the bar is waiting for; the
+    progressbar's `aria-valuenow` moves with it and announces nothing unless
+    it is focused.
+  - **No CSS at all**, which was a constraint rather than a happy accident:
+    `web/src/index.css` is held by the Queen's open PR tonight, so the
+    sentence had to be built out of `.theater-quiet`, the class the paragraph
+    already wore. It is a sentence, not a control, so commandment 17 has
+    nothing to say about it and `pressstates_test.go` does not move.
+  - **`spell` moved out of the room and into `lib/theater.ts`.** The stage
+    needed it and the room owned it; two spellings of a duration is how one
+    surface says `5m` where its neighbour says `300s` about the same fight.
+    Six call sites in `routes/Coliseum.tsx` now import it, and the finished
+    match was walked to prove all six still read (`5m`, `1m 12s`, `10m 12s`,
+    `1m 35s`).
+  - **Tests, and each was broken once to watch it fail.** Thirteen new:
+    `whatIsLeft` (six) and `spell` (two) in `web/src/lib/theater.test.ts`,
+    five on the stage in `web/src/components/theater.test.tsx`. Replacing the
+    median with a mean fails two; forcing `ahead` to null fails three on the
+    stage; dropping the sample floor from two to one fails two more. Full
+    restore proved by `git diff` afterwards.
+  - **Walked in the real room, not only in a test** (commandment 16's
+    standard, with commandment 14 owed on the deployed instance after a
+    merge). The committed bundle served by `mtglab-ui` on 8765, the room
+    entered at `/coliseum?m=fixture` with `window.fetch` patched to answer
+    one running Forge job — the route the `walk-the-coliseum-without-forge`
+    memory records, minus the board fixture, because the stage needs only
+    `partial.rows`. Four games fought of ten, 92/38/51/44s: the anvil read
+    `4 / 10`, the progressbar `4 of 10 games played`, and the sentence read
+    **"6 more games to fight — about 5m 6s"** — the upper middle of an even
+    sample (51s), times six. **No screenshot**: the in-app Browser pane
+    paints a page carrying a compositing `<video>` black, and the Coliseum's
+    hero loop is one, so the evidence here is the DOM read.
+  - Files: `web/src/lib/theater.ts`, `web/src/lib/theater.test.ts`,
+    `web/src/components/theater.tsx`,
+    `web/src/components/theater.test.tsx`, `web/src/routes/Coliseum.tsx`,
+    `web_dist/` (rebuilt). No Go, no route, no schema, no dependency.
+
+- **(open) The night shelf is scoped and not built, and the reason is a
+  decision rather than an afternoon.** ADR 46 names the morning read — *"a
+  night shelf in the Coliseum, its own PR, answered by joining
+  `night_bouts.match_id` to `forge_matches`"* — and it was this lane's first
+  candidate. Three findings sent it to the queue instead, each checked rather
+  than assumed:
+  - **No player-facing night read exists.** The only one is
+    `GET /api/admin/night` (`go/internal/api/night.go`), and its own comment
+    says why it may never be it: it answers owner ids, slugs, states and
+    log-grade failure reasons, *"admin-only wire, deliberately plain"*. A
+    shelf is a new route under `/api/coliseum`, not a widening of that one.
+  - **Who may see which night is Aaron's call and ADR 46 says so.** The ADR
+    defers cross-account leaderboards by name and points at `ledger.Scope` as
+    the one place that would widen. A night is a round-robin across accounts;
+    a shelf that lists last night's bouts is either scoped to your own decks
+    plus the house's (and then it is nearly empty for everyone but you) or it
+    is the widening the ADR reserved.
+  - **There is nothing to put on it yet.** No window is configured and the
+    night secrets are unset — which is the standing Blue daybreak line, from
+    the other end: that room says *"the torches are not lit yet"* and is
+    still telling the truth. A shelf built tonight renders an empty room on
+    the deployed instance, and "never start what cannot be finished" reads
+    both ways.
+  - **The shape, so it is not re-derived:** `GET /api/coliseum/night`
+    answering the latest finished run — the night's key, when it opened and
+    closed, and its bouts joined to `forge_matches` through
+    `night_bouts.match_id`, each carrying the two or four decks and the
+    score, filtered through `ledger.Scope` exactly as the standings are. A
+    fourth place in the room's tab strip beside *The sand · The record · The
+    laurels*, empty-state first (`NothingYet`'s shape in
+    `components/coliseumrecord.tsx` is the precedent and it is a good one).
+    No schema change: `night_runs` and `night_bouts` already hold everything
+    the read needs.
+
+- **The record's rows still have no way back to the deck, and that is also a
+  decision.** Considered as the second candidate and rejected for the same
+  class of reason. `components/coliseumrecord.tsx` prints a deck's title and
+  its slug and links neither, so a newcomer reading *"Goreclaw, Terror of Qal
+  Sisma · goreclaw-stompy"* on the board has no way to go and look at the
+  deck. The obstacle is that the board carries decks from matches you were
+  *in*, and an opponent's deck is 404 by ADR 5 — so a link on every row would
+  be a link that sometimes dead-ends, and deciding which rows are openable is
+  a server truth that does not exist yet (`owner_id` is on the wire, but
+  whether the house's own decks are openable to a signed-in stranger is not a
+  question this lane should answer alone). Recorded here rather than queued
+  as a third item, because it is the same ruling as the shelf's scope
+  question wearing different clothes: **answer `ledger.Scope` once and both
+  of these become buildable.**
 
 ### 2026-10-02 — the library gathered again, after *Reality Fracture*
 
