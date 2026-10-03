@@ -7633,6 +7633,21 @@ becomes a register. The design pass it measures is Aaron's and is queued.*
   monitor's configuration note) and **6** (a snapshot before a deploy)
   are unchanged and still his; **11**'s own line already recommends close.
 
+- **Morning addendum — the drain race in `convoke` bit the Queen's branch on
+  the arm64 coverage leg.** `TestAPanicReRaisesOnTheCaller` asserted "most of
+  the grid untouched" over 1000 pieces that cost one atomic increment each,
+  and the window between the `panic` statement and the worker's recover
+  setting the stop flag — a panic unwind, longer under coverage
+  instrumentation — is long enough for the second worker to drain 996
+  nanosecond pieces. The flag had already been moved ahead of the slow stack
+  read for this same test (#451's era); what remained was the pieces being
+  too cheap to measure "stops the hand-out" at all. Fixed in the test, not
+  the mechanism: every non-panicking piece sleeps a millisecond, turning an
+  even-odds race into a second of margin while the test still finishes in
+  milliseconds (thirty `-race` runs, 1.4 s). `time.Sleep` sites in tests
+  14 → 15, argued in the comment. Pre-existing flake from 2026-09-07, drawn
+  by #533's re-run; landed as its own PR on the morning walk.
+
 ### 2026-09-29 — the worker's 409, read off the machine and repaired by hand
 
 Not a run: the record of a deploy's second half, owed by the Cleanup entry
