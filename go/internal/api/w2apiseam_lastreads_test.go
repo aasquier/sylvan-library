@@ -91,10 +91,7 @@ func TestAnImportRefusesRatherThanJudgingADeckItCouldNotCheck(t *testing.T) {
 	// per budget would be measuring how fast a temp directory can be filled.
 	decks := decksDir(t)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	defer db.Close()
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {

@@ -79,11 +79,31 @@ reopened *Left deliberately* as a worklist.
 - **Two new committed executables** beside `testdata/fakejava`:
   `fakejava-ancient` and `fakejava-unreadable`, because a test minting its own
   races the probe ([[a-minted-executable-races-the-probe]]).
-- **Left for wave two**, running as this is written: the `needs-pool-seam`
-  branches in `api` and `claude` (≈21), the `sql.Open` callers' arms once
-  `auth.Open` drops its error (≈8), the `crypto/rand.Read` guards the stdlib
-  documents as dead (≈6, not in the fingerprinted `tier1.go`), the floor's
-  ratchet against `main`'s own print.
+- **Wave two, the same afternoon — three background lanes on the seam wave
+  one built.** `w2-api-seam` (#550) closed fifteen `needs-pool-seam` arms in
+  `cards.go`, `colors.go`, `lifecycle.go`, `edits.go` with two test-only
+  fixtures over `pool.Connect`: a faulty pool and a **moving pool** (a
+  connector that empties `oracle_cards` between a shortlist and its
+  hydration — the tool for every `rec == nil` drop arm, which a faulty pool
+  cannot reach because those arms are about a second query *succeeding* about
+  nothing). `w2-claude-seam` (#551) closed six in `argue`, `interview`,
+  `wheel` — `wheel` whole; two of `Brief`'s arms are `needs-deckread-seam`
+  because `Validate`/`Stats` re-read a deck the memo already holds and issue
+  zero statements. `w2-crosscut` (#552) dropped the error return from
+  `auth.Open`/`auth.OpenReadWrite` (10 production + 83 test call sites,
+  mechanical), deleted the `crypto/rand.Read` guards the stdlib documents as
+  dead (not in the fingerprinted `tier1.go`), and fixed `cache.Stats`
+  reporting `enabled: yes` over a store it could not open. Landed with the
+  floor's ratchet as #553: **`-func` 99.5%, 106 missing of 21,677,
+  67 functions**; `MINIMUM` 95.5 → **98.0** against the arm64 leg's
+  99.4 on #549, the gap kept.
+- **Rulings still owed, carried in the PR bodies rather than this queue:**
+  `digitValue`'s mathematical digits (a frozen grammar); `argueSweep`'s
+  defence-in-depth arm; the intake's commandment-10 leak through
+  `claude.Explain`; whether the shim should stop on its own context; one rule
+  for entropy (seam vs delete — the tree now has both); `deckread.ValidateWith`
+  / `StatsWith`; the `library.Visible` restructure; `rebuild.finish`'s four
+  behind DuckDB's appender.
 
 ### 2026-10-03 (night, mutation) — the instrument the coverage lane asked for, pointed at four kernels: fourteen real survivors, six proofs of equivalence, and the digit bound again
 
