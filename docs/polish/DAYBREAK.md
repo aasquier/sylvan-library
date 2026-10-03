@@ -186,15 +186,14 @@ items 1–2; answered as far as possible 2026-09-26.
 > files changed on the branch and changed on `main` since that branch's own
 > merge base were intersected, and for all three the answer is **exactly those
 > two documents and nothing else** — so the disjoint-bundle claim is now
-> measured rather than argued. The live states: **#534 `MERGEABLE`, only
-> behind; #532 and #533 `CONFLICTING`.** That changes the order. Take **#534
-> first** — `gh pr update-branch` is the whole job on it, because nothing it
-> edits overlaps what merged tonight. `update-branch` then **refuses** #532 and
-> #533 (it declines to update a branch whose merge is not clean, which is the
-> one thing the first draft of this note got wrong), so each of those is a
-> local `git merge origin/main` on the branch, **keep both sides of the two
-> document hunks**, push. Nothing was reflowed; it is a two-minute resolve
-> each. One more thing #534 carries: it opens a second `## Open — a ruling`
+> measured rather than argued. **All three were brought up to `main` at the
+> end of the night and read `MERGEABLE`** — the orchestrator did the two
+> document resolves so the morning would not. Merging any one of them puts the
+> other two behind again, on these same two files: try `gh pr update-branch`
+> first, and when it refuses (it declines a branch whose merge is not clean),
+> the resolve is a local `git merge origin/main` on the branch, **keep both
+> sides of the two document hunks**, push. Nothing was reflowed; it is a
+> two-minute resolve each. One more thing #534 carries: it opens a second `## Open — a ruling`
 > group a few lines above the existing `## Open — a ruling, and nothing else`.
 > Fold the new item into the existing group as it lands — two groups asking for
 > the same kind of answer is how a reader stops trusting the grouping. **Never
@@ -231,6 +230,32 @@ Queen-lane branch and lower the register to 12 in the same diff; rule on the
 bespoke four (`.art-pick-tile`, `.reader-tile`, `.wheel-folded`,
 `.tarot-hinge`) separately, since those are the deliberately-bespoke surfaces
 and a lift may be wrong on a card tile. Ledger: Red, 2026-10-03.
+
+**Green: the colour wheel's five discs now answer a thumb, and its ten guild
+lines cannot — 44px there is geometry, not effort.** The 44px floor #509 took
+is a `min-height` under `(pointer: coarse)`, and an SVG shape has no
+min-height, so the fifteen controls in the wheel were never covered by it:
+measured on a phone, a disc was **38px** and a guild line is **14.6px** across.
+The discs are fixed on `polish/green-2026-10-03` (an invisible hit circle,
+**38 → 46px** measured live, mutation-verified test; and, by your ruling on
+the walk, the five discs now wear the official symbols every other pip wears,
+with the drawn marks as the fallback — the one thing on the branch that
+renders differently). The lines would need a **60-user-unit** band each — ten of them,
+converging on five points — so every pair would overlap and the star's
+crossings would belong to whichever line was drawn last. · *Cost of leaving
+it:* a thumb on a phone picks the wrong guild, or none; `/learn` carries 32
+real `/colors/…` links, so nobody is shut out of the page, they just lose the
+diagram as a way in. · **Where to look, when you want to:** `web-dev` and
+`mtglab-ui` in `.claude/launch.json` (Vite on 5173 against the Go server on
+8765), then `/learn` → *The colours* at a phone width — the wheel is the
+pentagram under the tabs. Nothing animates there, so there is no cycle to wait
+out; the only thing to check by eye is that it looks **exactly** as it did, and
+the only thing to check by hand is tapping a disc near its edge. ·
+**Recommendation:** merge the branch for the five discs, and for the ten lines
+take the phone-only answer rather than a wider band — the wheel stays the
+pointer's affordance and the guild list beneath it is the finger's, which is
+also what the hover caption already implies (`(hover: hover)` is false on a
+phone). Ledger: Green, 2026-10-03.
 
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
