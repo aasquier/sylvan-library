@@ -124,10 +124,7 @@ func TestAScanFailsRatherThanOfferATranscriptionAsAReading(t *testing.T) {
 	t.Parallel()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)

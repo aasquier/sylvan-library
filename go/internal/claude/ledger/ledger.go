@@ -57,11 +57,14 @@ type Recorder struct {
 // `mode=rw` and not `rwc`, for the reason the package comment gives: the
 // ladder runs at boot, so a missing app.db is a broken deployment and must
 // say so here rather than at the first roll-up somebody reads.
+//
+// The error this still returns is the **ping's**, and only the ping's.
+// [auth.OpenReadWrite] offers none -- it records a DSN and names a driver, and
+// its own comment carries that argument -- so the arm that used to stand
+// between those two lines was a refusal nothing could trigger, sitting
+// directly above the one refusal that matters here.
 func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		return nil, fmt.Errorf("opening app.db for the Claude ledger: %w", err)
-	}
+	db := auth.OpenReadWrite(path)
 	// Proved at the open, not at the first write. `sql.Open` only records
 	// the DSN, so without this a missing `app.db` -- a volume that did not
 	// mount -- was discovered by the first conversation's `Record`, which

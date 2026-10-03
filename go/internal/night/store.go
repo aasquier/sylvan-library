@@ -123,7 +123,7 @@ type Store struct {
 // signature because the caller is a boot sequence and this is the line a
 // broken deployment would be caught on if opening ever learned to look.
 func NewStore(path string, now func() time.Time) (*Store, error) {
-	db, _ := auth.OpenReadWrite(path)
+	db := auth.OpenReadWrite(path)
 	return FromDB(db, now), nil
 }
 

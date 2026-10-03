@@ -31,10 +31,7 @@ func scratch(t *testing.T) (*night.Store, *ticking) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	clock := &ticking{at: time.Date(2026, 9, 6, 6, 0, 0, 0, time.UTC)}
 	return night.FromDB(db, clock.now), clock
@@ -447,10 +444,7 @@ func TestAMangledTimestampIsAnErrorNotAZeroTime(t *testing.T) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	ctx := context.Background()
 	s := night.FromDB(db, nil)
@@ -512,10 +506,7 @@ func TestABrokenHandleReportsInsteadOfInventing(t *testing.T) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}

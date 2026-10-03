@@ -44,6 +44,17 @@ func dataBackupCommand(cfg config.Config) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// **Only a race reaches the refusal below, and it stays anyway.**
+			// `auth.Backup`'s `VACUUM INTO` has just created this file, so the
+			// stat cannot fail for any reason except something else removing
+			// it in between -- which is not a fixture, and the alternative
+			// spellings are all worse. Folding the stat into `auth.Backup`
+			// moves the same arm one package over; reporting a zero size when
+			// it fails is a fallback reading as a fact, on the one line an
+			// operator reads to know the copy is real. Handing the stat in as
+			// a value would buy one statement and put a seam in the runbook's
+			// path for it. So: left, named, and not to be "covered" by calling
+			// past it.
 			info, err := os.Stat(args[0])
 			if err != nil {
 				return err

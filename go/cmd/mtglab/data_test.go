@@ -65,10 +65,7 @@ func TestABackupWritesAConsistentCopyAndSaysWhatItWrote(t *testing.T) {
 
 	// And the copy is a real database with the account in it, rather than a
 	// truncated file that only looks like one.
-	db, err := auth.Open(dest)
-	if err != nil {
-		t.Fatalf("the backup will not open: %v", err)
-	}
+	db := auth.Open(dest)
 	defer func() { _ = db.Close() }()
 	users, err := auth.AllUsers(t.Context(), db)
 	if err != nil {

@@ -46,10 +46,7 @@ func nightAPI(t *testing.T, shim *stubShim) (*API, *jobs.Registry, *night.Runner
 
 func countMatches(t *testing.T, dbPath string) int {
 	t.Helper()
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	defer db.Close()
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM forge_matches`).Scan(&n); err != nil {

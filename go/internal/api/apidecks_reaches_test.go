@@ -326,10 +326,7 @@ func TestADeckHistoryThatCannotBeReadIsRefusedRatherThanEmptied(t *testing.T) {
 	if err := write.Close(); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(path)
 	t.Cleanup(func() { _ = db.Close() })
 	a := New(Config{DecksDir: decksDir(t), Pool: pooltest.Open(t),
 		AdminEmail: "alice@example.com", AppDB: db})

@@ -156,14 +156,16 @@ func (r *Registry) Width(l Lane) int {
 // of a random (version 4) UUID, which are all random --
 // the version nibble sits at index 12 and the variant at 16 -- so six bytes
 // from crypto/rand is the same distribution rather than merely a similar one.
+// The panic that used to stand over the read is gone, and the reason is that
+// the standard library took the job over: [rand.Read] documents itself as never
+// returning an error and always filling the slice, and it crashes the program
+// irrecoverably rather than hand back a short read. "A registry that silently
+// hands out one id to two jobs" is not a state that can be arrived at, so the
+// guard against it was a branch no fixture could enter.
 func randomID() string {
 	var raw [6]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		// crypto/rand.Read does not fail on any platform this runs on, and
-		// the alternative to a panic here is a registry that silently hands
-		// out one id to two jobs.
-		panic("jobs: no randomness for a job id: " + err.Error())
-	}
+	// No error asked for, because there is none: see above.
+	_, _ = rand.Read(raw[:])
 	return hex.EncodeToString(raw[:])
 }
 

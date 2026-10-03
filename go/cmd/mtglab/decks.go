@@ -386,7 +386,7 @@ func openAppDB(cfg config.Config) *sql.DB {
 		// An absent app.db is an empty history, not a failure.
 		return nil
 	}
-	db, _ := auth.Open(path)
+	db := auth.Open(path)
 	return db
 }
 

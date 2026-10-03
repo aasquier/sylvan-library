@@ -64,10 +64,7 @@ func pairedRig(t *testing.T) *writeRig {
 	t.Helper()
 	decks := decksDir(t)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -242,10 +239,7 @@ func TestAnImportStagesItsSideboardOnTheSwapBoard(t *testing.T) {
 func TestNeitherCreateNorImportWillBuildADeckWithoutThePool(t *testing.T) {
 	t.Parallel()
 	decks := decksDir(t)
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{DecksDir: decks, AdminEmail: "alice@example.com", AppDB: db})
 

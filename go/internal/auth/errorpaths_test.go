@@ -46,10 +46,7 @@ func closedDB(t *testing.T) *sql.DB {
 	if err := seed.Close(); err != nil {
 		t.Fatal(err)
 	}
-	db, err := OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := OpenReadWrite(path)
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
