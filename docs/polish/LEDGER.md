@@ -2584,6 +2584,21 @@ the spirit of Magic*
   section's foot so the colours could not conflict.
   Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
   night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
+- **The `os.Getenv` count changes definition at 2026-09-26, so read the trend
+  in two halves.** Every entry from 2026-08-23 to 2026-09-19 quotes one number
+  from `grep -c 'os.Getenv\|os.LookupEnv'`, which adds up three unlike things:
+  a real read of the process, `os.Getenv` handed in *as a value* to a
+  `func(string) string` at the composition root, and `[os.Getenv]` in a doc
+  comment. The 09-24 parallel work turned almost all of them into hand-ins, so
+  **the single number rose while the doctrine got strictly better** — a trend
+  line measuring the wrong thing. From 09-26 the bullet in `blue.md` asks for
+  **two** numbers instead (real reads, and hand-ins) and the entries quote both:
+  09-26 and 10-02 each read **2 real reads outside tests and 6 hand-ins**
+  against a naive 15. A single figure in an older entry is therefore *not*
+  comparable to the pair in a newer one; the naive grep is quoted alongside for
+  exactly that comparison. (Recorded here by Colorless, 2026-10-03, because the
+  correction landed in Blue's reference file rather than in this section and a
+  reader of the trend had no way to know.)
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
   mypy exceptions, `pyproject.toml` extras, `mtglab animist`. The Go crossing
@@ -11311,8 +11326,9 @@ animation would have eaten it silently. It is a weaker gradient instead.
 *The pass auditing itself: last cycle's findings · are the checklists still
 finding things · the developer tooling · cross-color leftovers*
 
-- **Last run:** 2026-09-26 (rainbow, daylight — one lane of a parallel wave;
-  entry directly below). Previous: 2026-09-19 (rainbow, daylight), 2026-09-12
+- **Last run:** 2026-10-03 (night — the sixth lane of a serial seven-lane
+  night; entry directly below). Previous: 2026-09-26 (rainbow, daylight — one
+  lane of a parallel wave), 2026-09-19 (rainbow, daylight), 2026-09-12
   (rainbow, night — ran past 04:00 into 09-13), 2026-09-05 (rainbow, night),
   2026-08-24 (rainbow), 2026-08-21 (scoped — the relic sweep only),
   2026-08-19 (rainbow, the first colorless run with five colors to audit),
@@ -11325,6 +11341,364 @@ finding things · the developer tooling · cross-color leftovers*
   crossing on 2026-08-23, and `animist` moved out to `tools/`. The findings and
   the lessons still hold, and several are why the 2026-08-24 run went where it
   went; no command, count or path in them is a current fact.
+
+### 2026-10-03 (night) — the queue's own count recipe becomes a test, and three of the shelf's standing items turn out to be two
+
+The sixth lane of a **serial** night: seven lanes dispatched one at a time from
+20:14 PDT by an orchestrator holding the context, each in the main working tree
+off a written lane file, with a shared brief for the harness traps and the
+gauntlet recipe. Branched from `348e76e`, which carried Blue (#529), Black
+(#530) and Red (#531) merged and deployed. Four PRs were open when this lane
+read them — Green #532, the Queen #533, the Coliseum #534, Coverage #535 — so
+**every claim below about those four is a claim about a green unmerged PR and
+says so**, the 09-12/09-26 precedent for reading an open branch honestly. All
+five parts run; the relic sweep ran passes 1, 2, 4, 5 and 6.
+
+- **Fixed this run:**
+  1. **The queue is counted by a recipe written in prose, and nothing held the
+     recipe to the queue.** `DAYBREAK.md` says how to count its open items
+     (`grep -cE '^\*\*(White|Blue|Black|Red|Green|Colorless):'`) and records
+     why the convention matters — *"the recipe below cannot see a heading like
+     `**White (leg two):` and two of those hid from it for a week"*. The
+     convention was prose; the file's own paragraph warns that *"a count
+     written into prose is a claim that rots… and so is the recipe for checking
+     it"*, and it was right about itself. Meanwhile `daybreakrecord_test.go`
+     already held the *authoritative* definition of an item — a paragraph under
+     an `## Open` heading carrying `**Recommendation:**` — and the two
+     definitions could drift in both directions with nothing noticing: a
+     heading the recipe cannot see is an item missing from every count ever
+     quoted, and a recipe hit inside an item's *body* is a phantom item the
+     morning count invents. `TestTheQueuesOwnCountRecipeSeesEveryItem` holds
+     them equal. **The pattern is read out of the file's own fenced block
+     rather than restated in Go** — a test that repeats the recipe cannot tell
+     you the recipe is wrong, and the recipe is the half that has been wrong —
+     so a drift in the recipe itself now fails too. **Mutation-verified three
+     ways, each restore proved by an empty `git diff`:**
+
+     ```
+     (1) a heading rewritten to `**White (leg two): …`
+     daybreakrecord_test.go:277: an open daybreak item's heading is invisible to the file's own count recipe ((?m)^\*\*(White|Blue|Black|Red|Green|Colorless):), so every count quoted of this queue is short by one; the heading is: **White (leg two): the nine open torch Dependabot alerts are triaged in prose and never
+     daybreakrecord_test.go:283: DAYBREAK.md's own recipe counts 9 open items and the queue holds 10; a recipe hit outside an item heading is a phantom the morning count invents, and a heading the recipe misses is an item nobody counts
+     (2) the recipe's own `grep -cE '` spelling broken
+     daybreakrecord_test.go:261: DAYBREAK.md carries no `grep -cE '…'` recipe; without one this guard has nothing to hold the extractor against and would pass on anything
+     (3) both restored: `git diff -- docs/polish/DAYBREAK.md` empty
+     ```
+
+     **What it still cannot see, stated so nobody assumes otherwise:** a colour
+     dropped out of the recipe's alternation while no item of that colour is
+     open. The guard compares counts, so an unused alternative is invisible to
+     it; there is no honest way to check an alternative nothing matches, and
+     saying so is better than implying coverage it has not got.
+  2. **The night's own blockquote note said "Black added two" when the night
+     added three, and the queue it summarised held ten.** Black's two (the
+     cancelled Sonnet 5 rise, the unversioned `immutable`) were written; Red's
+     one (the press clause of commandment 17) was not, by nobody's fault —
+     Black wrote the note and Red ran after it, which is the serial shape's own
+     blind spot and exactly the *seven notes for one night* failure the header
+     is supposed to avoid. Rewritten as **one** dated note for the whole night:
+     what merged, what is held and why, the three walks the morning owes, and
+     the count as a reading of `main` rather than a forecast, since each held
+     branch brings its own queue line with it.
+  3. **The *watched deploy* group gets the morning's merge recipe at its head,
+     and the frightening half of it is not true.** Three held branches all
+     touch `web_dist/` and the obvious reading is a bundle merge nightmare.
+     Measured instead: they rebuilt **three disjoint files** —
+     `assets/pentagram.js` (#532), `assets/DeckDetail.js` + `assets/index.css`
+     (#533), `assets/Coliseum.js` (#534) — so no two touch the same built file
+     and the bundle cannot conflict between them. The filenames are stable
+     rather than content-hashed, which is what makes that true. What *does*
+     conflict is `DAYBREAK.md` and `LEDGER.md`, which all three edit, and
+     which is why #532 already reads `CONFLICTING` against `main` before
+     anything has merged. The note carries the order, the "keep both sides of
+     the document hunks" resolve, the standing refusal to hand-resolve a
+     generated file, and the close-out that costs a minute and proves the
+     three partial rebuilds compose: one `npm --prefix web run build` on `main`
+     should write **no** diff.
+  4. **`SKILL.md`'s "merge before advancing" is void at night for every lane
+     whose work renders, and the skill had not noticed it was arguing with
+     itself.** Serial is the default *because* merging each lane before the
+     next means the conflicts never exist; the Nightbound rule forbids merging
+     anything a user can see; so a serial night with three rendering lanes
+     advances anyway and ends holding three overlapping branches — a parallel
+     wave's integration cost, arrived at by the shape chosen to avoid it, and
+     paid by Aaron in the morning instead of the orchestrator at 3am. Both
+     consequences are now written where the next night reads them: assign
+     `web_dist/` and the stylesheet in the lane files **even when the lanes run
+     serially**, and put the merge order in the queue rather than in a report.
+     A second bullet records the other thing tonight proved: a lane file earns
+     its place serially too, because the brief is where seven lanes stopped
+     re-deriving the same harness traps one at a time.
+  5. **The cache register is finished, and two documents said it was
+     half-built.** Black's leg tonight landed `GET /api/admin/stats/system`'s
+     `caches` object — Tier 1, the deck shelf memo, the door's ETag memo, each
+     `{hits, misses}` or `null`. `SKILL.md`'s measuring shelf and
+     `colorless.md` part three each opened on *"nothing yet reads those counts
+     out of a running instance"*, which is the sentence a future Colorless run
+     would have re-queued as a standing item. Both corrected, with the reason
+     the route was the missing half rather than a nicety (a counter nobody
+     reads out of a *running* process proves nothing about the process) and the
+     door's handed-in reader named as the shape to copy. **Part three's
+     standing list drops from three items to two** — `benchstat`, and the bench
+     suite's one command plus its results ledger — and it has now shortened
+     four runs running, which is the honest answer to part three's own live
+     question about whether the rebuild is still shaped right: it is finishing,
+     not growing.
+  6. **`colorless.md` part three now says the two things about `animist verify`
+     that cost a lane its asset gate.** `tools/.venv` hard-points at the main
+     checkout, so a worktree lane verifies whichever branch the *main* tree has
+     out and reports it as its own — which is why 09-26 could not run it and a
+     serial night in the main tree always can. And the tool has **no
+     shrunken-run hole**: it exits non-zero with *"refused: no recipes named
+     and none found"*, so part three's "a shrunken run still prints a table"
+     warning is already answered for this one instrument. It prints no total,
+     so the count is `| grep -c ': held$'`.
+  7. **Blue's section head now says which `os.Getenv` numbers were measuring
+     what.** The 09-26 correction landed in `blue.md` and the 09-26 entry
+     recorded it *here* so it would not be fixed twice — but a reader of Blue's
+     trend line had no way to know that every entry from 08-23 to 09-19 quotes
+     one conflated number and every entry from 09-26 quotes a pair. A single
+     figure in an older entry is not comparable to the pair in a newer one, and
+     the section head is where a reader of the trend is already standing.
+- **Part one — is the ledger telling the truth?**
+  - **The queue, counted both ways on `main` before this lane touched it: 10
+    and 10.** The file's own recipe reads 10; `daybreakrecord_test.go`'s
+    extractor finds 10 and names all ten. They agreed before the new guard and
+    now cannot silently stop. This lane's own ruling makes it 11, both ways.
+  - **The marker audit is exact, which is the first time it has been.**
+    `(open)` markers by ledger section — **White 2, Blue 1, Black 4, Red 3 =
+    10** — against the queue's ten items by colour: White 2 (Dependabot,
+    `NOTICE.md`), Blue 1 (the unlit torches), Black 4 (Sonnet 5, the
+    unversioned `immutable`, the cache-write column, `CacheReadFraction`), Red
+    3 (off-platform uptime, the press pass, the deploy snapshot). Both
+    directions of `TestTheLedgerAndTheQueueAgreeOnWhatIsOpen` green, and the
+    totals match item-for-item rather than merely in aggregate. Those are the
+    arrival figures; this lane's own ruling adds Colorless 1 to each side.
+  - **Tonight's three merged lanes, two-places audit: 3 of 3 clean.** Black
+    wrote two `(open)` records and two queue lines; Red wrote one and one;
+    Blue queued nothing and said so in writing (*"the queue stays at seven and
+    `DAYBREAK.md` is untouched"* — true when written). Of the four open PRs,
+    #532 and #534 each add a queue line with a `Ledger: Green, 2026-10-03`
+    pointer, #533 **rewrites** Red's existing item rather than adding one (so
+    the count does not move on its merge), and #535 adds two with
+    `Ledger: White, 2026-10-03`. Projected queue after the whole train:
+    **11 → 16**. Not asserted as fact; four of those lines are on branches.
+  - **The unmarked-`Queued` walk, spot-checked rather than re-walked.** 25
+    `Queued for Aaron` blocks across the sections; the 09-26 run walked all of
+    them, so this run read the five written since 09-19. All five are
+    correctly unmarked: the interview's question count and the slot-set union
+    (Black, 5285) were answered in the 09-29 eight rulings; the Admin panel's
+    historical pricing (Black, 5754) is superseded by tonight's own Sonnet 5
+    record, which carries the marker; pool age (Green, 9470) was answered by
+    the 10-02 refresh; `goreclaw-stompy` (Green, 9615) was closed on 09-29.
+    `grep -ni 'ride the report'` returns only the 09-19/09-26/cleanup
+    archaeology of the mechanism itself — **no lane this night sent a question
+    to its report**, and this lane's own question is on the queue below.
+  - **Fix spot-checks, 4 of 4 hold:** `skillrecord_test.go` still carries
+    `TestTheSkillsNameOnlyTestsThatExist` (and now four tests, not the three
+    the 09-26 entry recorded — a fourth, the toolbox-verb leg, has joined
+    since); `daybreakrecord_test.go` still reads both directions off the
+    `(open)` marker; `colorless.md` part five still names the five
+    fingerprinted packages as the only hard exclusion; `blue.md`'s two-number
+    `os.Getenv` bullet is intact and 10-02's entry used it. Nothing reverted.
+  - **Corrections outrank overwrites, checked.** Every correction in fixes 5
+    and 6 is written beside what it corrects and quotes the sentence it
+    replaces, so the wrong reason cannot be re-derived from the fix.
+- **Part two — is the checklist finding things, or reciting them?**
+  - **Three colours earned it tonight through the standing question, which
+    remains the engine of the whole pass.** Red asked *which of commandment
+    17's three replies is enforced by nothing?* and found the press clause
+    held by nothing at all, 34 buttons through 15 classes. Blue asked it of
+    its own reference three times and found three claims the tree contradicted
+    — a `MTGLAB_FORGE_*` complaint fixed in Blue's own night a month ago and
+    re-read by four runs since, a goroutine census counted with one spelling
+    out of two (3 claimed, 8 real), a `sort.Slice` count short by one. Black
+    asked it of the money and found a price rise the world cancelled. This
+    lane asked it of the queue's own count recipe (fix 1). **Four colours, one
+    night, one question.**
+  - **What got past every checklist is this run's own subject again, and
+    mildly: two reference sentences describing an absence that another lane
+    had just filled** (fix 5). That is the 09-26 lesson repeating in a gentler
+    key — the run that reads the skill goes sixth, so a sentence the night's
+    own work falsified has a few hours to look true. There is no structural
+    fix available for *numbers* in a reference file; what there is, and what
+    09-26 built, is the test-citation guard, and it held tonight.
+  - **Dated and process prose in code added by tonight's three merged PRs:
+    zero.** `git diff a199cea..348e76e -- '*.go' '*.ts' '*.tsx' '*.css'`
+    grepped on the added side for `YYYY-MM-DD`, `#NNN`, `vNNN`, "tonight",
+    "today", "this run", "last night", "yesterday": **no hits.** Three lanes
+    writing comments at speed and none of them wrote a diary — the keep/cut
+    rule living in `datedcomments_test.go`'s const block rather than in a
+    reference file is the likeliest cause, since that is where a session is
+    already looking.
+  - **Reciting-risk verdict:** the relic sweep's passes are clean six runs
+    running and stay for the count habit — they are cheap and they are the
+    only thing that would catch a directory arriving — but part four should be
+    read as *maintaining a census*, not as hunting. The facet at risk of
+    reciting is part three's standing-items list, and the honest answer this
+    run is that it is not reciting because it keeps *shortening* (fix 5).
+- **Part three — the tooling.**
+  - **`animist verify`: 36 recipes, 36 held, exit 0** — run from the main tree
+    on this branch, which closes the gap the 09-26 lane had to leave open for
+    a structural reason. 34 on 09-19 and 09-26; two recipes added since.
+    Verdict about the *tool* rather than the assets: it refuses a zero-recipe
+    run by name, so it has no inert-pass hole, and it prints one line per
+    recipe with no total.
+  - **The record guards, `-count=1`, all PASS:** `daybreakrecord` (now three
+    tests), `skillrecord` (four), `licenserecord`, `datedcomments`,
+    `serialregister`, `coveragefloor`, `configrecord`, `hotlinkrecord`,
+    `shutdownrecord`, `spendrecord`. Re-run after every prose edit in this
+    diff.
+  - **The night's own tooling is four scratch files, three of them worth
+    promoting and one of them carrying the exact bug the skill forbids.** This
+    is the queued item below. `gowrap.sh` (5 lines: the Mac's three exports
+    with a literal `/Users/aaronsquier` prefix, a `cd` into `go/`, `exec
+    "$@"`) and `deploy.sh` (31 lines: sleep-30 poll of the `tests` run on
+    `main` by sha, then the deploy job's conclusions, then the machine image
+    tags, then `/api/health` and two public paths) are exactly the two
+    recipes `SKILL.md` already *describes* in prose and every night rewrites.
+    `LANE_BRIEF.md` is the condensed night rules plus the harness traps and
+    the known load-flakes. **`poll.sh` must not be promoted as written:** its
+    required-check set is a hard-coded literal of eight names, and `SKILL.md`
+    step 6 says in so many words to read that list back from the API *because
+    it has grown twice with no prose noticing*. Read tonight,
+    `gh api repos/aasquier/sylvan-library/branches/main/protection --jq
+    .required_status_checks.contexts` returns exactly those eight — so the
+    script is correct today, which is precisely what makes committing it
+    dangerous: it would be right on the day it landed and silently wrong on
+    the day the list grew.
+  - **The shelf's live question — what would a Go shelf measure that the stock
+    tools cannot?** Same answer as 09-26 and now with one fewer part: **run a
+    set of benchmarks as one thing and remember the answers.** The cache
+    counter half is built and read (fix 5). Nothing else proposed itself.
+- **Part four — the relic sweep (passes 1, 2, 4, 5, 6).**
+  - **Pass 1 — clean. 148 tracked directories** (flat against 09-26).
+    **52 Go packages, 52 with a package doc that argues, 0 without** (51 on
+    09-26; `library` is the new one, Black's deck-shelf memo).
+  - **Pass 2 — clean. 336 non-source files** (332 on 09-26): the migration
+    ladder, the tarot deck's plates, the scribe's GPL boundary, the docker
+    trio, `.env.example`, the two toolboxes' Python, the committed media, the
+    one committed executable.
+  - **Pass 4 — clean, 97 docs by title** (flat).
+  - **Pass 5 — not re-walked, deliberately.** Blue's lane read all 7 families
+    and all 35 commands tonight for its typo fix and recorded the census; a
+    second read is the same output from a less careful reader. Pass 5's
+    *existence* question is answered by that entry.
+  - **Pass 6 — 14 rows, all the migration ladder** (15 on 09-26; one fewer
+    because a migration gained a mention elsewhere). No finding.
+  - **The one thing that looks like a relic: two live worktrees that match no
+    lane.** `.claude/worktrees/agent-a033745369c1db585` (branch
+    `worktree-agent-a033745369c1db585`, `1d1e6ec`) and
+    `agent-ace54adcdc23122b3` (branch `white-pool-age`, `ee94542`). Tonight's
+    seven lanes all ran in the **main** working tree, so by the 09-26 rule —
+    *a clean worktree list is not the check, matching the lanes actually
+    running is* — neither is accounted for. Left in place and **not removed**:
+    a worktree may belong to a session this lane cannot see, and a relic is a
+    decision rather than a silent deletion. Not queue-class either; two stale
+    worktrees on a laptop are a chore, not a question. Recorded with the
+    recipe (`git worktree list`, read against the lanes the night actually
+    ran) so the next run can retire them if they are still there.
+- **Part five — the comments.** **No slice taken, and the reason is the diff
+  rather than the budget.** The ratchet reads `goDatedCommentCeiling = 94`
+  and `webDatedCommentCeiling = 269`, both green; the Go side's own grep
+  returns **93** (one under the ceiling, so the slack is being spent rather
+  than lost), and `web/src` is **362** by the reference's grep against a 269
+  ceiling, which is the two-definitions gap the reference already warns about
+  — the ratchet counts comment-*led* lines and the grep counts any comment
+  character. The densest untouched families the 09-26 entry named are
+  unchanged (`internal/prices` 10, `internal/claude` 13, `internal/night` 9),
+  and `web/src/index.css` — the densest file in the tree, and 09-26's deferred
+  slice — is **held by the Queen's unmerged #533**, which is the same blocker
+  that deferral has had twice now. Sweeping any of them tonight would mean
+  touching product files in a diff whose whole subject is the pass's own
+  surface, and the merged diffs carry zero dated prose to retire (part two).
+  **Slices done**, unchanged: `internal/sim/{cache,compile,curve,tier3}`
+  (08-24), `internal/api` non-test (09-05), `routes/Coliseum{,.test}.tsx`
+  (09-12), `components/board{,.test}.tsx` (09-19), `internal/sim/tier3` again
+  (09-26). **Not sweepable:** the five fingerprinted packages, unchanged.
+- **Measurements (2026-10-03, night, this Mac, serial lane, raw):**
+
+      queue on arrival, the file's own recipe       10
+      queue on arrival, daybreakrecord's extractor  10  (now held equal by a test)
+      queue after this lane                         11  (the one ruling below)
+      (open) markers by section, on arrival         White 2 · Blue 1 · Black 4 · Red 3 = 10
+      queue items by colour, on arrival             White 2 · Blue 1 · Black 4 · Red 3 = 10
+      (open) markers after this lane                the same, + Colorless 1 = 11
+      projected queue after the four open PRs       16  (#532 +1, #533 +0 rewrite, #534 +2, #535 +2)
+      two-places audit, tonight's merged lanes      3 of 3 clean
+      ledger-only questions found                   0
+      dated/process prose in code, a199cea..348e76e 0 hits
+      animist verify                                36 recipes / 36 held / exit 0   (34 on 09-26)
+      goDatedCommentCeiling                         94  (tree reads 93)
+      webDatedCommentCeiling                        269 (reference grep reads 362; different definition)
+      relic pass 1                                  148 dirs; 52 packages, 52 docs, 0 without
+      relic pass 2                                  336 non-source files
+      relic pass 4                                  97 docs by title
+      relic pass 6                                  14 rows, 0 findings
+      .claude/hooks                                 1 hook (+ an ignored __pycache__; trigger unfired)
+      live worktrees                                3 -- the main tree and TWO matching no lane
+      required checks, read from the API             8  (frontend, image, no-secrets-or-card-data,
+                                                        dependency-review, go (amd64), go (arm64),
+                                                        go-lint, tools)
+      Colorless 09-26 handoffs consumed             queued 2 of 2 answered 09-29 · deferred 2 of 4 fired
+      data/app.db                                   dated Sep 27 before and after; no server started
+
+- **(open) Queued for Aaron (2026-10-03): one — may the night's tooling live
+  in the repository instead of being rewritten every night?** Four files were
+  written in the scratchpad tonight and all four worked: `gowrap.sh`,
+  `deploy.sh`, `poll.sh` and `LANE_BRIEF.md`. Three of them are recipes
+  `SKILL.md` already describes in prose, which means every night pays to turn
+  prose into a working script before it can run a gauntlet or watch a deploy.
+  The proposal is `.claude/polish/` holding `gowrap.sh`, `deploy.sh` and the
+  lane brief, with `poll.sh` rewritten first so its required-check list is read
+  from `gh api … /branches/main/protection` rather than frozen as a literal —
+  the skill's own step 6 forbids the frozen form by name, and the list read
+  tonight matches it exactly, which is what makes the frozen version a trap
+  rather than an error. What it costs to leave: each night re-derives three
+  scripts and a brief, and the brief is where the harness traps and the
+  known load-flakes stop being learned one lane at a time. Recommendation is
+  on the queue.
+- **Deferred (2026-10-03), with triggers:**
+  - **A test that fails when `guard-git.py` goes inert.** *Trigger:* unchanged
+    — a second hook in `.claude/hooks/`, or the guard observed allowing a
+    spelling it documents refusing. Read tonight: one hook, plus an
+    `__pycache__` that `.gitignore` covers and `git ls-files` does not see.
+  - **`web/src/index.css` as a comment slice.** *Trigger:* the Queen's #533
+    merged. **Third cycle with the same blocker** — the sheet is the densest
+    file in the tree and it keeps being the file the Queen is rewriting, which
+    is not an accident and is worth saying rather than re-deferring silently:
+    the densest comment file is dense because it is the most-worked file.
+  - **Assigning the asset gate to a lane.** *Trigger:* the next **parallel**
+    wave. Unfired tonight (serial, main tree, gate run — fix 6), and the
+    mechanism it was waiting for now exists: lane files were written tonight,
+    so this is one line in one of them the moment the lanes are parallel again.
+  - **The reverse half of `daybreakrecord_test.go`.** *Consumed* — Aaron
+    answered "marker" on 09-29 and `TestTheLedgerAndTheQueueAgreeOnWhatIsOpen`
+    landed in #521. Recorded closed rather than deleted.
+- **Findings handed to other colours** (this run does not fix product code):
+  - **Red / the orchestrator:** `poll.sh`'s frozen required-check list, above.
+    It is Red's facet (CI) if the script is ever committed.
+  - **Nothing else.** No contradiction found between tonight's seven lanes;
+    the one adjacency was #533 and #534 both wanting the Coliseum's page, and
+    #534 stood down from `index.css` in writing (*"no CSS — the Queen's branch
+    holds `index.css` tonight"*), which is ownership working without a lane
+    file having to say it.
+- **Staleness, honestly stated** for the next bare `/polish`: every colour
+  carries a 2026-10-03 tag except **White**, whose last run is 2026-10-02 and
+  whose two owed items (the determinism replay, the per-version npm licence
+  re-read) are the oldest live work in the pass — though #535 is White's
+  coverage leg and lands tonight's tag on the section when it merges. Date
+  staleness is therefore near-nil and substance orders it: **Cleanup first**,
+  because the queue is eleven going on sixteen and five of those need only a
+  word; then **Green** (the authenticated phone sweep, still owed); then
+  **White** (the replay). One more note for the next night: tonight's lanes
+  split their own tag across two dates — Blue wrote `2026-10-02 (night)` and
+  Black and Red wrote `2026-10-03 (night)` for the same run — so `SKILL.md`'s
+  resume rule (*read which colours carry tonight's tag*) cannot answer "which
+  colours ran" for this night from the tag alone. Not corrected here, because
+  rewriting another colour's heading is exactly the overwrite this section
+  forbids; recorded so the next reader is not misled, and worth one sentence
+  in a lane brief: **the night's date is the date the orchestrator started,
+  and every lane writes that one.**
 
 ### 2026-09-26 (rainbow)
 
