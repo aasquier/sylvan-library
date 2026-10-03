@@ -750,3 +750,52 @@ func TestTheJavaSearchWalksTheGivenPathInOrder(t *testing.T) {
 		t.Error("an empty search path produced a JVM")
 	}
 }
+
+// [LoadSettings] — the production default, which `cmd/mtglab`'s `main` calls
+// once and nothing else in the tree calls at all.
+//
+// **A seam's default is the one line the deployed binary runs and no test
+// does.** Every question above is asked of [LoadSettingsFrom] against a map,
+// which is the whole point of the injection; the consequence nobody notices
+// is that the one-line wrapper composing it with [os.Getenv] drops to zero
+// coverage, and a wrapper handing down the wrong lookup — a `func(string)
+// string { return "" }` left behind by a debugging session, a second
+// `getenvOr` with a prefix — is invisible. Every override would silently
+// stop being read on the instance while every test above stayed green.
+//
+// So this asks the only question a test *can* ask without writing the
+// process environment: the settings this process loads must carry what this
+// process's environment actually says. `PATH` is the lever — it is set in
+// every process that can run a Go test, it is the one variable
+// [LoadSettingsFrom] copies verbatim rather than defaulting, and the JVM hunt
+// walks it, so a default reading a blank environment produces a Settings that
+// could never find Java.
+//
+// The sibling defaults in this shape are `config.Load`,
+// `claude.EndpointFromEnv`, `claude.SettingsFromEnv` and `pool.DownloadBulk`.
+func TestTheLoadedSettingsReadTheProcessTheyRunIn(t *testing.T) {
+	t.Parallel()
+	path := os.Getenv("PATH")
+	if path == "" {
+		t.Fatal("this process has no PATH, so the premise below cannot be " +
+			"asked; every environment that can run a Go test sets one")
+	}
+	loaded := LoadSettings()
+	if loaded.PathList != path {
+		t.Errorf("LoadSettings().PathList = %q, want this process's PATH %q "+
+			"— the default is not handing os.Getenv down", loaded.PathList, path)
+	}
+	// And the same lookup reaches the layout: with HOME set, the default
+	// Forge home sits under it rather than under an empty string's root.
+	if home := os.Getenv("HOME"); home != "" &&
+		!strings.HasPrefix(loaded.Home, home) &&
+		os.Getenv("MTGLAB_FORGE_HOME") == "" {
+		t.Errorf("LoadSettings().Home = %q, outside this process's HOME %q",
+			loaded.Home, home)
+	}
+	// The index is minted per load rather than shared, which is what makes
+	// two loaded configurations two machines.
+	if loaded.Index == nil {
+		t.Error("the loaded configuration has no card index")
+	}
+}
