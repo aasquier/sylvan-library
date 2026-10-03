@@ -159,6 +159,25 @@ the Coliseum).
 
 ## Open — a few clicks in the repository settings
 
+**Blue: the Coliseum has never fought a night, because the two switches that
+open it were never set on the instance — and this line spent a month reading
+as if it waited on something else.** `MTGLAB_NIGHT_WINDOW` and
+`MTGLAB_NIGHT_ZONE` are read at boot; unset means no scheduled nights, which is
+what `fly secrets list` has shown since ADR 46 landed (re-read 2026-10-03:
+zero `MTGLAB_NIGHT_*`, in secrets and in `fly.toml`). The earlier wording
+asked for the night shelf first; the shelf is a room to *read* the nights in,
+and nothing stops the nights running without it. · *Cost of leaving it:* the
+arena's record never moves, the Forge worker never wakes, and the Settings
+room's "the torches are not lit yet" stays true for the wrong reason. ·
+**Recommendation:** two minutes in your own session —
+`fly secrets set MTGLAB_NIGHT_WINDOW=01:00-04:00 MTGLAB_NIGHT_ZONE=America/Los_Angeles -a sylvan-library`
+(six bouts of ten games is about fifty minutes at the Forge's measured pace,
+so a three-hour window ends early rather than short; the other three switches
+keep their defaults) — then opt the decks that should fight into the arena
+after dark in the Settings room. After the first night, that Settings line
+becomes the untruth and the follow-up — the room reading the schedule off the
+wire — is real work for the next Blue run. Ledger: Blue, 2026-09-05.
+
 **White: nine Dependabot alerts, all `pip/torch`, all `development`, triaged in
 prose since 09-12 and never dismissed — two minutes in the Security tab.**
 Re-read from the API tonight: **9 open, 1 critical / 3 medium / 5 low, every
@@ -406,18 +425,6 @@ question of its own. Ledger: Black, 2026-08-24 (the carried list); re-checked
 2026-09-19 and 2026-09-28.
 
 ## Open — deliberately waiting, nothing to do yet
-
-**Blue: the Settings room says "the torches are not lit yet", and the only
-thing keeping that true is that you have not flipped the switch.** The line is
-hand-written into the bundle (`web/src/routes/Settings.tsx`) and true today,
-but the evening you set the five night secrets changes no code and rebuilds
-nothing, so the room would keep telling people the arena is dark while it
-fights. · *Cost of leaving it:* a small untruth on the one page where a person
-decides to enter their decks. · **What would have to be true:** the Coliseum's
-night shelf lands (ADR 46 names it as its own PR) and the settings room reads
-whether a night is scheduled off the wire. · **Recommendation:** unchanged —
-the copy becomes a fact the server owns when the shelf gives it something to
-read. Ledger: Blue, 2026-09-05.
 
 **Black: the cache-read price is one constant for the whole family, and the
 family stopped agreeing — but nothing is mispriced yet.**
