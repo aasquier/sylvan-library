@@ -50,6 +50,9 @@ type Fault struct {
 	// the two faults answer different questions and a test wants one at a
 	// time.
 	rows atomic.Int64
+	// rollbacks, when false, is a handle whose ROLLBACK fails too. A switch
+	// rather than a budget: see [Fault.FailRollbacks].
+	rollbacks atomic.Bool
 }
 
 // After arms the fault: the next n statements answer normally and every one
@@ -71,11 +74,32 @@ func (f *Fault) After(n int) { f.remaining.Store(int64(n)) }
 // a healthy database and a closed handle both hide.
 func (f *Fault) RowsAfter(n int) { f.rows.Store(int64(n)) }
 
-// Heal puts the handle back: every statement and every row answers again. For
-// the seeding a test does after it has proven the refusal.
+// FailRollbacks makes the ROLLBACK fail as well, and leaves the transaction
+// standing on the connection when it does.
+//
+// A switch rather than a budget, because a rollback is not a statement a
+// caller chose to run: it is what a `defer` does on the way out of every
+// failure, so counting it would make the budget mean something different
+// depending on which branch the code took. This is the volume that detached
+// -- where *nothing* works, the COMMIT and the ROLLBACK alike -- and it is the
+// only fixture that can reach the arm where a transaction has failed and
+// cannot be unwound. `database/sql`'s own `Tx.Rollback` is the one spelling
+// the statement budget never touches, because it goes to the driver's
+// transaction rather than through a connection's Exec.
+//
+// What it is for: `auth.discard` takes a connection away from the pool when
+// this happens, and without it the pinned connection goes back carrying an
+// open transaction -- a live instance that answers reads and writes nothing
+// until it restarts. A test arms this, provokes a failure, and then asks the
+// same handle to do a write.
+func (f *Fault) FailRollbacks() { f.rollbacks.Store(false) }
+
+// Heal puts the handle back: every statement, every row and every rollback
+// answers again. For the seeding a test does after it has proven the refusal.
 func (f *Fault) Heal() {
 	f.remaining.Store(-1)
 	f.rows.Store(-1)
+	f.rollbacks.Store(true)
 }
 
 // allow spends one statement of the budget, reporting whether it may run.
@@ -111,7 +135,8 @@ func OpenFaulty(path string) (*sql.DB, *Fault, error) {
 	if err := NewScratchDB(path); err != nil {
 		return nil, nil, err
 	}
-	return faultyHandle(path, "rw")
+	db, fault := faultyHandle(path, "rw")
+	return db, fault, nil
 }
 
 // OpenFaultyEmpty is [OpenFaulty] over a file with nothing in it — no schema,
@@ -122,28 +147,30 @@ func OpenFaulty(path string) (*sql.DB, *Fault, error) {
 // recorded schema, and the ladder is what produces it, so a fixture that
 // applied the schema first would leave the ladder with nothing to climb.
 func OpenFaultyEmpty(path string) (*sql.DB, *Fault, error) {
-	return faultyHandle(path, "rwc")
+	db, fault := faultyHandle(path, "rwc")
+	return db, fault, nil
 }
 
-func faultyHandle(path, mode string) (*sql.DB, *Fault, error) {
+// faultyHandle builds the handle, and has nothing to fail at: neither of the
+// two calls it makes can. `sql.Open` records a DSN and names a driver (this
+// package's import list registers it), and `Close` on a handle that has never
+// been asked for a connection has no connection to close. Both used to be
+// checked here, and both branches were unenterable -- a fixture whose own
+// error paths cannot fire is a fixture reading as more careful than it is.
+func faultyHandle(path, mode string) (*sql.DB, *Fault) {
 	dsn := "file:" + path + "?mode=" + mode +
 		"&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
 	// The driver is borrowed from a handle rather than named: `sql.OpenDB`
 	// wants a connector, and taking the registered driver off a throwaway
 	// handle avoids registering a second name for what is the same driver.
-	plain, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, nil, fmt.Errorf("faulty app.db: %w", err)
-	}
+	plain, _ := sql.Open("sqlite", dsn)
 	inner := plain.Driver()
-	if err := plain.Close(); err != nil {
-		return nil, nil, fmt.Errorf("faulty app.db: %w", err)
-	}
+	_ = plain.Close()
 	fault := &Fault{}
 	fault.Heal()
 	db := sql.OpenDB(&faultyConnector{dsn: dsn, driver: inner, fault: fault})
 	db.SetMaxOpenConns(1)
-	return db, fault, nil
+	return db, fault
 }
 
 type faultyConnector struct {
@@ -255,7 +282,15 @@ func (t *faultyTx) Commit() error {
 	return t.real.Commit()
 }
 
-func (t *faultyTx) Rollback() error { return t.real.Rollback() }
+func (t *faultyTx) Rollback() error {
+	if !t.fault.rollbacks.Load() {
+		// Left open on purpose, and the whole point: the transaction is still
+		// standing on the connection, which is the state `auth.discard` exists
+		// to get the handle out of.
+		return ErrGoneAway
+	}
+	return t.real.Rollback()
+}
 
 // faultyRows is the result set under [Fault.RowsAfter]: it hands back the
 // rows it was given until the budget runs out, and then fails the iteration
