@@ -137,6 +137,19 @@ type Config struct {
 	// `app.db`. A nil `*cache.Store` is a working store that caches nothing,
 	// so no caller branches on it.
 	SimCache *cache.Store
+	// ETagCounts reads the door's static-file ETag memo -- the one cache in
+	// this process that does not live under this package, handed in as a
+	// reader rather than reached for.
+	//
+	// It has to be a value for two independent reasons. `internal/door`
+	// imports `internal/api` and never the reverse (`layering_test.go` holds
+	// it), so this package cannot name a `*staticSite` at all; and the door
+	// builds its static site *before* it builds this API, so even inside the
+	// door there is nothing to point at until the composition root ties the
+	// two together. A door sets this to its site's own counter; everything
+	// else leaves it nil, and nil renders as `null` rather than as zeros --
+	// see [API.cacheCounts] for why that distinction is the whole point.
+	ETagCounts func() (hits, misses int)
 	// Mail is what EmailSender falls back to when it is nil: the three
 	// settings `auth.SenderFor` chooses between. Passed rather than looked up,
 	// so a test describes an instance with no mail key instead of unsetting
@@ -210,9 +223,13 @@ type API struct {
 	// deckMemo is the process's memory of parsed deck files, handed down
 	// through `library.Resolver` into every file tier a request builds. It
 	// lives here and not on the source because a source lives for one
-	// request; `library.Memo` argues the rest. Read by tests, rendered
-	// nowhere.
+	// request; `library.Memo` argues the rest. Its hit count is read by tests
+	// and by the admin stats route's cache register ([API.cacheCounts]);
+	// nothing a player can see renders it.
 	deckMemo *library.Memo
+	// etagCounts is [Config.ETagCounts]: the door's ETag memo, or nil when
+	// nothing above this API serves static files.
+	etagCounts func() (hits, misses int)
 
 	scryfallDir string
 	dataDir     string
@@ -272,7 +289,7 @@ func New(cfg Config) *API {
 		mail:        cfg.Mail, clientIPHeader: cfg.ClientIPHeader,
 		claude: cfg.Claude, forge: cfg.Forge,
 		setsFeed: cfg.SetsFeed, bulkIndex: cfg.BulkIndex,
-		deckMemo: library.NewMemo()}
+		deckMemo: library.NewMemo(), etagCounts: cfg.ETagCounts}
 	a.playCore = a.playForgeMatch
 	return a
 }
