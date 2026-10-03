@@ -85,7 +85,7 @@ var mediaExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true,
 	".svg": true, ".avif": true, ".ico": true,
 	".mp4": true, ".webm": true, ".mov": true,
-	".mp3": true, ".ogg": true, ".wav": true,
+	".mp3": true, ".ogg": true, ".wav": true, ".m4a": true, ".aac": true,
 	".woff": true, ".woff2": true, ".ttf": true, ".otf": true,
 }
 

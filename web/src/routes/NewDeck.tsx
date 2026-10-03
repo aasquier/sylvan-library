@@ -140,9 +140,10 @@ export default function NewDeck() {
     }
   }, [mode])
 
-  // Whether the séance deal is the event right now — the table reports it
+  // Whether a room is the event right now — the table reports it
   // (`TarotTable onCeremony`), and while it is, the masthead and the doors
-  // step aside so the room and its cards can share one screen.
+  // step aside so the room can have the screen. It began as the séance deal
+  // alone and is every seated room since the footage walk.
   const [ceremony, setCeremony] = useState(false)
 
   const [tier, setTier] = useState('guild')
@@ -386,10 +387,12 @@ export default function NewDeck() {
 
   return (
     <div className="space-y-8">
-      {/* The masthead and the doors step aside while the séance deal is the
-          event (Aaron's item 6): the felt used to start ~500px down the
-          page, and the room could never share a screen with its own cards.
-          `ceremony` is the table's own word for it, via `onCeremony`. */}
+      {/* The masthead and the doors step aside while a room is the event
+          (Aaron's item 6, widened on the footage walk): the felt used to
+          start ~500px down the page, and the room could never share a screen
+          with its own cards — and a tavern with the page's own header and
+          tabs over it was two pages at once. `ceremony` is the table's own
+          word for it, via `onCeremony`. */}
       {!ceremony && (
       <header className="space-y-3">
         <PageMasthead

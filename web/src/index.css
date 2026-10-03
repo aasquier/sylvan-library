@@ -2668,21 +2668,20 @@ button:hover .tarot-fan-card {
  *
  * `--pot-dy` does NOT mean what `--ball-dy` means, and the difference is real:
  * the sphere is a circle read against two axes, and a cauldron seen from a
- * standing person's height is an ellipse 0.16 as tall as it is wide. Both
- * readings are recorded in `assets/agatha/PROVENANCE.md`, because they answer
- * different questions — 40.9% is the circle that HANGS OVER the pot, and
- * 6.54% is the mouth's own opening, which is what anything landing IN the brew
- * wants.
+ * standing person's height is an ellipse — here 0.11 as tall as it is wide,
+ * the inner rim of the mouth measured off the footage's own still
+ * (`assets/agatha/PROVENANCE.md`). The earlier numbers were the Waterhouse
+ * plate's and went with it.
  *
- * Re-measure all four against the first frame of any footage that replaces the
- * plate, and nothing else. Nothing is cropped, so nothing drifts: `cover` on a
+ * Re-measure all four against the still of any footage that replaces this
+ * one, and nothing else. Nothing is cropped, so nothing drifts: `cover` on a
  * box whose aspect IS the picture's is deliberately a no-op, and a crop that
  * moved with the viewport would move the pot out from under the splash. */
 .cauldron-pot {
-  --pot-x: 66%; /* centre of the mouth, across the plate */
-  --pot-y: 36%; /* ...and down it */
-  --pot-d: 23%; /* the mouth's major axis, as % of plate WIDTH */
-  --pot-dy: 6.54%; /* ...and its minor axis, as % of plate HEIGHT */
+  --pot-x: 49.9%; /* centre of the mouth, across the plate */
+  --pot-y: 54.9%; /* ...and down it */
+  --pot-d: 27.2%; /* the mouth's major axis, as % of plate WIDTH */
+  --pot-dy: 5.3%; /* ...and its minor axis, as % of plate HEIGHT */
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -2703,78 +2702,16 @@ button:hover .tarot-fan-card {
   pointer-events: none;
 }
 
-/* LAYER 0b · the dusk, and it is a treatment rather than a bake.
+/* LAYER 0 was once followed by a dusk and a breathing ember bed, both drawn
+ * for the Waterhouse plate — a daylit oil that wanted holding back, and a
+ * photograph of a painting whose fire would never move on its own. The plate
+ * is footage now and already dark, with a real fire under the
+ * pot, so both layers are gone rather than switched off: a shade over a dark
+ * room is a hole, and a screened glow over real embers is two fires.
  *
- * The painting is daylit — mean luma 104 against the séance still's 52 — and
- * `fabrica.recipe.yaml` states the rule for holding one back: *"a level baked
- * into the byte stream is a decision `index.css` can no longer argue with"*.
- * So the committed file is the crop and nothing else, and this is the shade.
- * A black multiply at alpha `a` composites to exactly `v * (1 - a)`, which is
- * why the stylesheet and a bake are the same arithmetic and the stylesheet is
- * the right half of the line to put it on.
- *
- * The five stops are a smoothstep written out: CSS interpolates a gradient
- * linearly, and two stops alone put a visible shoulder across the sorceress.
- * Open over the cauldron, closing to dusk at the frame's edges — the measured
- * result is mean 54.1 / p90 116.1, inside the house's dark cluster. */
-.cauldron-dusk {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-  background: radial-gradient(25% 68% at 70% 44%,
-    rgba(0, 0, 0, 0) 55%,
-    rgba(0, 0, 0, 0.106) 66.25%,
-    rgba(0, 0, 0, 0.34) 77.5%,
-    rgba(0, 0, 0, 0.574) 88.75%,
-    rgba(0, 0, 0, 0.68) 100%);
-}
-
-/* LAYER 0c · the fire, breathing. The room's idle heartbeat.
- *
- * The plate is a photograph of a painting and photographs do not move, so
- * every other beat in this room is an *event* — a thing goes in, the colour
- * steps, the pot is poured. Between them the hut sat perfectly still, which is
- * commandment 6's exact complaint. A fire is the one thing in the picture that
- * would never be still, so the fire is what gets the pulse.
- *
- * Centred on the embers themselves rather than on the pot: 67.8% across and
- * 52.6% down, measured off the plate (`assets/agatha/PROVENANCE.md` records
- * the reading), which is below and right of the mouth's own centre. A quarter
- * of the plate wide, and the height is that same distance read against the
- * short side — 16:9 means one circle needs two percentages, which is the
- * hotspot contract's own note about `--pot-d` and `--pot-dy`.
- *
- * Screened, so it only ever ADDS to what Waterhouse already painted there. */
-.cauldron-embers {
-  position: absolute;
-  left: 67.8%;
-  top: 52.6%;
-  width: 25%;
-  height: 44.4%;
-  translate: -50% -50%;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  border-radius: 50%;
-  background: radial-gradient(ellipse closest-side,
-    rgba(255, 148, 52, 0.5) 0%,
-    rgba(214, 92, 22, 0.28) 42%,
-    rgba(140, 48, 10, 0.11) 68%,
-    transparent 88%);
-  filter: blur(10px);
-  opacity: 0.48;
-  animation: cauldron-embers 4.4s ease-in-out infinite;
-}
-
-@keyframes cauldron-embers {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
+ * The drawn stack from here down renders only where the film does not —
+ * reduced motion, or the ambience switch off — and on the film path nothing
+ * at all is drawn over the pot. */
 
 /* LAYER 1 · the dim, and it is the layer the whole effect turns on.
  * `.seance-glass-dim`'s argument verbatim: near-white plus anything is
@@ -2785,8 +2722,8 @@ button:hover .tarot-fan-card {
  * painted rim light with it and handed the layers above a black hole to draw
  * on, which is how the brew ended up being asked to supply ALL the light and
  * came out the colour of milk. At 0.84 the interior is a warm near-black and
- * Waterhouse's gold still kisses the far edge of the mouth, which is the light
- * the whole composition is lit by. */
+ * the rim's own light still kisses the far edge of the mouth, which is the
+ * light the whole composition is lit by. */
 .cauldron-dim {
   position: absolute;
   left: var(--pot-x);
@@ -2850,6 +2787,34 @@ button:hover .tarot-fan-card {
     opacity: 0.78;
     scale: 1.015 1.05;
   }
+}
+
+/* On the film path nothing is drawn over the pot. A tint of the brew's level
+ * on the real surface was tried and cut on Aaron's fifth walk: the reaction
+ * clips carry the change, and the level reaches the eye through the sockets
+ * and the words instead.
+ *
+ * The reactions: three one-shot clips over the loop, each the same frame as
+ * the plate (`cover` on the same box), invisible until it plays and fading
+ * back to the loop when it ends. The fade is what hides that the loop
+ * underneath is at some other moment of its steam. */
+.cauldron-reactions {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cauldron-reaction {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 320ms ease-out;
+}
+.cauldron-reaction.is-playing {
+  opacity: 1;
+  transition-duration: 140ms;
 }
 
 /* LAYER 3 · two soft caustics crawling on the surface, on a period that
@@ -3606,9 +3571,15 @@ button:hover .tarot-fan-card {
  * second measurement anywhere in this file. */
 .cauldron-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* One column: the sockets ride UNDER the picture now, not beside it. With
+     the sockets alongside, the folded hut got two thirds of the column and
+     was "still tiny" on the second walk; the picture is the point of this
+     room, so it takes the whole width and the three places read as its
+     caption. */
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 0.75rem;
+  padding-bottom: 0.75rem;
   border: 1px solid color-mix(in srgb, var(--copper) 30%, transparent);
   border-radius: 0.75rem;
   overflow: hidden;
@@ -3618,19 +3589,31 @@ button:hover .tarot-fan-card {
 
 .cauldron-strip-window {
   position: relative;
-  height: clamp(84px, 11vw, 126px);
+  /* The whole room, not a band. With the painting this was an 84-126px strip
+     magnified 1.7x onto the mouth; with the footage that was "way too small
+     and awkward", and a third-of-the-viewport panel at 1.15x was "still
+     tiny" — Aaron's words on the first two walks. So the folded pot is the
+     full picture at its own 16:9, as wide as the panel, capped at half the
+     viewport; when the cap bites, the crop is a band centred on the mouth
+     rather than a second composition. The conversation starts under it,
+     which is the trade the walk asked for: the hut is the point of this
+     room, and the reactions play on something the eye can actually see. */
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 52vh;
   overflow: hidden;
   isolation: isolate;
 }
 
-/* The same room, closer. `--cauldron-zoom` is the magnification and both
-   numbers below derive from it: the stage is that much wider than the window,
-   and it is pushed left by exactly as much as that magnification moves the
-   mouth. Vertically, `translateY(-36%)` of the stage's OWN height puts the
-   point at 36% of that height on the window's midline. Derived from the
+/* The same room at its own size. `--cauldron-zoom` is the magnification and
+   both numbers below derive from it: the stage is that much wider than the
+   window, and it is pushed left by exactly as much as that magnification
+   moves the mouth. Vertically, `translateY(calc(-1 * var(--pot-y)))` of the
+   stage's OWN height puts the mouth on the window's midline, which only
+   matters once `max-height` has cropped the picture. Derived from the
    contract, never re-measured. */
 .cauldron-strip-stage {
-  --cauldron-zoom: 1.7;
+  --cauldron-zoom: 1;
   position: absolute;
   width: calc(100% * var(--cauldron-zoom));
   left: calc(50% - var(--cauldron-zoom) * var(--pot-x));
@@ -3646,8 +3629,10 @@ button:hover .tarot-fan-card {
  * buttons. */
 .cauldron-sockets {
   display: flex;
-  gap: 0.6rem;
-  padding: 0 1rem;
+  /* Room between the three: under the full-width picture they sat shoulder
+     to shoulder and MEADOWSWEET ran into HENBANE (Aaron's fifth walk). */
+  gap: 2.25rem;
+  padding: 0.25rem 1.5rem 0;
   margin: 0;
   list-style: none;
 }
@@ -4034,13 +4019,6 @@ button:hover .tarot-fan-card {
   .cauldron-glow,
   .cauldron-window.is-serving .cauldron-brew {
     /* Their 0% frame reads, so these only need arresting. */
-    animation: none;
-  }
-  /* The fire holds at the middle of its own breath rather than at either end
-     of it: a hearth stopped at its dimmest is a hearth going out, and one
-     stopped at its brightest is a flare. */
-  .cauldron-embers {
-    opacity: 0.48;
     animation: none;
   }
   /* All three dots, standing still. The sentence is still the sentence and
@@ -8876,6 +8854,171 @@ button:hover .tarot-fan-card {
  * background propagates to the canvas, so there is nothing of body's own to
  * paint over it — and below every in-flow element in `#root`, which is
  * static and transparent. */
+/* ── a room that is footage ───────────────────────────────────────────────
+ *
+ * `components/roomplate.tsx`: the loop across the whole window, one veil, and
+ * nothing else on top — Aaron's ruling on the first clips. The
+ * same fixed, behind-everything placement as `.scene-backdrop` below, for
+ * the same reason, and `cover` because a 16:9 clip on a phone held upright
+ * keeps its middle: the fire, the bar, the thing the room is about. The veil
+ * is a shade (commandment 19's shape), darker at the foot where the words
+ * are and at the edges, and it is deliberately light: both clips were
+ * measured dark already (mean luma 26 and 41) and the words sit on their own
+ * surfaces. */
+.room-plate {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background: #07080a;
+}
+.room-plate-film {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.room-plate-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.22) 55%,
+      rgba(0, 0, 0, 0.5) 100%),
+    radial-gradient(ellipse 70% 60% at 50% 40%, transparent 50%,
+      rgba(0, 0, 0, 0.4) 100%);
+}
+/* While a footage room is open the forest steps out: no fireflies, no
+   falling leaves, no canopy over the header. Two pictures at once is one too
+   many, and the room is the picture. The ambience layer is removed rather
+   than faded (its motion is the distraction); the canopy keeps its box so
+   the header does not reflow under the person. */
+body.in-footage-room .forest-ambience {
+  display: none;
+}
+body.in-footage-room .header-canopy {
+  visibility: hidden;
+}
+
+/* The room's floor plan. The section fills the window under the header and
+   the conversation sits at its foot, so the picture's middle — the fire, the
+   bar — is the thing on screen and the words sit where a caption would. On
+   the second walk the chat card sat dead centre over the best of the film
+   and the footer floated under it mid-page; now the page is a window tall
+   and the footer is where a footer goes, at the end. The conversation column
+   is narrower than the painted rooms' for the same reason: it is a caption,
+   not a page. */
+.persona-room.is-footage {
+  display: flex;
+  flex-direction: column;
+  /* Measured, not guessed (`a-css-constant-is-measured-against-one-screen`
+     notwithstanding — this one is the page's own chrome, not the device's):
+     the section's top sits 236px below the page top at 1440x900 — header,
+     page padding, the hidden masthead's gap — and `main` keeps 2rem under
+     it. 15.5rem puts the floor's foot a dozen pixels above the fold and the
+     footer just under it, which is where a footer goes. */
+  min-height: calc(100vh - 15.5rem);
+}
+.persona-room.is-footage > .room-floor {
+  margin-top: auto;
+  /* The aside sits in the lower corner, level with the card's foot, rather
+     than hanging from the top of the floor under the buttons: the two
+     corners are the room's furniture and the picture is what is between
+     them. */
+  align-items: end;
+}
+.persona-room.is-footage > .room-floor > :first-child {
+  max-width: 44rem;
+}
+
+/* ── the fireside ─────────────────────────────────────────────────────────
+ *
+ * The material the two firelit footage rooms wear (`lib/costumes.ts`): dark
+ * glass over the picture, the room's accent as the one rule, a serif for the
+ * question, and an answer box that is a lit line rather than a boxed field.
+ * The blur is on OUR glass, never on the film (commandment 19 shaped, out of
+ * habit). Everything reads `--room-accent`, which is what makes the tavern
+ * brass and the campfire ember without a second family. */
+.fireside-card {
+  position: relative;
+  border-radius: 0.9rem;
+  padding: 1.1rem 1.3rem 1.2rem;
+  color: #f3e9d8;
+  /* Thinner than the first cut (0.6 → 0.38, blur 12 → 9): Aaron's third walk
+     asked for more of the room through the glass. The text-shadow on the
+     question is what keeps it legible over a bright log. */
+  background:
+    radial-gradient(120% 90% at 50% 120%,
+      color-mix(in srgb, var(--room-accent) 14%, transparent), transparent 60%),
+    rgba(9, 7, 5, 0.38);
+  -webkit-backdrop-filter: blur(9px) saturate(1.1);
+  backdrop-filter: blur(9px) saturate(1.1);
+  border: 1px solid color-mix(in srgb, var(--room-accent) 22%, transparent);
+  border-top-color: color-mix(in srgb, var(--room-accent) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 224, 0.07),
+    0 18px 44px rgba(0, 0, 0, 0.5);
+}
+/* The sign in the card's corner: the emblem struck small, the room's name in
+   small caps beside it, both in the accent. A letterhead, not a badge. */
+.fireside-sign {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--room-accent) 82%, #fff);
+}
+.fireside-sign .room-sign svg {
+  width: 1.7rem;
+  height: 1.7rem;
+}
+.fireside-question {
+  font-family: var(--font-serif, Georgia, 'Times New Roman', serif);
+  font-size: 1.08rem;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+.fireside-said {
+  color: #f6efe3;
+  background: color-mix(in srgb, var(--room-accent) 18%, rgba(0, 0, 0, 0.55));
+  border: 1px solid color-mix(in srgb, var(--room-accent) 32%, transparent);
+}
+.fireside-note {
+  color: rgba(243, 233, 216, 0.72);
+  font-style: italic;
+}
+/* The pen: no box, one line, and the line answers the hand. Rest is a dim
+   rule; hover warms it; focus lights it and lets a little of the room's
+   colour rise off it (commandment 17: every control replies). */
+.fireside-pen {
+  background: rgba(0, 0, 0, 0.32);
+  color: #f6efe3;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--room-accent) 40%, transparent);
+  border-radius: 0.5rem 0.5rem 0 0;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 220ms ease, background 180ms ease;
+}
+.fireside-pen::placeholder {
+  color: rgba(243, 233, 216, 0.45);
+}
+.fireside-pen:hover {
+  border-bottom-color: color-mix(in srgb, var(--room-accent) 65%, transparent);
+  background: rgba(0, 0, 0, 0.38);
+}
+.fireside-pen:focus {
+  border-bottom-color: var(--room-accent);
+  box-shadow:
+    0 1px 0 var(--room-accent),
+    inset 0 -14px 28px -20px var(--room-accent);
+  background: rgba(0, 0, 0, 0.42);
+}
+
 .scene-backdrop {
   position: fixed;
   inset: 0;

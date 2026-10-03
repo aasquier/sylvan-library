@@ -164,10 +164,51 @@ const COSTUMES: Partial<Record<PersonaKey, Costume>> = {
     readyAction: 'Pour it out',
     action: 'btn-copper-hot',
   },
+
+  /* The two firelit rooms that are footage (`lib/roomfootage.ts`) share one
+     material, the fireside: dark glass over the picture with the room's own
+     accent as the rule, the question set in a serif, and an answer box that
+     is a lit line rather than a boxed field. One family of classes for both
+     because the tavern's hearth and the campfire are the same light, and the
+     accent (`--room-accent`) is what tells them apart. Every class here is
+     defined in `index.css` under "a room that is footage". The wording is
+     each room's own. */
+  barkeep: {
+    mood: 'mist',
+    scroll: 'fireside-card',
+    question: 'fireside-question',
+    bubble: 'fireside-said',
+    note: 'fireside-note',
+    quill: 'fireside-pen',
+    placeholder: 'Say it the way you’d say it at the bar…',
+    ink: false,
+    thinking: 'He wipes the counter and waits…',
+    emptyReply: 'Lost that one under the noise — once more, when you’re ready.',
+    reading: 'Pouring one while it’s worked out…',
+    ready: 'That’s a round’s worth. He has a notion.',
+    readyAction: 'Hear it',
+    action: '',
+  },
+  storyteller: {
+    mood: 'mist',
+    scroll: 'fireside-card',
+    question: 'fireside-question',
+    bubble: 'fireside-said',
+    note: 'fireside-note',
+    quill: 'fireside-pen',
+    placeholder: 'Tell it the way it happened…',
+    ink: false,
+    thinking: 'A log settles. She thinks on it…',
+    emptyReply: 'The wind took that one. Tell it again.',
+    reading: 'Finding the shape of it…',
+    ready: 'Three tales told. She knows which one is yours.',
+    readyAction: 'Hear it told',
+    action: '',
+  },
 }
 
-/** What this room is wearing. A voice with no costume — which is seven of the
- *  eight, and every voice the server grows tomorrow — gets the plain room. */
+/** What this room is wearing. A voice with no costume — five of the eight,
+ *  and every voice the server grows tomorrow — gets the plain room. */
 export function costumeFor(persona: string): Costume {
   return COSTUMES[persona as PersonaKey] ?? PLAIN
 }
