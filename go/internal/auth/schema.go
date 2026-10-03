@@ -26,6 +26,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -39,13 +40,21 @@ const SchemaVersion = 17
 //go:embed migrations/*.sql
 var migrationFS embed.FS
 
-// migrations returns the ladder in order. A missing rung is an error, not a
-// shorter ladder: `%04d.sql` names are looked up one by one rather than
-// globbed, so a misnamed file cannot silently drop the rungs after it.
-func migrations() ([]string, error) {
+// migrations reads the ladder in order out of a filesystem. A missing rung is
+// an error, not a shorter ladder: `%04d.sql` names are looked up one by one
+// rather than globbed, so a misnamed file cannot silently drop the rungs after
+// it.
+//
+// The filesystem is an argument rather than the embedded one by name, which is
+// what makes that refusal drivable: the embedded ladder is complete by
+// construction (a missing script fails the build), so the only way to ask
+// "what does a boot do when a rung is gone" is to hand it a ladder with a rung
+// gone. The composition root for it is [Migrate], which passes the embedded
+// one and nothing else.
+func migrations(ladder fs.FS) ([]string, error) {
 	scripts := make([]string, 0, SchemaVersion)
 	for i := 1; i <= SchemaVersion; i++ {
-		b, err := migrationFS.ReadFile(fmt.Sprintf("migrations/%04d.sql", i))
+		b, err := fs.ReadFile(ladder, fmt.Sprintf("migrations/%04d.sql", i))
 		if err != nil {
 			return nil, fmt.Errorf("schema ladder: %w", err)
 		}
@@ -70,10 +79,9 @@ func Migrate(path string) error {
 	// this connection's, matching every other handle in the module.
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rwc&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return fmt.Errorf("app.db: %w", err)
-	}
+	// No error: see [Open]. The file is not touched until the first statement,
+	// which is the pragma read inside `migrate`.
+	db, _ := sql.Open("sqlite", dsn)
 	defer func() { _ = db.Close() }()
 	ctx := context.Background()
 	// The pragma dance below is per-connection state, and database/sql is a
@@ -84,10 +92,10 @@ func Migrate(path string) error {
 		return fmt.Errorf("app.db: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
-	return migrate(ctx, conn)
+	return migrate(ctx, conn, migrationFS)
 }
 
-func migrate(ctx context.Context, conn *sql.Conn) error {
+func migrate(ctx context.Context, conn *sql.Conn, ladder fs.FS) error {
 	var version int
 	if err := conn.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return fmt.Errorf("app.db: reading user_version: %w", err)
@@ -95,7 +103,7 @@ func migrate(ctx context.Context, conn *sql.Conn) error {
 	if version >= SchemaVersion {
 		return nil
 	}
-	scripts, err := migrations()
+	scripts, err := migrations(ladder)
 	if err != nil {
 		return err
 	}

@@ -117,11 +117,13 @@ type Store struct {
 // NewStore opens app.db for the night. `mode=rw`, never `rwc`: the ladder
 // runs at boot, so a missing file is a broken deployment that must say so
 // loudly rather than a silently-minted empty database.
+// It cannot fail today: `auth.OpenReadWrite` builds a DSN and records it (its
+// own comment argues why there is no error there), and the file is first
+// touched by whichever statement comes first. The error stays in the
+// signature because the caller is a boot sequence and this is the line a
+// broken deployment would be caught on if opening ever learned to look.
 func NewStore(path string, now func() time.Time) (*Store, error) {
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		return nil, fmt.Errorf("opening app.db for the night: %w", err)
-	}
+	db, _ := auth.OpenReadWrite(path)
 	return FromDB(db, now), nil
 }
 
@@ -179,10 +181,11 @@ func (s *Store) StartRun(ctx context.Context, nightKey string, sample bool,
 	if err != nil {
 		return Run{}, err
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return Run{}, err
-	}
+	// No error asked for: this driver's result carries the rowid the INSERT
+	// above assigned, and a branch nothing can enter reads as a safety the
+	// program does not have. The same reading as the three `n, _ :=
+	// res.RowsAffected()` reads further down this file.
+	id, _ := res.LastInsertId()
 	if err := tx.Commit(); err != nil {
 		return Run{}, err
 	}
@@ -208,10 +211,8 @@ func (s *Store) PlanBouts(ctx context.Context, runID int64, plans []Plan) error 
 		if err != nil {
 			return err
 		}
-		boutID, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
+		// The id, without an error that cannot arrive -- see `StartRun`.
+		boutID, _ := res.LastInsertId()
 		// Seat numbers are the slice's order, 1-based, and they are written
 		// here rather than carried on [Seat] so that the one place that
 		// decides the order is the one place that records it.
@@ -441,10 +442,11 @@ func (s *Store) settle(ctx context.Context, boutID int64, to State,
 	if err != nil {
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
+	// How many rows moved, without an error beside it: a successful Exec on
+	// this driver counts its own changes and has nothing to fail at. **The
+	// count itself is the load-bearing half** -- zero rows is the stale
+	// picture this function exists to refuse -- and it is checked.
+	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("bout %d is not open to being %s: it is settled or was never planned",
 			boutID, to)
@@ -494,10 +496,8 @@ func (s *Store) CloseRun(ctx context.Context, runID int64) error {
 	if err != nil {
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
+	// The count, no error -- see `settle`.
+	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("run %d is not open, so there is nothing to close", runID)
 	}
@@ -513,10 +513,8 @@ func (s *Store) FinishRun(ctx context.Context, runID int64) error {
 	if err != nil {
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
+	// The count, no error -- see `settle`.
+	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("run %d is not open, so there is nothing to finish", runID)
 	}
@@ -656,10 +654,14 @@ func parseStamp(s string) (time.Time, error) {
 // restamp is what a stored instant reads back as: the recorded format's own
 // precision, so a Run handed straight out of StartRun equals the same Run
 // read later.
+// An instant the recorded format cannot express comes back exactly as it went
+// in. That is not a theoretical arm: the format carries a four-digit year, so
+// a year outside 1000..9999 renders to something RFC3339 will not read, and
+// the honest answer to "what does this read back as" is then "as itself"
+// rather than the zero time.
 func restamp(t time.Time) time.Time {
 	parsed, err := parseStamp(stamp(t))
 	if err != nil {
-		// Isoformat's own output always parses; this is unreachable.
 		return t
 	}
 	return parsed

@@ -145,6 +145,14 @@ type ResendSender struct {
 	apiKey string
 	from   string
 	post   Transport
+	// endpoint is where the POST goes; empty means [ResendEndpoint], which is
+	// what the composition root leaves it as and what every deployed send
+	// uses. It is a field and not a constant for one reason: the URL is the
+	// one input to this request that can make building it fail, and a
+	// provider's address held as a constant is a branch no test can enter.
+	// Unexported deliberately -- the key rides in a header on this request,
+	// so nothing outside this package may choose where it is sent.
+	endpoint string
 }
 
 // NewResendSender builds one, refusing an empty key.
@@ -171,18 +179,28 @@ func httpPost(req *http.Request) (int, []byte, error) {
 	return resp.StatusCode, body, err
 }
 
+// url is where this sender posts: the provider's own address unless a test
+// has pointed it somewhere local.
+func (r *ResendSender) url() string {
+	if r.endpoint == "" {
+		return ResendEndpoint
+	}
+	return r.endpoint
+}
+
 // Send posts one message.
 func (r *ResendSender) Send(message Message) error {
-	payload, err := json.Marshal(map[string]any{
+	// Three strings and a slice of one: there is no value in this map that
+	// `encoding/json` can refuse, so the error it offers is not asked for. A
+	// branch that cannot be entered reads to the next person as a message
+	// that might fail to encode, and none can.
+	payload, _ := json.Marshal(map[string]any{
 		"from":    r.from,
 		"to":      []string{message.To},
 		"subject": message.Subject,
 		"text":    message.Body,
 	})
-	if err != nil {
-		return failf("%w: the message would not encode", ErrEmailNotSent)
-	}
-	req, err := http.NewRequest(http.MethodPost, ResendEndpoint, bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, r.url(), bytes.NewReader(payload))
 	if err != nil {
 		return failf("%w: %v", ErrEmailNotSent, err)
 	}

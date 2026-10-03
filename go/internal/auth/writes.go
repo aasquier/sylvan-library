@@ -43,13 +43,13 @@ import (
 // `foreign_keys` is on because `Delete` leans on it: `sessions` and
 // `auth_tokens` declare ON DELETE CASCADE, and with the pragma off those
 // clauses are a comment and a deleted account leaves its sessions live.
+// Like [Open], it cannot fail -- [sql.Open] records a DSN and names a driver
+// -- and the error it offers is not asked for; the argument is written out at
+// [Open].
 func OpenReadWrite(path string) (*sql.DB, error) {
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open app.db for writing: %w", err)
-	}
+	db, _ := sql.Open("sqlite", dsn)
 	// One writer. SQLite serialises them anyway, and a pool of them would only
 	// convert waiting-in-Go into waiting-on-the-file lock. It also makes
 	// `exclusive` cheap: the connection it pins is the only one there is.

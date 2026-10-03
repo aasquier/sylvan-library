@@ -86,7 +86,7 @@ func TestMigrateBuildsTheRecordedSchema(t *testing.T) {
 // in for an instance that stopped upgrading at an earlier deploy.
 func buildAtRung(t *testing.T, path string, k int) {
 	t.Helper()
-	scripts, err := migrations()
+	scripts, err := migrations(migrationFS)
 	if err != nil {
 		t.Fatalf("migrations: %v", err)
 	}
