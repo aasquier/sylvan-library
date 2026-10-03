@@ -153,19 +153,36 @@ func rejectf(format string, args ...any) error {
 // resolve the deck (404 before anything else), and refuse a caller who may
 // read but not write before the body is even parsed.
 func (a *API) writeTarget(w http.ResponseWriter, r *http.Request) (library.Source, *deck.Deck, bool) {
+	src, _, d, ok := a.writeTargetWith(w, r)
+	return src, d, ok
+}
+
+// writeTargetWith is [API.writeTarget] and the write half it already resolved.
+//
+// **The writer it threw away.** `writeTarget` has always asked for a
+// `library.Writer` and discarded it, purely to refuse a caller who may read and
+// not write -- so every route that went on to need one asked again, with the
+// same source and the same slug, and checked an error that by then could not be
+// anything but nil. Five of those second asks sat uncovered, one per write verb.
+// Handing the writer back closes them by not asking: there is one resolution
+// per request, and the refusal a reader meets is in one place rather than two.
+func (a *API) writeTargetWith(w http.ResponseWriter, r *http.Request) (
+	library.Source, library.Writer, *deck.Deck, bool) {
+
 	src, ok := a.sourceFor(w, r)
 	if !ok {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
 	slug := r.PathValue("slug")
 	d, err := src.Get(r.Context(), slug)
 	if a.refuseWrite(w, "write", err) {
-		return nil, nil, false
+		return nil, nil, nil, false
 	}
-	if _, err := library.WriterFor(src, slug); a.refuseWrite(w, "write", err) {
-		return nil, nil, false
+	writer, err := library.WriterFor(src, slug)
+	if a.refuseWrite(w, "write", err) {
+		return nil, nil, nil, false
 	}
-	return src, d, true
+	return src, writer, d, true
 }
 
 // answer writes a commit's result, or the refusal it produced.

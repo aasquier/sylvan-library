@@ -49,11 +49,15 @@ func (a *API) appDB() *sql.DB {
 	if _, err := os.Stat(a.dbPath); err != nil {
 		return nil
 	}
-	db, err := auth.Open(a.dbPath)
-	if err != nil {
-		a.log.Warn("app.db exists but could not be opened read-only", "error", err)
-		return nil
-	}
+	// **No warn-and-degrade arm, because there is no failure here to degrade
+	// from.** `auth.Open` records a DSN and opens nothing -- the handle is lazy
+	// -- so for a driver that is registered it cannot answer an error, and the
+	// arm that used to sit here looked like the obvious lever for "the volume
+	// did not mount" and was not. The fault a missing or unreadable volume
+	// produces lands on the first *statement* through this handle, which is
+	// where every caller already answers it; the `os.Stat` above is this
+	// function's own guard for the file that is not there at all.
+	db, _ := auth.Open(a.dbPath)
 	a.lazyDB = db
 	return db
 }
@@ -88,6 +92,30 @@ func (a *API) refuse(w http.ResponseWriter, where string, err error) bool {
 		wire.Detail(w, http.StatusInternalServerError, "the library could not answer that right now")
 	}
 	return true
+}
+
+// rawOrdered answers an ordered body, or refuses it.
+//
+// **One branch where there were eight.** Every route whose payload has to keep
+// its key order ended `raw, err := wire.MarshalOrdered(body)` followed by the
+// same `refuse` the route's real failures go through -- and that second arm is
+// unreachable by construction: the payload was built two lines above out of
+// values the route itself chose, and there is no unmarshalable one among them.
+// Six copies of it sat uncovered and two more had already given up and written
+// `raw, _ :=`, which is the worse of the two answers: a value that will not
+// render becomes a 200 carrying an empty body, where a reader would rather be
+// told the library could not answer.
+//
+// Folding them into one function keeps the diagnosis, deletes seven branches,
+// and -- the point -- leaves a single arm a test can actually enter, by handing
+// it a value no JSON encoder will take. `wire.JSON` makes the same argument for
+// unordered bodies one layer down.
+func (a *API) rawOrdered(w http.ResponseWriter, where string, body []wire.KV) {
+	raw, err := wire.MarshalOrdered(body)
+	if a.refuse(w, where, err) {
+		return
+	}
+	wire.Raw(w, http.StatusOK, raw)
 }
 
 // sourceFor resolves the owner segment, answering the 404 itself.
@@ -175,11 +203,7 @@ func (a *API) getDeck(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "deck", err) {
 		return
 	}
-	raw, err := wire.MarshalOrdered(body)
-	if a.refuse(w, "deck", err) {
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "deck", body)
 }
 
 // validateDeck is `GET .../validate` -- `service.validate_deck`.
@@ -285,11 +309,7 @@ func (a *API) commanderDossier(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "commander", err) {
 		return
 	}
-	raw, err := wire.MarshalOrdered(body)
-	if a.refuse(w, "commander", err) {
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "commander", body)
 }
 
 // commanderPrintings is `GET .../printings` -- `service.commander_printings`:
@@ -372,8 +392,7 @@ func (a *API) commanderPrintings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	raw, _ := wire.MarshalOrdered([]wire.KV{{Key: "slug", Value: d.Slug}, {Key: "commander", Value: name}, {Key: "selected", Value: selected}, {Key: "printings", Value: printings}})
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "printings", []wire.KV{{Key: "slug", Value: d.Slug}, {Key: "commander", Value: name}, {Key: "selected", Value: selected}, {Key: "printings", Value: printings}})
 }
 
 // deckLog is `GET .../log` -- `service.history_for`: what has been done to
@@ -437,11 +456,7 @@ func (a *API) deckArtifacts(w http.ResponseWriter, r *http.Request) {
 	if a.refuse(w, "artifacts", err) {
 		return
 	}
-	raw, err := wire.MarshalOrdered(shelf)
-	if a.refuse(w, "artifacts", err) {
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "artifacts", shelf)
 }
 
 // deckArtifact is `GET .../artifacts/{name}` -- one deliverable, verbatim.
@@ -549,7 +564,6 @@ func (a *API) challengeProgress(w http.ResponseWriter, r *http.Request) {
 		}
 		slots = append(slots, wire.OrderedMap([]wire.KV{{Key: "key", Value: combo.Key}, {Key: "name", Value: combo.Name}, {Key: "tier", Value: combo.Tier}, {Key: "decks", Value: decks}}))
 	}
-	raw, _ := wire.MarshalOrdered([]wire.KV{{Key: "pool", Value: havePool || len(filled) > 0}, {Key: "filled", Value: len(filled)},
+	a.rawOrdered(w, "colors/progress", []wire.KV{{Key: "pool", Value: havePool || len(filled) > 0}, {Key: "filled", Value: len(filled)},
 		{Key: "total", Value: len(reference.Colors().Combinations)}, {Key: "slots", Value: slots}})
-	wire.Raw(w, http.StatusOK, raw)
 }

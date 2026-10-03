@@ -135,13 +135,8 @@ func (a *API) artMotionStatus(w http.ResponseWriter, r *http.Request) {
 			urls = append(urls, wire.KV{Key: keys[name], Value: base + "/" + name + "?v=" + stamp + suffix})
 		}
 	}
-	raw, err := wire.MarshalOrdered([]wire.KV{{Key: "ready", Value: true}, {Key: "effect", Value: effectKey}, {Key: "fingerprint", Value: stamp},
+	a.rawOrdered(w, "art/motion", []wire.KV{{Key: "ready", Value: true}, {Key: "effect", Value: effectKey}, {Key: "fingerprint", Value: stamp},
 		{Key: "urls", Value: wire.OrderedMap(urls)}, {Key: "attribution", Value: meta}})
-	if err != nil {
-		a.fail(w, "art/motion", err)
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
 }
 
 // artMotionFile is `GET /api/art/motion/{oracle_id}/{effect}/{filename}` --
