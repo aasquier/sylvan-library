@@ -830,6 +830,52 @@ func endGroup(p *os.Process) {
 	_ = p.Kill()
 }
 
+// endings is the three ways a match is ended early, and the one rule all of
+// them share: **nothing is signalled once the subprocess has been reaped.**
+//
+// A group kill names a group by a number, and once [exec.Cmd.Wait] has returned
+// that number belongs to whoever the kernel hands it to next — so a timer that
+// fires a hair late must do nothing at all, or a SIGKILL goes into somebody
+// else's work with no symptom anywhere on this side. Three timers and a watcher
+// race the reap by construction, and this is the one place that race is settled.
+//
+// A value rather than four locals and a closure inside [spawn] precisely so the
+// rule can be asked a question: the window it protects is microseconds wide in a
+// real bout, and what is on the other side of it is somebody else's process.
+type endings struct {
+	mu     sync.Mutex
+	reaped bool
+	// expired is the whole-subprocess clock, abandoned is [RunOptions.Abort],
+	// clocked is the per-game ceiling. Kept apart because they are different
+	// news: a match that ran out of clock is a result nobody got, a match nobody
+	// was left to watch is not a failure at all, and a game that outran its
+	// ceiling is one casualty inside a bout that survives.
+	expired, abandoned, clocked bool
+	// kill takes the whole process group down. A field because the group is a
+	// fact about a subprocess that may not have started yet.
+	kill func()
+}
+
+// stop raises `mark` and ends the match, unless it has already been reaped.
+func (e *endings) stop(mark *bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.reaped {
+		return
+	}
+	*mark = true
+	e.kill()
+}
+
+// reap closes the window every [endings.stop] checks and says what ended the
+// match. Called once, after [exec.Cmd.Wait].
+func (e *endings) reap() (killed, quit, cut bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.reaped = true
+	return e.expired, e.abandoned, e.clocked
+}
+
 func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, error) {
 	// Forge writes the card-database complaints to stderr and the results to
 	// stdout, but not reliably — the unsupported-card warning arrives on both.
@@ -877,27 +923,12 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 
 	// A blocking read honours no deadline of its own, so the deadline is a
 	// timer that kills the JVM — EOF then ends the read loop, and the flag is
-	// what tells a killed run from a finished one.
-	//
-	// Both ways of ending a match early go through `stop`, which raises the
-	// flag its caller came for and then takes the group down. `reaped` is why
-	// it is one function rather than two: once [exec.Cmd.Wait] has returned,
-	// the pid belongs to whoever the kernel hands it to next, and a group kill
-	// names a *group* by that number — so a timer that fires a hair late must
-	// not fire a SIGKILL into somebody else's work.
-	var mu sync.Mutex
-	expired, abandoned, clocked, reaped := false, false, false, false
-	stop := func(mark *bool) {
-		mu.Lock()
-		defer mu.Unlock()
-		if reaped {
-			return
-		}
-		*mark = true
-		endGroup(cmd.Process)
-	}
+	// what tells a killed run from a finished one. Every way of ending a match
+	// early goes through [endings], which is also where the race against the
+	// reap is settled.
+	ends := &endings{kill: func() { endGroup(cmd.Process) }}
 
-	timer := time.AfterFunc(opt.Timeout, func() { stop(&expired) })
+	timer := time.AfterFunc(opt.Timeout, func() { ends.stop(&ends.expired) })
 
 	// **The per-game ceiling, and killing the JVM is the whole mechanism.**
 	// Forge offers nothing else: its own clock ends a *wait* rather than a game
@@ -910,25 +941,36 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	// through the bout; it is the sound the wedge makes.
 	var pace *time.Timer
 	if opt.GameCeiling > 0 {
-		pace = time.AfterFunc(opt.GameCeiling, func() { stop(&clocked) })
+		pace = time.AfterFunc(opt.GameCeiling, func() { ends.stop(&ends.clocked) })
 		defer pace.Stop()
 	}
 
 	// [RunOptions.Abort] kills the same way, and the watcher is wound up when
-	// the read loop ends so a finished match leaves no goroutine behind.
+	// the read loop ends so a finished match leaves no goroutine behind — and
+	// "leaves" is held at the return rather than eventually: the defer waits
+	// for the watcher to go, because a closed `done` and a ready `Abort` are
+	// two arms of one select, and a caller who sends an abort the instant a
+	// match returned would otherwise be heard by a watcher that is still
+	// packing up (a stop after the reap is a no-op, so nothing was ever
+	// wrong — but a goroutine that outlives its match is still a goroutine
+	// that outlives its match, and the test that asserts it may not now can).
 	// `abandoned` is kept apart from `expired` because they are different news:
 	// a match that ran out of clock is a result nobody got, and a match nobody
 	// was left to watch is not a failure at all.
 	done := make(chan struct{})
-	defer close(done)
+	var watcher sync.WaitGroup
+	defer func() {
+		close(done)
+		watcher.Wait()
+	}()
 	if opt.Abort != nil {
-		go func() {
+		watcher.Go(func() {
 			select {
 			case <-opt.Abort:
-				stop(&abandoned)
+				ends.stop(&ends.abandoned)
 			case <-done:
 			}
-		}()
+		})
 	}
 
 	var text []string
@@ -972,10 +1014,7 @@ func spawn(argv []string, home string, opt RunOptions, read telling) (*spawned, 
 	timer.Stop()
 	elapsed := time.Since(started).Seconds()
 
-	mu.Lock()
-	reaped = true
-	killed, quit, cut := expired, abandoned, clocked
-	mu.Unlock()
+	killed, quit, cut := ends.reap()
 	// Asked before the timeout, because a match killed by both was killed by
 	// whoever stopped listening first — and a bout nobody is waiting on is not
 	// news about the clock.

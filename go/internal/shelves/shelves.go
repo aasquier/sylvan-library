@@ -133,7 +133,7 @@ func (s *Shelves) Symbol(ctx context.Context, code string) string {
 		s.Log.Warn("symbol: response did not look like an SVG", "code", code)
 		return ""
 	}
-	if err := writeAtomic(target, body); err != nil {
+	if err := writeAtomic(target, body, rand.Reader); err != nil {
 		s.Log.Warn("symbol: could not cache", "code", code, "error", err)
 		return ""
 	}
@@ -196,7 +196,7 @@ func (s *Shelves) OCR(ctx context.Context, name string) string {
 		s.mu.Unlock()
 		return ""
 	}
-	if err := writeAtomic(target, body); err != nil {
+	if err := writeAtomic(target, body, rand.Reader); err != nil {
 		s.Log.Warn("ocr asset: could not cache", "name", name, "error", err)
 		return ""
 	}
@@ -307,13 +307,19 @@ func isFile(path string) bool {
 // writeAtomic stages under a unique name and renames into place: two cold
 // asks each write whole bytes and whichever lands second wins with an
 // identical file, where a shared stage could leave a torn one forever.
-func writeAtomic(target string, body []byte) error {
+//
+// `entropy` is where the stage name's nonce comes from. A parameter rather than
+// a reach for `crypto/rand` inside, so that the one refusal this function has
+// an opinion about and cannot otherwise be shown — a machine with no entropy to
+// name a temporary file with — is a reader a test hands in. Both callers pass
+// `rand.Reader`.
+func writeAtomic(target string, body []byte, entropy io.Reader) error {
 	// The cache is the app's own, read by the one account that writes it.
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return err
 	}
 	var nonce [4]byte
-	if _, err := rand.Read(nonce[:]); err != nil {
+	if _, err := io.ReadFull(entropy, nonce[:]); err != nil {
 		return err
 	}
 	stage := filepath.Join(filepath.Dir(target), fmt.Sprintf(".%s.%s.tmp", filepath.Base(target), hex.EncodeToString(nonce[:])))

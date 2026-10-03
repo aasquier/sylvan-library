@@ -329,10 +329,7 @@ func decksLogCommand(cfg config.Config) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			db, err := openAppDB(cfg)
-			if err != nil {
-				return err
-			}
+			db := openAppDB(cfg)
 			if db != nil {
 				defer db.Close()
 			}
@@ -373,12 +370,24 @@ func decksLogCommand(cfg config.Config) *cobra.Command {
 // exists, and nil when it does not -- a deck with no history. It must never
 // create the file: the ladder belongs to the serving command, and a reader
 // that acquires a database is the one thing this surface refuses to be.
-func openAppDB(cfg config.Config) (*sql.DB, error) {
+// **It cannot fail, so it does not say it can.** [auth.Open] returns an error
+// only from [database/sql.Open], which for a driver that is already registered
+// records the DSN and returns -- it opens nothing, so there is no input it
+// refuses. An `if err != nil` beside one is therefore a branch no fixture can
+// enter: the volume that did not mount, the file somebody chmodded to nothing,
+// the database truncated to half a page are all discovered by the first
+// *statement* instead, which is one line further down in every caller. Asking
+// for an error that cannot arrive left four unreachable refusals across this
+// binary; the four call sites that still take the handle from somewhere else
+// point here for the argument.
+func openAppDB(cfg config.Config) *sql.DB {
 	path := cfg.AppDBPath()
 	if _, err := os.Stat(path); err != nil {
-		return nil, nil //nolint:nilerr,nilnil // an absent app.db is an empty history, not a failure
+		// An absent app.db is an empty history, not a failure.
+		return nil
 	}
-	return auth.Open(path)
+	db := auth.Open(path)
+	return db
 }
 
 // logStamp renders an ISO-8601 instant as something a terminal column can

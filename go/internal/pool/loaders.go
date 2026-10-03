@@ -68,8 +68,15 @@ func loadInto(ctx context.Context, db *sql.DB, catalog, path, table string,
 	}
 	committed := false
 	defer func() {
+		// **The undo is not the caller's to cancel.** A cancelled context is
+		// one of the ways this load fails -- an operator who walked away, a
+		// request that went -- and a ROLLBACK issued on that same context does
+		// not run at all, which leaves the emptied table emptied and the
+		// half-appended rows standing. That is the single outcome the
+		// transaction exists to prevent, so the undo is detached from whatever
+		// brought it about and the cancellation reaches only the work.
 		if !committed {
-			_, _ = conn.ExecContext(ctx, "ROLLBACK")
+			_, _ = conn.ExecContext(context.WithoutCancel(ctx), "ROLLBACK")
 		}
 	}()
 	if _, err := conn.ExecContext(ctx, "DELETE FROM "+qualified); err != nil {
@@ -78,10 +85,14 @@ func loadInto(ctx context.Context, db *sql.DB, catalog, path, table string,
 
 	var total int64
 	err = conn.Raw(func(driverConn any) error {
-		dc, ok := driverConn.(driver.Conn)
-		if !ok {
-			return fmt.Errorf("load %s: not a duckdb connection", table)
-		}
+		// **Unchecked, because `database/sql` hands this callback the
+		// connection's own `driver.Conn` and nothing else.** The comma-ok form
+		// that used to stand here asked a question with one answer: a `*sql.Conn`
+		// is a borrowed driver connection, `Raw` passes it straight through, and
+		// there is no handle in the world that reaches here carrying something
+		// that is not one. What *can* arrive is a driver connection that is not
+		// DuckDB's, and the appender below is where that is found out and said.
+		dc := driverConn.(driver.Conn) //nolint:forcetypeassert // see above
 		appender, err := duckdb.NewAppenderWithColumns(dc, catalog, "", table, columns)
 		if err != nil {
 			return err

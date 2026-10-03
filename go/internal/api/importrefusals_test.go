@@ -146,10 +146,7 @@ func TestNeitherCreateNorImportReportsADeckItCouldNotWrite(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(decks, 0o750) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: db})

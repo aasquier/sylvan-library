@@ -1,0 +1,18 @@
+#!/bin/sh
+# A JVM that answers the version probe with a number nobody can hold.
+#
+# Committed rather than minted, for `fakejava`'s reason. The version line is
+# shaped exactly like a real one and its major is twenty digits long, which the
+# probe's own regexp matches happily and no integer can carry — so this is the
+# one way the probe's last refusal is reached: a binary that answered, in the
+# right format, with something unreadable.
+#
+# It is not hypothetical. A wrapper script, a container's `java` that prints a
+# build identifier, or a vendor's own numbering is one line away from this, and
+# the answer has to be "not a candidate" rather than a number nobody checked.
+if [ "$1" = "-version" ]; then
+  echo 'openjdk version "99999999999999999999.0.1" 2023-10-17' 1>&2
+  exit 0
+fi
+echo "there is no JVM here, only a version line" 1>&2
+exit 1

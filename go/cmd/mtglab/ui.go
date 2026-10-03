@@ -216,13 +216,33 @@ const shutdownGrace = 20 * time.Second
 // stops it.
 func serve(cfg config.Config, forge tier3.Settings, host, port, webDist, tarot string) error {
 	addr := net.JoinHostPort(host, port)
-	return serveOn(cfg, forge, webDist, tarot, func() (net.Listener, error) {
+	return serveOn(cfg, forge, webDist, tarot, listenOn(addr, func(err error) error {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}))
+}
+
+// listenOn is the bind, as a value: the listener acquisition [serveOn] and
+// [serveShimOn] both take as an argument, for the callers that only know an
+// address and cannot hold it (the argument is made in full on [serveOn]).
+//
+// **Named rather than written twice inline**, because the success half of a
+// bind was the half nothing ran: both callers block in `Serve` the instant it
+// returns, so every test that drove them drove the refusal and a test that
+// wanted the socket had nowhere to stand. Asked for a port of its own
+// (`:0`) this answers in no time at all and the caller closes it again,
+// which is `cmd_listenonce_test.go`.
+//
+// The refusal is the caller's own sentence: the app's door and the worker's
+// door are different rooms to whoever is reading a log, and only the app's
+// names the address.
+func listenOn(addr string, refuse func(error) error) func() (net.Listener, error) {
+	return func() (net.Listener, error) {
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			return nil, fmt.Errorf("listen on %s: %w", addr, err)
+			return nil, refuse(err)
 		}
 		return l, nil
-	})
+	}
 }
 
 // serveOn is [serve] with the listener supplied rather than named, acquired at
@@ -457,10 +477,10 @@ func ensureMaintainerAtBoot(cfg config.Config) error {
 	if cfg.AdminEmail == "" {
 		return nil
 	}
-	db, err := auth.OpenReadWrite(cfg.AppDBPath())
-	if err != nil {
-		return err
-	}
+	// No error asked for: `OpenReadWrite` is `sql.Open`, argued in full at
+	// [openAppDB]. An unreadable file is discovered by the reconciliation
+	// below, which is what this function exists to run.
+	db := auth.OpenReadWrite(cfg.AppDBPath())
 	defer func() { _ = db.Close() }()
 	return auth.EnsureMaintainer(context.Background(), db, cfg)
 }

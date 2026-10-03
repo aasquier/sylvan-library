@@ -194,15 +194,9 @@ func forgeAPIIn(t *testing.T, shim *stubShim) (*API, *jobs.Registry, string, str
 	t.Helper()
 	dbPath := appDB(t)
 	dir := decksDir(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	t.Cleanup(func() { db.Close() })
-	writeDB, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeDB := auth.OpenReadWrite(dbPath)
 	t.Cleanup(func() { writeDB.Close() })
 
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -404,10 +398,7 @@ func TestAFinishedMatchIsRecorded(t *testing.T) {
 	}
 	reg.Wait()
 
-	db, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(dbPath)
 	defer db.Close()
 	matches, err := matchledger.FromDB(db, slog.Default()).Recent(t.Context(), 10)
 	if err != nil {

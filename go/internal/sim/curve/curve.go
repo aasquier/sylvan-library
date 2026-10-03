@@ -438,18 +438,15 @@ func TypicalAccelerant(library []sim.Card, turn int) (Piece, bool) {
 		sumDelay += p.Delay
 	}
 	n := float64(len(usable))
-	cost := floats.Round(float64(sumCost) / n)
-	output := floats.Round(float64(sumOutput) / n)
-	delay := floats.Round(float64(sumDelay) / n)
-	if cost < 0 {
-		cost = 0
-	}
-	if output < 1 {
-		output = 1
-	}
-	if delay < 0 {
-		delay = 0
-	}
+	// **Floors rather than branches.** A mean of accelerants cannot come out
+	// negative — every piece above has a cost and a delay of at least zero — so
+	// two of these three guards were arms nothing could enter, and the third (a
+	// rock that rounds to no mana) is a piece of advice nobody can act on. Said
+	// as floors, the three read as what they are: the bounds the recommendation
+	// is only ever quoted inside.
+	cost := max(floats.Round(float64(sumCost)/n), 0)
+	output := max(floats.Round(float64(sumOutput)/n), 1)
+	delay := max(floats.Round(float64(sumDelay)/n), 0)
 	return Piece{Cost: cost, Output: output, Delay: delay}, false
 }
 

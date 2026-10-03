@@ -476,13 +476,9 @@ func failureText(err error) string {
 
 func serveShim(ctx context.Context, forge tier3.Settings) error {
 	addr := net.JoinHostPort(forge.ShimHost, strconv.Itoa(forge.ShimPort))
-	return serveShimOn(ctx, forge, func() (net.Listener, error) {
-		l, err := net.Listen("tcp", addr)
-		if err != nil {
-			return nil, fmt.Errorf("forge shim: %w", err)
-		}
-		return l, nil
-	})
+	return serveShimOn(ctx, forge, listenOn(addr, func(err error) error {
+		return fmt.Errorf("forge shim: %w", err)
+	}))
 }
 
 // serveShimOn is [serveShim] with the listener supplied rather than named, for

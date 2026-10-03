@@ -208,10 +208,7 @@ func TestTheWatchingReadRefusesWhenTheBoutsCannotBeRead(t *testing.T) {
 	}
 	// The run row survives; the bouts do not. Nothing in the app does this --
 	// it is a half-applied restore, and the point is that the read notices.
-	db, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(dbPath)
 	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(`DROP TABLE night_bouts`); err != nil {
 		t.Fatal(err)

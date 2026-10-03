@@ -267,10 +267,7 @@ func TestTheRecorderOpensAndClosesADatabaseOfItsOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rec, err := NewRecorder(path, quiet())
-	if err != nil {
-		t.Fatalf("opening a ledger over a real app.db: %v", err)
-	}
+	rec := NewRecorder(path, quiet())
 	seedOneMatch(t, rec)
 	if got, err := rec.Recent(context.Background(), 5); err != nil ||
 		len(got) != 1 {
@@ -293,10 +290,7 @@ func TestTheRecorderOpensAndClosesADatabaseOfItsOwn(t *testing.T) {
 	// caller sees. `cache.Open` makes the opposite choice and proves the file
 	// at Open; the difference is that nothing reads through this handle on a
 	// hot path. Worth knowing if that ever changes.
-	absentFile, err := NewRecorder(filepath.Join(t.TempDir(), "nothing.db"), nil)
-	if err != nil {
-		t.Fatalf("opening a ledger over a missing file: %v", err)
-	}
+	absentFile := NewRecorder(filepath.Join(t.TempDir(), "nothing.db"), nil)
 	t.Cleanup(func() { _ = absentFile.Close() })
 	if _, err := absentFile.Recent(context.Background(), 5); err == nil {
 		t.Error("a ledger over a database that is not there answered " +
@@ -314,10 +308,7 @@ func TestAHandleSomebodyElseOpenedIsWrappedWithADefaultLogger(t *testing.T) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 
 	shared := FromDB(db, nil)

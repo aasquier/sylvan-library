@@ -71,6 +71,9 @@ lever and a grind is visible before the work starts.
 | merged `main` after the cleanup step, 2026-09-28 | **97.0%** (run 36504824056) | |
 | floor in `ci.yml` | **95.5** (ratcheted 2026-09-29 at that 97.0; Aaron: "ratchet", the gap is kept) | |
 | the night lane of 2026-10-03, either side of its own nine statements | **97.0%** flat | 97.00% → **97.04%** |
+| **the climb to 99, 2026-10-03 (eight lanes, one integration PR)** | **99.4%** | 136 missing of 21,694, 85 functions |
+| wave two, 2026-10-03 (three lanes on the pool seam and the `sql.Open` / `crypto/rand` classes) | **99.5%** | 106 missing of 21,677, 67 functions |
+| floor in `ci.yml` | **98.0** (ratcheted 2026-10-03 at the arm64 leg's 99.4 on #549; the gap is kept; next click 98.5 at a printed 99.7) | |
 
 **Leg two is the leg that says the climb is over**, and the number is the
 argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
@@ -106,8 +109,8 @@ package costs coverage" trap below, paid knowingly and kept small — the first
 `authtest/faulty.go` paid forty-nine of them. **CI's arm64 print on the merged
 branch is the authority; neither lane's local number is.**
 
-The gate is at 95.5 and the tree is over 97 because Aaron asked for exactly
-that pair: a diff can cost a few tenths of honest refactoring without going
+The gate is at 98.0 and the tree is over 99 because Aaron asked, on
+2026-09-29, for exactly this pair's shape (then 95 under 96): a diff can cost a few tenths of honest refactoring without going
 red, and a diff that costs a whole point is what the floor exists to notice.
 
 **How the climb was paid for.** Nine lanes, one per package group, each
@@ -152,15 +155,81 @@ exists.
 
 ## Left deliberately
 
+> **Reopened by Aaron on 2026-10-03.** His ask — *"get our test coverage up
+> to 99% … you might have to rewrite some stubborn code to be more testable"*
+> — turned this list from branches-to-skip into branches whose honest closure
+> needs a code change, and licensed the change. Eight Opus lanes, one per
+> package group, read every entry below and answered each one of three ways,
+> in order of preference: **reach it** (a fixture that produces the fault),
+> **hand the value in** (a seam whose default is itself tested), or **delete a
+> branch that is dead by a fact about the code**, with the argument in a
+> comment at the site. 652 missing → 136, 97.0 → 99.4. The entries
+> below are kept as they stood, each annotated with what became of it, because
+> the *shape* of each one is still the useful part — and three of them turned
+> out to be wrong, which is worth more than the statements.
+>
+> **What closed, by class.** *A scan into `*any` cannot fail* — folded into the
+> walk's own `rows.Err()` verdict across `pool`, `deckread`, `library`,
+> `cards`; nothing dropped. *`sql.Open` never fails for a registered driver* —
+> deleted inside `auth`, `authtest`, `night`, `door`, `cmd/mtglab`, `api`
+> (modernc.org/sqlite implements `driver.Driver` only, probed not assumed);
+> the exported signatures still carry the error, so the CALLERS' arms are wave
+> two's. *`RowsAffected`/`LastInsertId` after a successful `Exec`* — deleted in
+> `night`'s store and `auth.Create`, the count still checked. *Guards over
+> embedded data* — `GetMode(constant)` became `modeOf(name)` which panics by
+> name; `tools.go`'s nil arms moved to a load-time check; the `init`s became
+> `loadX(raw []byte)` seams driven with bad documents. *`crypto/rand` failing*
+> in `tarot`, `brew`, `wheel`, `shelves` — entropy is an `io.Reader` handed in,
+> the default tested once. *The second read that cannot fail* —
+> `writeTargetWith` hands back the writer `writeTarget` already resolved. *The
+> three `karsten` memo caps* — `remembering(table, key, value, limit)`. *The
+> `deckread` dossier's ten* — the pool seam below. *`prompt.secret`'s pty* —
+> `prompt.tty terminal`, whose default is drivable without a pty because
+> `term.ReadPassword` refuses a non-tty fd; the 2026-09-29 closure is reopened
+> honestly.
+>
+> **The seam the queue asked for exists**: `pool.NewOver(path, log, connect)`
+> with `pool.Connect func(ctx, path) (*sql.DB, error)`, zero value byte-for-byte
+> the old `acquire`; reached from tests through `pooltest.OpenFaultyPool(t)` /
+> `pooltest.FaultyPoolOver(t, path)` with `fault.After(n)` and
+> `fault.RowsAfter(n)`. A Pool memoises `Columns`/`GetCards`, so a fresh Pool
+> per budget; the budget is spent across every statement including `Columns`'
+> one-row-per-column, so sweep a range; one pool file per parallel subtest.
+>
+> **Three entries were wrong.** `simMulliganCommand`'s non-flat `BEST:` arm did
+> NOT need a deck the fixture cannot express — flatness is measured against
+> the default, and 36 lands + 63 Sol Rings at seed 7 reports +0.61.
+> `ApplyBulk`'s fold-error arms are reachable with nothing hand-built:
+> `PlanBulk`'s pre-check is `if err == nil`, so a deck whose `cards:` is a flow
+> sequence walks past it. And `decklist.digitValue`'s "unreachable" fallback is
+> **reachable and a bug**: U+1D7CE–U+1D7FF is one contiguous run of fifty Nd
+> code points, so `digitValue('𝟙')` answers 0 where Python's `int()` (the
+> recorded semantics) says 1 — a pasted `𝟙 Sol Ring` reads as quantity 0. Left
+> unfixed on purpose: a behaviour change in a grammar held to frozen corpora
+> is Aaron's call, and no test was written for the one input the arm gets
+> right, because that would make a broken function read as covered.
+>
+> **New classes, from the lanes that hit them.** *DuckDB connects eagerly at
+> `sql.Open`*, so `pool.Open`'s ping can never be the first failure. *The
+> DuckDB appender type-asserts the concrete driver conn*, so a wrapped faulty
+> connector fails at the appender rather than at its budget — `rebuild.finish`'s
+> four are unreachable by any connector fixture. *`tier3.homeDirFrom`* wants
+> `os.UserHomeDir` to fail in a process that has `HOME` — the `prompt.secret`
+> kind of entry, seam present, default unreachable, not worth removing the
+> platform fallback. *The `GOCACHE` is shared across worktrees*: a test that
+> locates `testdata/` by source path can read a sibling lane's tree, which is
+> why forge failures under parallel lanes name another lane's `fakejava`.
+
 Every lane named what it judged unreachable and why, so that a future pass
 reads this list before spending an hour on a branch that cannot be entered
 honestly. **A branch whose comment says it is unreachable is not coverage to
 take**; calling past the guard proves nothing and leaves a test that reads
 as meaningful to whoever finds it next.
 
-- `deckyaml.orderedValue`'s map cases and `sortedKeys` (only reachable from
-  them), and `checkCompanion`'s `condition == ""` — the two standing entries,
-  still standing.
+- `deckyaml.orderedValue`'s map cases and `sortedKeys` — **closed 2026-10-03**
+  by an in-package call with what a decoder that stopped honouring
+  `UseOrderedMap` would hand it. `checkCompanion`'s `condition == ""` — the
+  one standing entry, still standing.
 - **Second reads that cannot fail after a first succeeded**: `src.ReadText`
   in `internal/api/edits.go` after `writeTarget`'s `Get`; the duplicate
   `library.WriterFor` calls in `lifecycle.go`; `commanderRecords` after the

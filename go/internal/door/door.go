@@ -154,10 +154,11 @@ type Door struct {
 	slowRequest time.Duration
 }
 
-// New builds a door. It opens `app.db` read-only when auth is required (and
-// proves it can read the users table, so a wrong data directory fails at
-// start rather than as a 401 on every request), and lists the bundle's root
-// files once from the trusted directory.
+// New builds a door. It opens `app.db` read-only when auth is required and
+// lists the bundle's root files once from the trusted directory. Reading the
+// users table is [Door.Check]'s job, called straight after this by the serving
+// command, so a wrong data directory fails at start rather than as a 401 on
+// every request.
 func New(cfg Config) (*Door, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -167,11 +168,12 @@ func New(cfg Config) (*Door, error) {
 	}
 	d := &Door{cfg: cfg, log: cfg.Logger, slowRequest: cfg.SlowRequest}
 	if cfg.RequireAuth {
-		db, err := auth.Open(cfg.AppDB)
-		if err != nil {
-			return nil, err
-		}
-		d.db = db
+		// `auth.Open` has no failure to report -- it builds a DSN and names a
+		// driver, which its own comment argues -- and since it no longer
+		// offers one, there is nothing here to check. [Door.Check] is where an
+		// `app.db` that cannot be read is discovered, by reading it, and the
+		// command calls it before taking the port.
+		d.db = auth.Open(cfg.AppDB)
 	}
 	site, err := newStaticSite(cfg.WebDist, cfg.TarotDir, cfg.Logger)
 	if err != nil {

@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -120,17 +121,17 @@ func (c *Conn) ArtFor(ctx context.Context, names []string) (map[string]Art, erro
 		return nil, fmt.Errorf("card_art: %w", err)
 	}
 	defer rows.Close()
+	var scanned error // see [scanRecord]: a scan into `*any` has no refusal
 	for rows.Next() {
 		var name, image, artist, set, setName any
-		if err := rows.Scan(&name, &image, &artist, &set, &setName); err != nil {
-			return nil, fmt.Errorf("card_art: %w", err)
-		}
+		scanned = errors.Join(scanned,
+			rows.Scan(&name, &image, &artist, &set, &setName))
 		art := Art{Name: AsString(name), Image: AsString(image),
 			Artist: AsString(artist), Set: strings.ToUpper(AsString(set)),
 			Printing: AsString(setName)}
 		out[strings.ToLower(art.Name)] = art
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, fmt.Errorf("card_art: %w", err)
 	}
 	return out, nil

@@ -80,14 +80,35 @@ const Horizon = 10
 
 // ---------------------------------------------------------- the arithmetic
 
-// cacheLimit bounds the two memo tables at 100,000 entries: a bound, not a
-// policy. The heatmap asks for the same tuple once
+// cacheLimit bounds the three memo tables at 100,000 entries each: a bound, not
+// a policy. The heatmap asks for the same tuple once
 // per card sharing a cost and a 99-card deck asks a few thousand times, so a
 // memo is the difference between milliseconds and seconds once the binomials
 // are big integers. Eviction is wholesale rather than least-recently-used,
 // because these are pure functions of four small ints and the only property
 // that matters is that the map cannot grow without bound.
 const cacheLimit = 100_000
+
+// remembering files `value` under `key`, emptying the table first if it has
+// reached `limit`.
+//
+// **One memo discipline in one place, with the ceiling handed in.** The same
+// four lines stood at three call sites below, and the eviction in each of them
+// was unreachable by anything but a hundred thousand distinct tuples — so the
+// bound that exists to keep three maps from growing forever was the one thing
+// about them nothing could check. Handed the limit, the rule is a function of
+// its own arguments: a table at its ceiling is emptied and the new entry is the
+// only one left, which is the whole claim [cacheLimit] makes.
+//
+// Returns the table because emptying it means replacing it, and a caller
+// assigning the result is a caller that cannot forget to.
+func remembering[K comparable, V any](table map[K]V, key K, value V, limit int) map[K]V {
+	if len(table) >= limit {
+		table = map[K]V{}
+	}
+	table[key] = value
+	return table
+}
 
 type hyperKey struct{ population, successes, draws, wanted int }
 
@@ -114,10 +135,7 @@ func binom(n, k int) *big.Int {
 		return v
 	}
 	v := new(big.Int).Binomial(int64(n), int64(k))
-	if len(binomCache) >= cacheLimit {
-		binomCache = map[[2]int]*big.Int{}
-	}
-	binomCache[key] = v
+	binomCache = remembering(binomCache, key, v, cacheLimit)
 	return v
 }
 
@@ -148,10 +166,7 @@ func HypergeometricAtLeast(population, successes, draws, wanted int) float64 {
 	v := hypergeometricAtLeast(population, successes, draws, wanted)
 
 	hyperMu.Lock()
-	if len(hyperCache) >= cacheLimit {
-		hyperCache = map[hyperKey]float64{}
-	}
-	hyperCache[key] = v
+	hyperCache = remembering(hyperCache, key, v, cacheLimit)
 	hyperMu.Unlock()
 	return v
 }
@@ -223,10 +238,7 @@ func Exactly(population, successes, draws, count int) float64 {
 	v := exactly(population, successes, draws, count)
 
 	hyperMu.Lock()
-	if len(exactCache) >= cacheLimit {
-		exactCache = map[hyperKey]float64{}
-	}
-	exactCache[key] = v
+	exactCache = remembering(exactCache, key, v, cacheLimit)
 	hyperMu.Unlock()
 	return v
 }
@@ -826,10 +838,12 @@ func Read(library []sim.Card, commander *sim.Card, target float64, onThePlay boo
 				}
 				return cards[i].Name < cards[j].Name
 			})
-			turn := cards[0].MV()
-			if turn < 1 {
-				turn = 1
-			}
+			// Turn one at the earliest: a pip is asked for by a card that costs
+			// something, so a mana value below one is not a thing a compiled
+			// deck holds — and a rung measured against turn zero would be
+			// asking about a draw that has not happened. A floor rather than a
+			// branch, because the branch could not be entered.
+			turn := max(cards[0].MV(), 1)
 			names := make([]string, len(cards))
 			for i, c := range cards {
 				names[i] = c.Name

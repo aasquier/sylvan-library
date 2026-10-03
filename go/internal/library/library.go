@@ -255,14 +255,16 @@ func SharedDecks(ctx context.Context, db *sql.DB) ([]Shared, error) {
 	}
 	defer rows.Close()
 	out := []Shared{}
+	var scanned error // see [SQLSource.Slugs]
 	for rows.Next() {
 		var s Shared
-		if err := rows.Scan(&s.Username, &s.Slug, &s.Name); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&s.Username, &s.Slug, &s.Name))
 		out = append(out, s)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // MaintainerUsername is the
