@@ -170,6 +170,53 @@ cheaper alternative is to drop to the door's own `no-cache`-plus-ETag and pay
 one revalidation per visit. It moves a served route and the committed bundle
 together, so it wants a deploy you are watching. Ledger: Black, 2026-10-03.
 
+**Green: a Forge match now tells you how much longer it has to run, and it is
+waiting for your eye.** The longest wait in the application — ten whole games
+of Commander — showed how far in you were and never how much was left; the
+sentence under the feed spanned a factor of twenty, which is the difference
+between forty seconds and twenty minutes. The stage now says *"6 more games to
+fight — about 5m 6s, at the pace of the ones already fought"*, measured off
+the match's own games (median, never a mean; silent until two have landed,
+because a first game is the slowest of the match). No CSS — the Queen's branch
+holds `index.css` tonight — and no Go, no route, no schema. · *Cost of leaving
+it:* nothing breaks, and every person who sends two decks in goes on guessing
+whether to wait; the branch goes stale against the bundle. · **Where to look:**
+`mtglab-ui` in `.claude/launch.json` (the Go server on 8765 serves the
+committed bundle, auth is off locally), then **the Coliseum** (`/coliseum`) —
+pick two decks, *Send them in*, and read the line under the feed once the
+second game lands. There is no Forge on this Mac, so the cheap version is the
+room's own fixture route: open `/coliseum`, patch `window.fetch` to answer
+`/api/jobs/fixture` with a running job carrying four `partial.rows`, then go to
+`/coliseum?m=fixture` — the recipe is in the ledger entry. Nothing here
+animates on a loop, so there is no cycle time to wait out; the hero video on
+that page is an 11-second loop and is not part of this. · **Recommendation:**
+merge it. Ledger: Green, 2026-10-03 (night, the Coliseum).
+
+## Open — a ruling
+
+**Green: who may see which bouts? One answer unblocks both of the Coliseum's
+two missing rooms, and neither can be built without it.** ADR 46 names the
+night shelf as its own PR and deliberately leaves cross-account leaderboards to
+you, pointing at `ledger.Scope` as the one place that would widen. Today the
+scope is the narrow one — a match you were in, plus the house's own — and two
+separate features run straight into it: the **night shelf** (a night is a
+round-robin across accounts, so a shelf is either near-empty for everybody but
+you, or it is the widening the ADR reserved) and **a way back to the deck from
+the record** (the board prints a deck's slug and links nothing, because an
+opponent's deck is 404 by ADR 5 and a link that sometimes dead-ends is worse
+than none). · *Cost of leaving it:* the room keeps a record you cannot click
+and a night you cannot read, and every session that reaches for either
+re-derives this paragraph. Nothing is broken and nothing is urgent — the night
+has not run yet. · **Recommendation:** rule that **a deck appearing on the
+record is openable when it is the house's own or yours, and otherwise is not a
+link at all** — the narrow reading, no new sharing, and enough to make the
+record clickable this week; then rule separately on whether a night shelf shows
+only your own and the house's bouts (same rule, and buildable the moment the
+torches are lit) or the whole night (a sharing decision, and a bigger one). The
+shelf's full shape — the route, the join, the tab, the empty state — is written
+out in the ledger so it is not scoped twice. Ledger: Green, 2026-10-03 (night,
+the Coliseum).
+
 ## Open — a migration window
 
 **Black: prompt-cache *writes* are invisible in both usage ledgers, so the

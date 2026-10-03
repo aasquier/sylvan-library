@@ -122,6 +122,55 @@ describe('the stage', () => {
     expect(screen.queryByText(/half a minute/i)).toBeNull()
   })
 
+  // **The wait has a clock in it once there is something to clock.** The
+  // stage says how far in a match is; this is the half that says how much
+  // longer, which is the question somebody deciding whether to wait is
+  // actually asking.
+  it('says how much longer, once two games have been fought', () => {
+    stage([row({ game: 1, seconds: 45 }), row({ game: 2, seconds: 45 })],
+      { games: 8 })
+    // Six to come at 45s each: 4m 30s. Said as a count of fights and a
+    // stretch of time, never as a percentage or a raw second count.
+    expect(screen.getByText(/6 more games to fight/)).toBeTruthy()
+    expect(screen.getByText(/about 4m 30s/)).toBeTruthy()
+  })
+
+  it('names one remaining game in the singular', () => {
+    stage([row({ game: 1, seconds: 30 }), row({ game: 2, seconds: 30 })],
+      { games: 3 })
+    expect(screen.getByText(/One more game to fight/)).toBeTruthy()
+  })
+
+  // The estimate is a guide and the sentence says so. The copy above it lost
+  // a "within half a minute" for being a promise the deployed arena could not
+  // keep, and an estimate that does not admit what moves it is the same
+  // mistake one layer up.
+  it('calls the figure a guide rather than a promise', () => {
+    stage([row({ game: 1, seconds: 45 }), row({ game: 2, seconds: 45 })],
+      { games: 8 })
+    expect(screen.getByText(/a guide and not a promise/)).toBeTruthy()
+    // And it is audible: somebody who cannot see the bar is told each time a
+    // game lands, which is the one piece of news this wait carries.
+    expect(screen.getByRole('status').textContent)
+      .toMatch(/6 more games to fight/)
+  })
+
+  // A sample of one is the first game of the match, and a first game is the
+  // slowest of them because the forge lights from cold — so an estimate drawn
+  // from it would promise a wait about double the truth. The room falls back
+  // to its general words instead of guessing.
+  it('promises nothing from a single game', () => {
+    stage([row({ game: 1, seconds: 180 })], { games: 10 })
+    expect(screen.queryByText(/more games to fight/)).toBeNull()
+    expect(screen.getByText(/a typical game takes a few seconds/)).toBeTruthy()
+  })
+
+  it('stops counting down when the match is over', () => {
+    stage([row({ game: 1, seconds: 45 }), row({ game: 2, seconds: 45 })],
+      { games: 8, running: false })
+    expect(screen.queryByText(/more games to fight/)).toBeNull()
+  })
+
   it('never flips a painting to make the two face each other', () => {
     const { container } = stage([row()])
     for (const art of container.querySelectorAll('.theater-art')) {
