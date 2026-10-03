@@ -6256,12 +6256,40 @@ button:hover .tarot-fan-card {
   border: 1px solid var(--hairline);
   background: var(--page);
   color: var(--text-primary);
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease,
+    transform 120ms ease, box-shadow 120ms ease;
 }
 .card-action:hover:not(:disabled),
 .card-action:focus-visible:not(:disabled) {
   border-color: var(--text-muted);
   background: var(--gridline);
+}
+/* **The press, in two halves — and the second half is the one that matters.**
+ *
+ * Commandment 17 names three replies and this family answered two: the ground
+ * arrives on hover, the vine ring arrives on focus, and the click landed in
+ * silence. `.chip-toggle:active` is the house answer and the argument above it
+ * is the argument — a control whose only other feedback is a change elsewhere
+ * on the page makes the hand go looking to find out whether anything happened.
+ *
+ * Two halves rather than one, because a press reply built out of movement
+ * alone is a press reply that **vanishes under `prefers-reduced-motion`**, and
+ * the person who asked for less motion did not ask for less feedback. The
+ * settle is the half that moves; the sink is the half that does not, and the
+ * reduced-motion block below drops only the first. `.btn-ghost:active` already
+ * proves a press can reply with nothing but a ground.
+ *
+ * A plate pushed into its surface takes a shadow along its top edge — which is
+ * why this is an inset and not a dimming. Nothing here reaches a card image:
+ * the shadow is on the button, and these buttons hold words. */
+.card-action:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-action:active:not(:disabled) {
+    transform: none;
+  }
 }
 /* The keyboard's reply, for the same reason `.btn:focus-visible` has one:
  * without it the browser's default ring is the only answer, and on a dark
@@ -8286,7 +8314,8 @@ button:hover .tarot-fan-card {
  * arrives, ink when it does. The colour lives here so :hover outranks it. */
 .disclosure-toggle {
   color: var(--text-muted);
-  transition: color 120ms ease;
+  transition: color 120ms ease, background-color 120ms ease,
+    transform 120ms ease;
 }
 .disclosure-toggle:hover {
   color: var(--text-primary);
@@ -8294,6 +8323,23 @@ button:hover .tarot-fan-card {
 .disclosure-toggle:focus-visible {
   outline: 2px solid var(--vine);
   outline-offset: 2px;
+}
+/* The press, in the two halves argued above `.card-action:active` — a settle
+ * that moves and a ground that does not, so the reply survives
+ * `prefers-reduced-motion`.
+ *
+ * The caret this header carries cannot be the reply, and that is worth knowing
+ * before anyone tries: every caller draws it with an inline
+ * `transform: rotate(-90deg)` for the folded state, and no `:active` in this
+ * file can outrank an inline style. The button moves; the caret rides along. */
+.disclosure-toggle:active {
+  transform: translateY(1px);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-toggle:active {
+    transform: none;
+  }
 }
 
 /* Rows inside a dropdown menu (the settings gear): the whole row is the
@@ -8358,7 +8404,8 @@ button:hover .tarot-fan-card {
 .strip-tab {
   color: var(--text-muted);
   border-color: transparent;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color 120ms ease, border-color 120ms ease,
+    background-color 120ms ease, transform 120ms ease;
 }
 .strip-tab:hover {
   color: var(--text-primary);
@@ -8370,6 +8417,26 @@ button:hover .tarot-fan-card {
 .strip-tab.is-active {
   color: var(--text-primary);
   border-color: var(--series-1);
+}
+/* The press, in the two halves argued above `.card-action:active`. A tab was
+ * the sharpest case of the silence: its hover reply is ink, and the ink it
+ * arrives at is the *same* ink `.is-active` wears — so pressing an inactive
+ * tab moved it from looking-like-the-chosen-one to being the chosen one, and
+ * during the press itself the strip said nothing at all.
+ *
+ * It settles rather than sliding, which is the distinction `.chip-toggle` and
+ * `.chip-place` draw between a thing you push where it stands and a thing that
+ * takes you away. A tab is the first kind: it changes what is in front of you
+ * and leaves you where you are — commandment 20's own test, answered here in
+ * the direction the finger feels. */
+.strip-tab:active {
+  transform: translateY(1px);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .strip-tab:active {
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
