@@ -6866,6 +6866,125 @@ runs against a cache nobody emptied.
   2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
   first Red run and the baseline the numbers below are a trend against.
 
+### 2026-10-03 (night, the Queen)
+
+*The Queen's lane of the same night, run after Red's. One PR, and every line
+of it renders, so it is held for Aaron's eye. Walked on the dev door (Vite on
+5173 against the Go server on 8765) at 1280×720 in dark, on `/coliseum` and on
+a deck page stood up from the API for the walk and deleted after it.*
+
+- **(open) Landed: the press register Red opened at fifteen closes at ten,
+  and three rules bought five classes.** Red's own entry below queued the
+  design pass and recommended `.card-action`, `.strip-tab` and
+  `.disclosure-toggle` — 24 of the 34 silent buttons — with the register
+  lowered to 12 in the same diff. The three rules landed and the register
+  fell further than that: **15 classes → 10, 34 silent buttons → 10**, because
+  `pressSilence` returns nil for an element the moment *any* class it wears
+  answers `:active`, and `.card-action-danger`, `.armed` and `.is-on` ride on
+  elements that now answer through a sibling. That is the argument for the
+  register's own shape, made by its first lowering: a ban on fifteen would
+  have demanded fifteen rules.
+- **The press reply is in two halves, and the second half is the finding.**
+  The house answer is `.chip-toggle:active`'s `transform: translateY(1px)`,
+  and copying it verbatim would have shipped a reply that **disappears under
+  `prefers-reduced-motion`** — `.chip-toggle` and `.chip-place` both arrest
+  their own press in a reduced-motion block, which hands the person who asked
+  for less motion exactly the silence the comment above `.chip-toggle:active`
+  was written to close. So each new rule has a half that moves and a half that
+  does not: the settle, plus a ground (`color-mix(in srgb, var(--text-primary)
+  7%, transparent)` on the two text controls) or a sink (`inset 0 1px 2px
+  rgb(0 0 0 / 0.28)` on `.card-action`, a plate pushed into its surface taking
+  a shadow along its top edge). The reduced-motion block drops only the
+  settle. `.btn-ghost:active` was the precedent that made this obvious — it
+  answers a press with a ground and no movement at all. The same correction on
+  `.chip-toggle` and `.chip-place` is queued rather than taken: overturning an
+  argued rule alone at 2am is not a night's work.
+- **Measured under a real held press, not inferred from the sheet.** A
+  `mousedown` listener reading `getComputedStyle` 160 ms into a held
+  `left_click_drag`, so the 120 ms transition had landed and `:active` was
+  genuinely on (`e.matches(':active')` true in all three):
+  `.strip-tab` → `matrix(1, 0, 0, 1, 0, 1)` and `color(srgb 1 1 1 / 0.07)`;
+  `.disclosure-toggle` → `0.99958` px and the same ground;
+  `.card-action` → 1 px, `rgba(0, 0, 0, 0.28) 0px 1px 2px inset`.
+  **Reading at `mousedown` itself returns the pre-transition value and reads
+  as a dead control** — the first three readings here were identity matrices,
+  and they were the transition at t=0 rather than a missing rule. A press
+  state cannot be screenshotted mid-hold by this rig, so the computed value
+  under the held press is the evidence this entry rests on.
+- **Landed: a `.card-action` whose hover was half-silenced by a duplicate of
+  its own border.** The deck page's *Tag a pilot — who plays this one?*
+  carried `style={{ border: '1px solid var(--hairline)', … }}`, which is
+  exactly what `.card-action` already draws — and a `border` shorthand resets
+  `border-color`, which is the longhand `.card-action:hover` uses. Measured on
+  the page with the pointer resting on it: `:hover` true, the ground arrived
+  at `rgb(44, 44, 42)`, and the edge sat at `rgba(255, 255, 255, 0.1)` for the
+  whole hover. The inline border is gone; the same held press now reads
+  `rgb(137, 135, 129)` on the edge. `web/src/routes/DeckDetail.tsx:254`.
+- **Landed: the guard for that shape, because the three control guards cannot
+  see it.** `barebutton_test.go`, `focusstates_test.go` and
+  `pressstates_test.go` all read the stylesheet, so a class with a perfect
+  `:hover` face satisfies every one of them while the element wearing it shows
+  none of it. `inlineshorthand_test.go` reads the other side: an inline
+  shorthand over a longhand the sheet uses for `:hover`, `:active` or
+  `:focus-visible`. **951 tags carrying an inline style, read against 153
+  dressed classes, 0 collisions** — born green because the one it was written
+  from is fixed. It is a ban rather than a register deliberately: the broader
+  net (any inline key over the *same* property) finds four and at least two
+  look deliberate, and a guard born red on judgment calls is a guard somebody
+  deletes. The four are listed under what was left, below.
+- **Mutation-verified, both ways.** Restoring the inline border: the new guard
+  fails naming `web/src/routes/DeckDetail.tsx:254`, the class, and
+  `border-color`. Deleting `.strip-tab:active`: the register fails at 11
+  against a ceiling of 10, printing nine `.strip-tab` sites. The reader's own
+  fixtures pin five shapes of `inlineSets` and the three interactive
+  pseudo-classes.
+- **Two weaknesses in `classAnswers`, found by a mutant that lived and worth
+  the next session's half hour.** The shared reader
+  (`focusstates_test.go:199`) is used by the focus and press registers, and
+  (1) it reads `.strip-tab:not(:active)` as a press face — the optional
+  compound group swallows `:not(`, so the `:active` inside a negation counts;
+  (2) it reads a rule that exists **only inside a reduced-motion block** as a
+  press face, so `@media (prefers-reduced-motion: reduce) { .x:active {
+  transform: none } }` alone would satisfy the register while answering
+  nobody. Neither is reachable by an honest edit — the first requires writing
+  a negation nobody writes, the second requires arresting a press that does
+  not exist — which is why the honest mutant here had to delete both halves.
+  Not queued: it is a sharpening of a guard, not a question for Aaron.
+- **A fallback the build tool writes, site-wide and pre-existing.** Lightning
+  CSS expands `background: color-mix(…, var(--text-primary) 7%, transparent)`
+  into `background: var(--text-primary)` plus an `@supports` override, so a
+  browser without `color-mix` gets the colour at **full strength** — a solid
+  near-white block where a 7% wash was meant. `.chip-toggle:hover` has shipped
+  the identical shape for weeks (verified in the live sheet, same expansion),
+  and `color-mix` landed in Safari 16.2 against a declared floor of 16.4, so
+  nothing reachable renders it. Recorded rather than queued: it is a fact
+  about the toolchain, not a fault in a rule, and the next person to read a
+  `color-mix` fallback in the live sheet should not have to rediscover it.
+- **What was examined in the room and deliberately left.** The ten classes the
+  register still holds are the bespoke shelf — `.art-pick-tile` (2),
+  `.reader-tile`, `.wheel-folded`, `.wheel-fold-btn`, `.tarot-hinge`,
+  `.hand-folded`, `.lab-note`, `.menu-row`, `.field-hint`, `.is-on` — and
+  whether a card tile should settle under a thumb the way a plate does is a
+  design question rather than a missing rule. The broad inline sweep's other
+  three: `web/src/components/keeper.tsx:153` (`.btn:hover` sets
+  `border-color`, inline sets `borderColor`),
+  `web/src/components/tarot.tsx:560` (`.btn` and an inline `opacity`) and
+  `web/src/routes/Library.tsx:519` (`.btn-danger:hover` sets `background`,
+  inline sets `background`). Each needs a look at the control before a rule is
+  written about it, which is the next controls run's opening list.
+- **Rig notes, both bought tonight.** The Browser pane's `resize_window` to
+  1440×900 renders the page at that size and *scales it into an 800-wide
+  pane*, so `computer` coordinates are CSS pixels × (pane width ÷ emulated
+  width) and a screenshot of a page with a compositing video on it can come
+  back a black rectangle with the sticky header missing. Clearing the
+  emulation (`preset: "desktop"`) still leaves a 1280-wide viewport behind an
+  800-wide frame — the factor was 0.625 all night, and every coordinate in
+  this entry's walk was computed rather than read off a picture. Second: the
+  Coliseum's hero is a `<video>` (`daynight/loop.mp4`, **11.04 s**, `loop`)
+  and it reports `paused: true` in the pane, so the big black band above the
+  arena painting in an early screenshot was a video that had not painted —
+  not a layout fault, and the next lane should not file it as one.
+
 ### 2026-10-03 (night)
 
 *One PR, test-only and therefore mergeable: the press clause of commandment 17

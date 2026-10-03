@@ -243,11 +243,18 @@ function PilotLine({ deck, deckRef, onRefresh }: {
           change
         </button>
       ) : (
+        /* No inline `border` on this one, and that is the whole point.
+           `.card-action` already draws `1px solid var(--hairline)`, so the
+           inline shorthand that used to sit here was a duplicate — and a
+           shorthand outranks the longhand `border-color` that
+           `.card-action:hover` sets, so the edge of this control could never
+           answer the pointer. Measured on the page: the ground arrived and the
+           edge stayed at `rgba(255,255,255,0.1)` for the whole hover. The ink
+           stays inline because no rule in the sheet contends for it. */
         <button type="button"
                 onClick={() => { setValue(deck.pilot); setEditing(true) }}
                 className="card-action rounded-md px-2.5 py-1 text-xs font-medium"
-                style={{ border: '1px solid var(--hairline)',
-                         color: 'var(--series-1)' }}>
+                style={{ color: 'var(--series-1)' }}>
           Tag a pilot — who plays this one?
         </button>
       ))}
