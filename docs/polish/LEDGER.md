@@ -19,7 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-10-03 (night, the coverage lane). Previous: 2026-10-02
+- **Last run:** 2026-10-03 (night, the mutation lane). Previous: 2026-10-03
+  (night, the coverage lane), 2026-10-02
   (solo, daylight), 2026-09-26 (rainbow,
   and its second leg — the grind), 2026-09-24 (the coverage climb, outside
   the rainbow), 2026-09-19
@@ -32,6 +33,180 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-10-03 (night, mutation) — the instrument the coverage lane asked for, pointed at four kernels: fourteen real survivors, six proofs of equivalence, and the digit bound again
+
+The mutation lane of the same serial night run, taken on the question the
+coverage lane's queued item ends on: *a LIVED mutant in code that reads as
+covered is worth more than the next tenth.* Four determinism kernels, each on a
+throwaway `git worktree` (the 2026-10-02 protocol), `gremlins unleash
+./internal/<pkg>/` with `go/.gremlins.yaml`'s four mutant families. **Test
+files only** — nothing under a fingerprinted package's non-test source moved,
+so ADR 18's deployed Tier 1 cache is untouched, and no `testdata/` corpus was
+read for an expected value, let alone regenerated.
+
+| package | before | after | killed → | lived → | not covered |
+|---|---|---|---|---|---|
+| `internal/floats` | **76.32%** | **91.43%** | 58 → 64 | **18 → 6** | 6 → 6 |
+| `internal/mana` | **90.24%** | **94.59%** | 37 → 35 | **4 → 2** | 2 → 2 |
+| `internal/textutil` | **90.91%** | **90.00%** | 10 → 9 | 1 → 1 | 2 → 2 |
+| `internal/mt19937` | **91.57%** | — | 76 | 7 | 9 |
+
+Raw, `internal/floats`, before and after:
+
+```
+Mutation testing completed in 19 seconds 217 milliseconds
+Killed: 58, Lived: 18, Not covered: 6
+Timed out: 0, Not viable: 0, Skipped: 0
+Test efficacy: 76.32%
+Mutator coverage: 92.68%
+
+Mutation testing completed in 18 seconds 820 milliseconds
+Killed: 64, Lived: 6, Not covered: 6
+Timed out: 6, Not viable: 0, Skipped: 0
+Test efficacy: 91.43%
+Mutator coverage: 92.11%
+```
+
+**`Fsum`'s finish is covered on nearly every call and was pinned nowhere.**
+Three survivors sat in the five lines that turn Shewchuk's partials back into
+one float: `hi = x + y` (87:11) could be written `hi = x - y`, `lo = y - (hi -
+x)` (88:11) could be written `y + (hi - x)`, and the sign test in the half-even
+correction (95, four positions) could be negated — and all twenty-odd recorded
+`fsum` sequences still passed. The reason is structural rather than sloppy: in
+every recorded sequence the smaller partial sits far below the larger's
+half-ulp, where `x + y` and `x - y` both round to `x`, and the correction block
+never decides anything. The corpus cannot be asked for the missing cases — it
+is frozen — so the expectation came from **an independent oracle**: a sum of
+float64s is a rational, `big.Float` at 4096 bits accumulates it exactly, and
+`Float64` rounds that once to nearest-even, which is the contract `Fsum`'s own
+doc claims. Two tests:
+
+  1. `TestFsumIsTheCorrectlyRoundedSumOfEveryDyadicTriple` — all **32,768**
+     ordered triples from a 32-value grid (±{1, 1.5}·2^e over eight exponents
+     straddling 2^53), each against the oracle. **0 disagreements, 0.02 s.**
+     *Exhaustive deliberately*: of those triples **350** tell `x + y` from `x -
+     y` and **80** tell the correction's sign test from its negation — a
+     seeded sample of a few hundred would have missed every one and read green.
+  2. `TestFsumFinishesTheAccumulationTheWayItsDocDescribes` — the three
+     sentences the doc ends on, each a sequence whose answer is an exact
+     float64 **written as the arithmetic that defines it**: `[1, -2^54,
+     1.5·2^53]` → `1 - 2^52` (an exact addition inside the top-down loop);
+     `[0.375, -1.5·2^51, -2^52, 1.5·2^52]` → `0.375 - 2^50` (two of them, the
+     only shape that tells `lo`'s sign apart — four terms, so the sweep above
+     cannot reach it); `[2^53, 1, 2^-53]` → `2^53 + 2` (the correction, where
+     without it the answer is one ulp under and a running total agrees with the
+     mutant). Each case also asserts that a naive running total *disagrees*, so
+     no case can rot into a vacuous one, and that the oracle and the hand
+     derivation agree, so a typo in either is caught by the other.
+     Mutation-verified by hand on the worktree: `hi = x - y` fails all three
+     named cases plus the sweep; restored, `git status` clean of non-test files.
+
+**`Repr`'s round-trip property cannot see the presentation, and six mutants
+proved it.** `repr_test.go`'s own header said the frozen corpus has no `repr`
+section and so wrote two *properties* instead — but every mutation of the
+fixed/exponential switch still produces a decimal that parses back to the same
+float64, because `1e+15` and `1000000000000000.0` **are** the same number.
+Round-tripping is a property of the digits; a boundary is a property of the
+*spelling*, and only a spelling pins a spelling.
+`TestReprRendersTheSpellingsItsOwnContractNames` is the doc comment's own
+claims as a table — five of the fifteen strings verbatim from it (`1e+16`,
+`1000000000000000.0`, `0.0001`, `1e-05`, `100.0`), the rest the same four rules
+one case further — and it kills all six plus four more. Hand-verified, each
+mutant failing by the case's name: `decpt >= 16` → `Repr(1e15) = "1e+15"`;
+`decpt <= -3` → `Repr(0.0001) = "1e-04"`; `case decpt < 0` → `Repr(0.5) =
+".5"`; `case decpt > len(digits)` → `Repr(25) = "25."`; `IsInf(v, 1)` on the
+negative arm → a panic inside `Repr`.
+
+**A trap worth the next session's five minutes: gremlins reports a mutant in a
+`switch` *case expression* as NOT COVERED however hard the tests drive it.**
+Go's coverage blocks begin at the case *body*, so the position of `case decpt
+<= 0:` falls outside every block and gremlins reads no counter for it. Four of
+`floats`' six NOT COVEREDs are that (`repr.go:38:21`, `71:13`, `73:13`), and so
+are all four in `mana`/`textutil` and six of `mt19937`'s nine. They are not
+gaps: three of them are killed by hand mutation above. The honest NOT COVERED
+in `floats` is `repr.go:55:49`, the panic on an unreadable exponent from
+`strconv.FormatFloat(v, 'e', …)` — unreachable without mutating `strconv`.
+
+**The six that survive `floats` are equivalent mutants, each with a proof
+rather than a shrug**, which is the half of a mutation report that has to be
+written down or the next run re-derives it:
+
+- `floats.go:59:19` — `math.Abs(x) < math.Abs(y)` → `<=`. Equal magnitudes
+  means `y == x` or `y == -x`, and both give `lo == 0` in either order, so the
+  swap is invisible. Twenty million random sequences found no counterexample.
+- `floats.go:95:20/43/57/80` (four boundaries) — `lo < 0.0` → `<=` and
+  `partials[n-1] < 0.0` → `<=`, plus their mirrors. `lo == 0` with `n > 0` is
+  unreachable: the loop exits with `lo == 0` only by reaching `n == 0`. And
+  `partials` never holds a zero — both append sites are guarded by `!= 0.0`.
+  (The four *negations* at the same positions are real and are now killed.)
+- `floats.go:175:14` — `sign(n *big.Int)`'s `n.Sign() < 0` → `<= 0`. `sign` is
+  called only from the two `switch` arms that require a non-zero remainder, so
+  `num == 0` never reaches it.
+
+**`internal/mana`: the digit bound again, in a second package, found the same
+way.** `mana.go:122` tests `r < '0' || r > '9'`; the **upper** bound had
+nothing holding it, because every recorded cost in the package's tables stops
+at 8. Under `r >= '9'`, `{9}` is not digits, the symbol falls to the `default`
+arm, and a nine-generic cost becomes **one** generic — a mana value four off
+with no error anywhere. This is `internal/sim/compile`'s `168:8` from the
+2026-10-02 baseline, one package over: *a reader's bounds are pinned only by a
+symbol that sits on them, and nothing a deck happens to contain is a bound.*
+`TestParseReadsEveryASCIIDigitAsGeneric` sweeps all ten digits and then past
+them (`{10}`, `{19}`, `{90}`, `{99}`, `{9}{9}`). Verified both ways by hand:
+`r >= '9'` fails with `Parse("{9}{G}").Generic = 1, want 9`; `r <= '0'` fails
+with `Parse("{0}{G}").Generic = 1, want 0`. The two that still live are
+`solver.go:169:17` and `205:17` — `src.Amount > 0` → `>= 0` in `unitCount`
+(adding zero), and `src.Amount <= 0` → `< 0` in `CanPay` (a `for range 0`
+loop) — equivalent, both by the arithmetic of zero.
+
+**`internal/textutil`: the one survivor was a panic, not a wrong answer.**
+`textutil.go:113`'s `if i < len(s) && s[i] == '\n'` is the only line in
+`SplitLines` that reads *past* the rune it is holding, and both of the
+corpus sweeps wrap their boundary in `"a" + … + "b"`, so nothing ever asked
+about the last byte. Moved to `i <= len(s)`, the function panics with an index
+out of range on any text whose final byte is a carriage return — a deck's YAML
+pasted out of a Windows editor.
+`TestATerminatorAtTheVeryEndAddsNoEmptyLine` is the documented claim ("no
+empty final element for a string that ends in one") applied to the end of the
+string: `"one\rtwo\r"`, `"one\r\ntwo\r\n"`, `"\r"`, `"\r\n"`, `"one\ntwo\n"`.
+Verified by hand; the mutant panics and the test fails by name.
+
+**`internal/mt19937` needed nothing, and that is a result.** 7 LIVED, every one
+equivalent, each by an argument about the kernel rather than about its tests:
+`seed < 0` → `<= 0` (two's-complement negation of zero is zero, and the
+`else` arm answers the same `0`); `BitLen() > 0` → `>= 0` (`(0-1)/32 + 1` is
+1, which is the default `keyused` anyway); `len(key) > k` → `>=` (equality
+assigns `k` to itself); `rest < 32` → `<= 32` (`k == 64` shifts by zero);
+`count <= 0` → `< 0` in `RandRangeStep` (a defensive panic the earlier
+emptiness check makes unreachable); and `floorDiv`'s two sign tests (`a == 0`
+makes `a%b == 0`, which short-circuits the conjunct; `b == 0` divides by zero
+one line earlier). Nothing to add: the seeded generator is the best-pinned
+kernel in the tree, which is the right place for the recorded goldens to have
+left it.
+
+- **Considered and rejected.** (a) *Changing `floats.go` so the correction
+  block is reachable from simpler inputs* — nothing is wrong with it, and ADR
+  18 forbids touching a fingerprinted non-test file tonight regardless. (b)
+  *Adding a `repr` section to `testdata/corpus.json`* — the corpus is frozen;
+  the doc comment is a better source of truth for a spelling anyway, since it
+  is the thing the code promises. (c) *A seeded random sweep instead of an
+  exhaustive one* — 350 of 32,768 is a 1% hit rate; a sample is a test that
+  passes for the wrong reason.
+- **A measurement caveat, honestly.** `timeout-coefficient: 4` over a baseline
+  of a fraction of a second is a budget this Mac's scheduler misses under its
+  own load: `textutil`'s two `Head` mutants swapped classification between the
+  two runs (TIMED OUT ↔ KILLED ↔ LIVED at the same position), which is why its
+  efficacy reads 90.91 → 90.00 while its one real survivor died. Across both
+  runs no mutant went from caught to surviving. **Read a LIVED next to a
+  TIMED OUT at the same position as one unstable mutant, and compare two runs**
+  — the rule `.gremlins.yaml` already states for benchmarks.
+- **Queue movement: none added.** Every survivor is now either killed by a test
+  or carries a written proof of equivalence; nothing here needs a code change,
+  which is the only thing that would have earned a daybreak line. The open
+  White item asking whether mutation testing becomes the climb's instrument now
+  has its first full night of evidence, and the sentence pointing at it is in
+  `DAYBREAK.md`.
 
 ### 2026-10-03 (night, coverage) — four seams nothing had ever run, two of the rebuild's refusals, and the environment doctrine made checkable
 

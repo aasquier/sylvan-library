@@ -3,6 +3,7 @@ package floats_test
 import (
 	"encoding/json"
 	"math"
+	"math/big"
 	"os"
 	"testing"
 
@@ -107,6 +108,151 @@ func TestFsumBeatsANaiveSumOnAtLeastOneCase(t *testing.T) {
 		t.Fatal("no sequence in the corpus separates fsum from a running total")
 	}
 	t.Logf("%d of %d sequences separate fsum from a running total", differs, len(corpus.Fsum))
+}
+
+// The corpus pins what `Fsum` answers; it does not pin *how it finishes*, and
+// mutation testing is how that came out. `gremlins unleash ./internal/floats/`
+// read 76.32% efficacy, and three of the eighteen survivors were in the five
+// lines that turn the partials back into one float: `hi = x + y` in the
+// top-down loop can be written `hi = x - y`, `lo = y - (hi - x)` can be written
+// `y + (hi - x)`, and every recorded sequence still passes. The lines are
+// *covered* — they run on nearly every call. They are not pinned, because in
+// each recorded sequence the smaller partial sits far below the larger's
+// half-ulp, where `x + y` and `x - y` both round to `x`.
+//
+// The corpus cannot be asked for the missing cases: it is frozen and never
+// regenerated. An independent oracle can be. A sum of float64s is a rational,
+// `big.Float` at a precision no such sum can exceed accumulates it exactly, and
+// `Float64` rounds that once to the nearest float64 with ties to even — which
+// is the contract `Fsum`'s own doc claims ("the answer is the nearest float64
+// to the true sum"). So every expectation below is derived from the definition
+// rather than recorded from a run, and `testdata/corpus.json` is untouched.
+
+// oraclePrec holds any sum of a handful of float64s exactly. A float64's set
+// bits live between 2^-1074 and 2^1023, so 2151 bits span the widest pair with
+// no rounding at all; the rest is room for the carries.
+const oraclePrec = 4096
+
+func fsumOracle(values []float64) float64 {
+	acc := new(big.Float).SetPrec(oraclePrec)
+	for _, v := range values {
+		acc.Add(acc, new(big.Float).SetPrec(oraclePrec).SetFloat64(v))
+	}
+	out, _ := acc.Float64()
+	return out
+}
+
+// dyadicGrid is ±{1, 1.5}·2^e over eight exponents chosen to straddle the
+// places the accumulation turns: 2^53 is where consecutive integers stop being
+// representable, 2^54 and 2^55 are where a 1 falls below half an ulp (so the
+// correction at the end of `Fsum` decides the last bit), 2^41 and 2^51 let a
+// triple leave a residue several binades down, and 2^-1 and 2^2 let the
+// smallest term be a fraction. The halves matter as much as the powers: a
+// mantissa of 1.5 is what makes a sum land exactly on a midpoint and so makes
+// ties-to-even observable.
+func dyadicGrid() []float64 {
+	var out []float64
+	for _, e := range []int{-1, 2, 10, 41, 51, 53, 54, 55} {
+		for _, m := range []float64{1, 1.5} {
+			for _, s := range []float64{1, -1} {
+				out = append(out, s*m*math.Ldexp(1, e))
+			}
+		}
+	}
+	return out
+}
+
+// Exhaustive rather than sampled, because the cases that distinguish a
+// correctly-rounded sum from a nearly-correct one are a thin scatter: of the
+// 32,768 triples below, 350 tell `x + y` from `x - y` and 80 tell the sign test
+// in the half-even correction from its negation. A seeded sample of a few
+// hundred would miss every one and read green.
+func TestFsumIsTheCorrectlyRoundedSumOfEveryDyadicTriple(t *testing.T) {
+	t.Parallel()
+	grid := dyadicGrid()
+	bad := 0
+	for _, a := range grid {
+		for _, b := range grid {
+			for _, c := range grid {
+				values := []float64{a, b, c}
+				got, want := floats.Fsum(values), fsumOracle(values)
+				if math.Float64bits(got) != math.Float64bits(want) {
+					bad++
+					if bad <= 10 {
+						t.Errorf("Fsum(%v) = %v (%#016x), exactly summed and rounded once it is %v (%#016x)",
+							values, got, math.Float64bits(got), want, math.Float64bits(want))
+					}
+				}
+			}
+		}
+	}
+	t.Logf("%d triples over a grid of %d, %d disagreements", len(grid)*len(grid)*len(grid), len(grid), bad)
+}
+
+// The three sentences `Fsum`'s doc comment ends on, each as a sequence that
+// fails if the sentence stops being true. Every expectation here is an exact
+// float64 written as the arithmetic that defines it — no case needs a value
+// nobody can derive by hand, which is the property that keeps this out of the
+// frozen corpus's territory.
+func TestFsumFinishesTheAccumulationTheWayItsDocDescribes(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name   string
+		values []float64
+		want   float64
+	}{
+		{
+			// "the final accumulation stops at the first inexact addition":
+			// the top-down loop runs, adds exactly, and the sum of the two
+			// partials is the answer. 1 - 2^54 + 1.5·2^53 is 1 - 2^52, which
+			// is under 2^53 and so exactly a float64; a running total loses
+			// the 1 when it meets 2^54 and answers -2^52.
+			name:   "an exact addition inside the top-down loop",
+			values: []float64{1, -math.Ldexp(1, 54), 1.5 * math.Ldexp(1, 53)},
+			want:   1 - math.Ldexp(1, 52),
+		},
+		{
+			// The same loop iterating twice, which is the only shape that
+			// tells `lo = y - (hi - x)` from `y + (hi - x)`. The exact sum is
+			// 0.375 - 2^50, whose set bits run from 2^49 down to 2^-3 —
+			// exactly 53, so it is a float64 and not a rounding.
+			name:   "two exact additions, so the residual is carried twice",
+			values: []float64{0.375, -1.5 * math.Ldexp(1, 51), -math.Ldexp(1, 52), 1.5 * math.Ldexp(1, 52)},
+			want:   0.375 - math.Ldexp(1, 50),
+		},
+		{
+			// "then corrects for half-even rounding across partials", which is
+			// the one case the correction exists for. 2^53 + 1 + 2^-53 is a
+			// hair above the midpoint between 2^53 and 2^53+2, so it rounds
+			// up; without the correction the answer is 2^53, one ulp under,
+			// and that is also what a running total says (2^53 + 1 ties to
+			// even, back to 2^53, and 2^-53 then vanishes).
+			name:   "the half-even correction across partials",
+			values: []float64{math.Ldexp(1, 53), 1, math.Ldexp(1, -53)},
+			want:   math.Ldexp(1, 53) + 2,
+		},
+	} {
+		if got := floats.Fsum(c.values); !same(got, c.want, epsilonFsum) {
+			t.Errorf("%s: Fsum(%v) = %v (%#016x), the arithmetic says %v (%#016x)",
+				c.name, c.values, got, math.Float64bits(got), c.want, math.Float64bits(c.want))
+		}
+		// Each case must also be worth having: a sequence a running total
+		// gets right proves nothing about the algorithm, which is the lesson
+		// TestFsumBeatsANaiveSumOnAtLeastOneCase records for the corpus.
+		naive := 0.0
+		for _, v := range c.values {
+			naive += v
+		}
+		if math.Float64bits(naive) == math.Float64bits(c.want) {
+			t.Errorf("%s: a running total also answers %v, so the case is vacuous", c.name, naive)
+		}
+		// And the oracle must agree with the hand derivation, so a typo in
+		// either one is caught by the other.
+		if oracle := fsumOracle(c.values); math.Float64bits(oracle) != math.Float64bits(c.want) {
+			t.Errorf("%s: the exact sum rounds to %v (%#016x), the comment derives %v (%#016x)",
+				c.name, oracle, math.Float64bits(oracle), c.want, math.Float64bits(c.want))
+		}
+	}
 }
 
 func TestRoundBreaksTiesToEven(t *testing.T) {
