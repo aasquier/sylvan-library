@@ -7402,8 +7402,10 @@ becomes a register. The design pass it measures is Aaron's and is queued.*
   the red check is *correct* about the worker being a sha behind, and the
   complaint was never that it was red but that it would not say why. Printing
   the body answers the actual complaint. **No new daybreak line**: the queue
-  already holds a `deploy.yml` item needing a watched deploy (item 6, the
-  snapshot step), there is no new question for Aaron here, and two lines
+  already holds a deploy-job item needing a watched deploy (item 6, the
+  snapshot step in `.github/workflows/ci.yml` — this sentence said
+  `deploy.yml`, a file this repository has never had; corrected by Cleanup,
+  2026-10-03), there is no new question for Aaron here, and two lines
   asking for one morning's attention to the same job is how a queue stops
   being read.
 - **Hot-spot patrol: `internal/api`, and the finding is in allocation
@@ -14132,6 +14134,166 @@ for anything still in hand — *what would have to be true* for the next cleanup
 to land it. An item carried three cleanups with no stated reason is a finding
 about this phase, not about the item.
 
+- **Last run:** 2026-10-03 (cleanup, night — the last lane of a serial night
+  that ran ten pull requests before it; entry directly below). Previous:
+  2026-09-29 (the rulings),
+  2026-09-28 (the fourth run), 2026-09-19, 2026-09-12, 2026-09-05, 2026-08-23
+  (the run Aaron asked this phase into existence on). This bullet is new on
+  2026-10-03: the other six sections have carried one since they were written
+  and this one never did, so "when did cleanup last run" was a question you
+  answered by reading dates off entry headings.
+
+### 2026-10-03 (cleanup, night) — one anchor that never existed
+
+The last lane of a serial night, run against `main` at `7c52d9c` with every
+mergeable pull request of the night already in it — **seven merged**: #528
+White, #529 Blue, #530 Black, #531 Red, #535 Coverage, #536 Colorless, #537
+Mutation — and **three held for Aaron's eye** because every line of them
+renders: #532 Green, #533 the Queen, #534 the Coliseum. **Queue depth: 13
+before, 13 after**, by
+the file's own recipe, which is the honest number and not a disappointing one:
+every one of the thirteen needs a click in a tab this pass has no account for,
+a dollar, a ruling, a watched deploy or a migration window. A cleanup whose
+input is a queue of *exactly the things a run may not do* empties nothing, and
+saying so is the phase's own rule.
+
+**One sentence the resume rule needs:** tonight's lanes split the night's tag
+across two dates — Blue's entry is `2026-10-02 (night)` and every other lane's
+is `2026-10-03 (night)` — and they are **one night**, the hours either side of
+midnight on 2026-10-02/03, not two runs. No heading was rewritten to say so;
+this sentence is where the next session reads it.
+
+**Untap — thirteen items re-checked against the code, oldest first.** None was
+*already done* and none was *gone stale*; what the re-reads bought was two
+corrections and one measurement.
+
+- *Still true and still needs Aaron — thirteen.* The reads, not the lines:
+  Dependabot is **9 open, 1 critical / 3 medium / 5 low, every one `pip/torch`
+  and `development`** (API, tonight — the fourth identical read); there is
+  still no snapshot step in any workflow (the only `snapshots` word in
+  `.github/workflows/` is a Forge release tag); `cache_creation_input_tokens`
+  still appears in exactly two test fixtures and nowhere in serving code;
+  `prices.CacheReadFraction` is still `0.1` for the whole family and
+  `claude-fable-5-1` is still absent from `Table`; Sonnet 5 still carries its
+  `Then`/`Until: "2026-08-31"` window and `prices.Source` still points at
+  `platform.claude.com/docs/en/pricing`; `/api/ocr/*` still answers
+  `max-age=31536000, immutable` on a URL with no stamp in it; `Settings.tsx`
+  still says the torches are unlit and no route answers whether a night is
+  scheduled, so the Blue item is still waiting on the thing it says it waits
+  for. `COVERAGE.md`'s deckread paragraph needed nothing: the coverage lane
+  had already written the re-queue into it.
+- *Still true and no longer needs him — none, and this is where a cleanup
+  normally earns its night.* The one candidate was Black's pricing item, whose
+  dead `Source` URL is a one-line fix needing no ruling — and it renders, on
+  the admin panel, as the link a person clicks to check the rates. Nothing a
+  user can see merges at night, and a link's destination is something a user
+  can see the moment they use it. It stays with the rest of its branch.
+
+**Upkeep — the queue itself, four edits.**
+
+1. **The merge-order note at the head of *a watched deploy* was reasoning;
+   it is now a reading, and the order it gave was wrong.** Live states:
+   **#534 `MERGEABLE` and only behind, #532 and #533 `CONFLICTING`.** For each
+   branch, the files changed on the branch and on `main` since that branch's
+   own merge base were intersected, and the answer for all three is **exactly
+   `DAYBREAK.md` and `LEDGER.md`** — so the disjoint-bundle argument
+   (`pentagram.js` · `DeckDetail.js` + `index.css` · `Coliseum.js`) is now
+   measured. The correction that matters: `gh pr update-branch` **refuses** a
+   branch whose merge is not clean, so it is the whole job on #534 and no help
+   at all on #532 and #533, which want a local `git merge origin/main` and a
+   two-minute resolve keeping both sides. And #534 opens a second
+   `## Open — a ruling` group a few lines above the existing
+   `## Open — a ruling, and nothing else`; the note now says to fold it in as
+   it lands.
+2. **The deploy-snapshot item had been sending readers to a file this
+   repository has never had.** It said the step was missing from deploy.yml.
+   There is no such file and `git log --all` has never known one: continuous
+   deployment is the `deploy` job inside `.github/workflows/ci.yml`, gated on
+   `tests`. Three cleanups re-verified the item's *claim* — still no snapshot
+   step, true every time — and not one of them opened the file it named,
+   because the name reads exactly like a file a repository would have. Fixed
+   in the queue line and in both ledger sentences that repeated it (Red's
+   2026-09-29 entry, the 2026-09-28 Cleanup entry).
+3. **The Dependabot item is four lines shorter.** Its own third carry already
+   produced the finding that an item waiting only on a click in a tab earns a
+   one-line ask rather than a paragraph re-verified each cleanup; this is that
+   finding acted on rather than restated. The paragraph's content lives where
+   it belongs — `tools/pyproject.toml`'s triage — and the line now carries the
+   number, the scope and the sentence to paste into the dismissal.
+4. **The prose-extractor item got the measurement it had been asking for since
+   2026-08-24** (see below).
+
+**Discard to hand size — one guard, and it is the one the night's own rot
+asked for.** `TestTheQueueNamesConfigurationFilesThatExist` holds every
+backticked `.yml` and `.toml` in `DAYBREAK.md` to a file in this checkout,
+resolving a path written relative to whatever directory the sentence stands in.
+It fails on `main` as written (the snapshot item's deploy.yml), and two
+mutations were run: with the suffix clause removed it fails on `ci.yml`,
+which proves the resolver is
+load-bearing rather than decorative, and its built-body leg fails if the
+extractor stops seeing either of the two anchors it is handed. Two shapes
+failed the test's own first run and both are now rules the comment states: a
+line that names a file *because it does not exist* writes it without backticks
+(the snapshot item does exactly that now), and so does a sentence about a bare
+extension. `cmd/mtglab` is not a fingerprinted package and the file is a test,
+so no Tier 1 cache moved.
+
+**What the extractor measured, which is the answer to the White prose item.**
+The question it has carried since 2026-08-24 was whether the wider prose is
+worth a third extractor. It is not, in that shape, and the numbers say why:
+pointed at `DAYBREAK.md`, `recordkit_test.go`'s existing `repoPaths` flags
+**five anchors and four of the five are the queue doing its job** —
+`gowrap.sh`, `deploy.sh`, `poll.sh` and `LANE_BRIEF.md` are named by the open
+Colorless item *because they live in a scratch directory and vanish with it* —
+and the fifth is a gitignored deck file. **A queue names what does not exist
+yet; a record names what does**, which is why the same extractor is honest on
+`NOTICE.md` and would cry wolf here. The *map* is the other case: `COVERAGE.md`
+names **41 anchors and 40 resolve**, the single miss being a gitignored
+`deck.yaml` — but only once the resolver allows a path written relative to
+`go/`, because that file speaks from inside the Go tree. Root-anchored
+resolution alone calls **19 of its 20** slashed paths broken. So the item's
+recommendation is now a suffix resolver in the kit plus a guard on the maps,
+never on this queue and never on `LEDGER.md`, which is history and is supposed
+to name files that were deleted.
+
+**Considered and rejected:**
+
+- **Merging Black's two dollar items into one.** They are one *shipment* — the
+  pricing correction over-reads by ~13.6% and the missing cache-write column
+  under-reads by 14–20%, so shipping either alone moves the headline figure the
+  wrong way, which the pricing item already says in its own recommendation.
+  They are not one *question*: one asks to re-record three frozen golden cases
+  deliberately, the other asks for a migration window. Merging them would have
+  taken the queue to 12 and bought the morning nothing, and it would have moved
+  a paragraph across the one file three held branches are already conflicting
+  in — turning #534's clean `update-branch` into a hand resolve. The pairing is
+  written where it belongs: in the pricing item's last sentence.
+- **A path guard over `docs/` wholesale**, for the reason the measurement
+  above gives.
+- **Landing the Colorless tooling item** (`.claude/polish/` for the night's
+  four scratch files). It is tooling and it would merge, but it is a ruling
+  about where this project keeps the pass's own instruments, asked tonight by
+  the lane that found it, and a cleanup answering a question Colorless raised
+  four hours earlier is the phase deciding for Aaron rather than for itself.
+- **The two live worktrees under `.claude/worktrees/`** that match no lane of
+  tonight (`agent-a033745369c1db585`, `agent-ace54adcdc23122b3`). Colorless
+  recorded them and left them; Cleanup left them too. A relic is a decision,
+  never a silent deletion.
+
+**What would have to be true for the next cleanup to land each of the
+thirteen.** The three waiting items say so themselves and are unchanged. For
+the rest: the two clicks and the dollar need Aaron in a browser he is signed
+into, and nothing else will ever do; the snapshot step, the `pool.Pool`
+connector, the OCR stamp and the pricing branch each need a morning he can
+watch a boot on, which is one morning for all four if they are ordered; the
+cache-write column needs a migration window; the coverage ruling and the
+tooling ruling need one sentence each. **The honest reading of this entry is
+that the queue is now made entirely of the four things a night run may not
+do** — which is a different state from the one the 09-28 regroup found, where
+half the file was work nobody had done. Sixty minutes of a seventh lane can
+correct the queue, measure a standing question and close a rotten anchor; it
+cannot click in the Security tab.
+
 ### 2026-09-29 (cleanup) — the rulings
 
 The morning after the fourth run, Aaron answered the whole *a ruling* group
@@ -14375,8 +14537,9 @@ alone), four-way, every classification re-made this afternoon:**
   merge queue (see the trigger note below). **A dollar:** the external
   monitor and the phone (`fly secrets list` and the instance's check config
   unchanged; on the queue since 09-19 only, in the ledger since 08-16).
-  **A watched deploy:** the deploy-time snapshot (`deploy.yml` re-read: no
-  snapshot step). **A migration window:** the cache-write tokens column
+  **A watched deploy:** the deploy-time snapshot (re-read: no snapshot step —
+  this said `deploy.yml`, and the deploy job is in
+  `.github/workflows/ci.yml`; corrected by Cleanup, 2026-10-03). **A migration window:** the cache-write tokens column
   (`cache_creation_input_tokens` still appears only in two test fixtures).
 - *Still true, deliberately waiting — three*: the Settings torches copy
   (`Settings.tsx:353` unchanged; `fly secrets list` shows no

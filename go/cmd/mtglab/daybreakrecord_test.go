@@ -302,3 +302,103 @@ func namesALedgerSection(item string, patterns []*regexp.Regexp) bool {
 	}
 	return false
 }
+
+// configAnchor matches the backticked tokens this guard holds: a `.yml` or a
+// `.toml`, the two extensions that in this repository can only name a file the
+// tree actually carries -- a workflow or a manifest.
+//
+// The two it deliberately does not hold are the whole argument. `.yaml` is a
+// deck (ADR 30: the library lives on the volume and is gitignored), so a queue
+// line naming one would be flagged for existing in the only place it is
+// allowed to exist. `.sh` and `.md` are worse: a queue names what does **not**
+// exist yet, which is what a queue is for -- measured 2026-10-03, the one open
+// Colorless item names `gowrap.sh`, `deploy.sh`, `poll.sh` and `LANE_BRIEF.md`
+// precisely because they live in a scratch directory and vanish with it, so
+// four of five flags from the wider extractor were the queue working. That is
+// the difference between this file and the records `licenserecord_test.go` and
+// `skillrecord_test.go` hold: a record names what is, a queue names what
+// should be. It is also why `LEDGER.md` is not held by anything here -- it is
+// history, and history is supposed to name files that were deleted.
+//
+// Backticks are the anchor, which cuts both ways and is the rule to know: a
+// queue line that discusses a name *because it does not exist* -- the one this
+// guard was written for does exactly that -- writes it without them, and so
+// does a sentence naming a bare extension. Both shapes failed the first run of
+// this test on the same branch that wrote it, which is the cheapest possible
+// proof that the marker means something.
+//
+// The leading `\.?[A-Za-z0-9_]` is why `.github/workflows/ci.yml` matches and
+// a bare "`.yml`" in a sentence about extensions does not.
+var configAnchor = regexp.MustCompile("`(\\.?[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(?:yml|toml))`")
+
+// resolvesInCheckout answers whether a path a document names is a file in this
+// tree, allowing the path to be written relative to whatever directory the
+// sentence is standing in -- `ci.yml` for `.github/workflows/ci.yml`. These
+// documents speak from inside `go/`, from the repository root and from the
+// skill directory in consecutive paragraphs, and a resolver that only tries
+// the root calls 19 of `COVERAGE.md`'s 20 slashed paths broken.
+func resolvesInCheckout(token string, files []string) bool {
+	suffix := "/" + token
+	for _, f := range files {
+		if f == token || strings.HasSuffix(f, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestTheQueueNamesConfigurationFilesThatExist holds the daybreak queue's
+// workflow and manifest anchors to the tree. The rot it was written for was
+// live for a month and cost a reader the whole trip: the deploy-snapshot item
+// said the snapshot step was missing from `deploy.yml`, and this repository has
+// never had such a file -- continuous deployment is the `deploy` job inside
+// `.github/workflows/ci.yml`. Three cleanups re-verified the item's *claim*
+// (still no snapshot step, true every time) and none of them opened the file
+// named, because the name reads exactly like a file a repository would have.
+//
+// The extractor is proved against a built body first, so that a queue which
+// happens to name no configuration file cannot turn this guard inert without
+// anybody noticing -- the sibling guards above refuse to pass on an empty
+// queue, which is right for them and wrong here: a morning with no workflow
+// question in it is an ordinary morning, not a broken extractor.
+func TestTheQueueNamesConfigurationFilesThatExist(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	files := checkoutFiles(t, root)
+
+	built := "a line about `.github/workflows/ci.yml` and one about `deploy.yml`.\n" +
+		"A deck in `decks/x/deck.yaml` and a script in `gowrap.sh` are not anchors."
+	var found []string
+	for _, m := range configAnchor.FindAllStringSubmatch(built, -1) {
+		found = append(found, m[1])
+	}
+	if len(found) != 2 {
+		t.Fatalf("the extractor read %v out of a body holding exactly two "+
+			"configuration anchors; a miss here makes every green below "+
+			"meaningless", found)
+	}
+	if !resolvesInCheckout(found[0], files) {
+		t.Errorf("%q does not resolve in this checkout, and it is this "+
+			"repository's own workflow file", found[0])
+	}
+	if resolvesInCheckout(found[1], files) {
+		t.Errorf("%q resolves in this checkout; the guard below can no longer "+
+			"fail, so delete it or find the rot it was written for", found[1])
+	}
+
+	body, err := os.ReadFile(filepath.Join(root, "docs", "polish", "DAYBREAK.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range configAnchor.FindAllStringSubmatch(string(body), -1) {
+		token := m[1]
+		if !resolvesInCheckout(token, files) {
+			t.Errorf("docs/polish/DAYBREAK.md names the configuration file %q "+
+				"and no file in this checkout answers to that path; a queue "+
+				"line is read by somebody who then opens the file it names, so "+
+				"either the path is stale (say where the thing moved to) or the "+
+				"file was never there (which is how `deploy.yml` sent three "+
+				"cleanups to a path this repository has never had)", token)
+		}
+	}
+}
