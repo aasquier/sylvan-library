@@ -31,24 +31,36 @@ import (
 //
 // # Why a register and not a ban
 //
-// A ban would be born red on fifteen classes, which is a design pass across
-// the Coliseum's tab strips, the deck page's card actions and every
+// A ban would have been born red on fifteen classes, which is a design pass
+// across the Coliseum's tab strips, the deck page's card actions and every
 // disclosure in the app -- not a thing a guard can demand in the diff that
 // introduces it. So this is `datedcomments_test.go`'s ratchet instead: the
 // number may not rise, and a branch that lowers it re-types the constant in
-// the same diff. The two families named in commandment 17's own text are the
-// measure of how little this was watched -- `.chip-toggle` answers the press
-// with an argued comment above the rule, and its named sibling `.strip-tab`
-// does not, across nine buttons.
+// the same diff.
+//
+// The first lowering is the argument for the shape. Three classes took the
+// house press reply -- `.card-action`, `.strip-tab`, `.disclosure-toggle` --
+// and the register fell by *five*, because `.card-action-danger`, `.armed` and
+// the rest ride on elements that now answer through a sibling. A ban on the
+// fifteen would have asked for fifteen rules; the ratchet asked for three and
+// got the other two free, which is the whole reason the unit below is a class
+// and the verdict is per element.
 //
 // # Why the unit is a class and not a button
 //
-// Thirty-four buttons wear the fifteen classes, and `.card-action` alone is
-// ten of them. Gating on button sites would turn "somebody added a tenth card
-// action" into a red check about an omission somebody else made in the
-// stylesheet, which is how a guard gets deleted in anger. The fault is one
-// rule missing from one named place, so the count is of named places. The
-// sites are printed anyway, because the fix wants to be looked at on a page.
+// Gating on button sites would turn "somebody added a tenth card action" into
+// a red check about an omission somebody else made in the stylesheet, which is
+// how a guard gets deleted in anger. The fault is one rule missing from one
+// named place, so the count is of named places. The sites are printed anyway,
+// because the fix wants to be looked at on a page.
+//
+// # What is left, and why it is not simply more of the same
+//
+// What the first lowering did not touch is the deliberately bespoke shelf --
+// the art picker's tiles, the reader tiles, the wheel's folds, the tarot
+// hinge. Those carry their own named classes on purpose, and whether a card
+// tile should settle under a thumb the way a plate does is a design question
+// rather than a missing rule. Read the ledger's Red section before taking one.
 //
 // # Why Go and not Vitest
 //
@@ -68,7 +80,7 @@ import (
 //
 // `pressSilentClassCeiling` is the register. **Lower it freely; raising it is
 // a decision that belongs in the diff.**
-const pressSilentClassCeiling = 15
+const pressSilentClassCeiling = 10
 
 func TestEveryButtonThatAnswersHoverAnswersThePress(t *testing.T) {
 	t.Parallel()

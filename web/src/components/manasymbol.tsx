@@ -28,15 +28,7 @@
 import { useState, type ReactNode } from 'react'
 import { GLYPH_PATH, hasGlyph } from '../lib/managlyphs'
 import { COLOR_VAR } from '../lib/mtg'
-
-/**
- * Codes the symbol route has refused this session, remembered at module
- * level so one offline render of a 99 does not fire ~200 doomed requests
- * and re-fire them on every scroll. A symbol that comes back (the network
- * returns) is one reload away, which is what a browser already means by
- * "try again".
- */
-const FAILED = new Set<string>()
+import { noteOfficialSymbolFailed, officialSymbolFailed } from '../lib/symbolmemo'
 
 /**
  * One official symbol as an image, with the caller's fallback behind it.
@@ -53,7 +45,7 @@ export function OfficialSymbol({ symbol, size, fallback }: {
 }) {
   const code = symbol.replace(/\//g, '').toUpperCase()
   const [failed, setFailed] = useState(false)
-  if (failed || FAILED.has(code) || !/^[0-9A-Z]{1,10}$/.test(code)) {
+  if (failed || officialSymbolFailed(code) || !/^[0-9A-Z]{1,10}$/.test(code)) {
     return <>{fallback ?? null}</>
   }
   return (
@@ -67,7 +59,7 @@ export function OfficialSymbol({ symbol, size, fallback }: {
       draggable={false}
       loading="lazy"
       style={{ display: 'block', width: size, height: size }}
-      onError={() => { FAILED.add(code); setFailed(true) }}
+      onError={() => { noteOfficialSymbolFailed(code); setFailed(true) }}
     />
   )
 }

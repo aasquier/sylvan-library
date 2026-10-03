@@ -227,30 +227,62 @@ items 1–2; answered as far as possible 2026-09-26.
 > build` on `main` should write **no** diff — that is the proof the three
 > partial rebuilds compose, and it costs a minute.
 
-**Red: commandment 17 names three replies and the third one was never
-enforced by anything — fifteen classes answer the hover and take the click in
-silence, and one of them is a family the commandment names by name.** The
-register landed tonight (test-only, so it may merge); what it measures is a
-design pass that renders, so it is yours. The list: `.card-action` (10
-buttons), `.strip-tab` (9), `.disclosure-toggle` (5), `.art-pick-tile`,
-`.menu-row`, `.reader-tile`, `.field-hint`, `.tarot-hinge`, `.hand-folded`,
-`.lab-note`, `.wheel-folded`, `.wheel-fold-btn` and three modifiers riding
-them. `.chip-toggle:active` already exists *with a comment arguing exactly
-this fault*, and `.strip-tab` is its sibling in the commandment's own
-sentence. · *Cost of leaving it:* nothing breaks; a third of the app's
-dressed buttons stay two-thirds of a control, and the register holds the
-number where it is. · **Where to look, when you want to:** the `web-dev` and
-`mtglab-ui` entries in `.claude/launch.json` (Vite on 5173 against the Go
-server on 8765; auth is off locally, so the deck pages open), then the
-Coliseum's tab strip and a deck page's card actions — press and *hold* one of
-each and watch nothing happen. Nothing animates here, so there is no cycle
-time to wait out. · **Recommendation:** give
-the three big ones (`.card-action`, `.strip-tab`, `.disclosure-toggle`, 24 of
-the 34 buttons) `.chip-toggle:active`'s `transform: translateY(1px)` in one
-Queen-lane branch and lower the register to 12 in the same diff; rule on the
-bespoke four (`.art-pick-tile`, `.reader-tile`, `.wheel-folded`,
-`.tarot-hinge`) separately, since those are the deliberately-bespoke surfaces
-and a lift may be wrong on a card tile. Ledger: Red, 2026-10-03.
+**Red: the third clause of commandment 17 is built and waiting for your eye —
+three classes took the press reply, the register fell from fifteen to ten, and
+every line of it renders.** The register landed overnight as test-only and
+merged; the design pass it measures is on `polish/queen-2026-10-03`, green and
+unmerged because a merge is a deploy. `.card-action`, `.strip-tab` and
+`.disclosure-toggle` now answer a press with two halves — a 1px settle plus a
+ground or an inset sink — and the second half exists because a reply built out
+of movement alone vanishes under `prefers-reduced-motion`, which is what
+`.chip-toggle` and `.chip-place` currently do to their own press. One `.btn`-
+family bug rode along: the deck page's *Tag a pilot* button carried an inline
+`border` that duplicated its class's own and silently reset the `border-color`
+its `:hover` sets, so the edge of that control never answered the pointer at
+all; a new guard refuses the shape tree-wide. · *Cost of leaving it:* nothing
+breaks, and the register holds the number where it is — but ten dressed
+buttons stay two-thirds of a control and the branch goes stale against the
+bundle. · **Where to look:** `mtglab-ui` and `web-dev` in `.claude/launch.json`
+(the Go server on 8765, Vite on 5173; auth is off locally so the deck pages
+open), then **the Coliseum's tab strip** (`/coliseum`, the row reading *The
+sand · The record · The laurels*) and **a deck page's card actions and
+category folds**. Press and **hold** one of each: it should sink a pixel and
+take a faint ground, and let go cleanly. Nothing here animates on a loop, so
+there is no cycle time to wait out — the only thing with a clock on that page
+is the Coliseum's own hero video, which is an 11-second loop and is not part of
+this. · **Recommendation:** merge it. Then rule separately on the ten classes
+left, which are the deliberately bespoke ones (`.art-pick-tile`,
+`.reader-tile`, `.wheel-folded`, `.tarot-hinge` and their siblings) — a settle
+may be wrong on a card tile — and on whether `.chip-toggle` and `.chip-place`
+should keep a non-moving half of their press under reduced motion, which is
+the same correction applied backwards to an already-argued rule. Ledger: Red,
+2026-10-03 (night, the Queen).
+
+**Green: the colour wheel's five discs now answer a thumb, and its ten guild
+lines cannot — 44px there is geometry, not effort.** The 44px floor #509 took
+is a `min-height` under `(pointer: coarse)`, and an SVG shape has no
+min-height, so the fifteen controls in the wheel were never covered by it:
+measured on a phone, a disc was **38px** and a guild line is **14.6px** across.
+The discs are fixed on `polish/green-2026-10-03` (an invisible hit circle,
+**38 → 46px** measured live, mutation-verified test; and, by your ruling on
+the walk, the five discs now wear the official symbols every other pip wears,
+with the drawn marks as the fallback — the one thing on the branch that
+renders differently). The lines would need a **60-user-unit** band each — ten of them,
+converging on five points — so every pair would overlap and the star's
+crossings would belong to whichever line was drawn last. · *Cost of leaving
+it:* a thumb on a phone picks the wrong guild, or none; `/learn` carries 32
+real `/colors/…` links, so nobody is shut out of the page, they just lose the
+diagram as a way in. · **Where to look, when you want to:** `web-dev` and
+`mtglab-ui` in `.claude/launch.json` (Vite on 5173 against the Go server on
+8765), then `/learn` → *The colours* at a phone width — the wheel is the
+pentagram under the tabs. Nothing animates there, so there is no cycle to wait
+out; the only thing to check by eye is that it looks **exactly** as it did, and
+the only thing to check by hand is tapping a disc near its edge. ·
+**Recommendation:** merge the branch for the five discs, and for the ten lines
+take the phone-only answer rather than a wider band — the wheel stays the
+pointer's affordance and the guild list beneath it is the finger's, which is
+also what the hover caption already implies (`(hover: hover)` is false on a
+phone). Ledger: Green, 2026-10-03.
 
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
