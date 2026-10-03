@@ -99,6 +99,63 @@ describe('the colour wheel', () => {
     expect(container.querySelectorAll('.pentagram-edge')).toHaveLength(10)
   })
 
+  it('wears the official symbol on every vertex, and the drawn mark only when it fails', () => {
+    const { container } = draw()
+    // Five images, one per colour, each asking the app's own origin for the
+    // real symbol (ADR 33) — the same URL every pip in prose asks for, so the
+    // wheel teaches the mark a card shows rather than a drawing of it.
+    const hrefs = [...container.querySelectorAll('.pentagram-vertex image')]
+      .map((el) => el.getAttribute('href'))
+    expect(hrefs).toEqual(['W', 'U', 'B', 'R', 'G'].map((c) => `/api/symbols/${c}.svg`))
+    // And no drawn path until one is needed.
+    expect(container.querySelectorAll('.pentagram-vertex path')).toHaveLength(0)
+
+    // The cache is cold or the network is away: the image fails, and that
+    // vertex alone falls back to the drawn mark while the other four keep
+    // asking. A wheel with one blank disc teaches less than one with a
+    // drawing on it.
+    const blue = target('Mono-U').querySelector('image')!
+    fireEvent.error(blue)
+    expect(target('Mono-U').querySelector('image')).toBeNull()
+    expect(target('Mono-U').querySelectorAll('path')).toHaveLength(1)
+    expect(container.querySelectorAll('.pentagram-vertex image')).toHaveLength(4)
+  })
+
+  it('gives every vertex a thumb-sized target, measured in CSS pixels', () => {
+    const { container } = draw()
+    const svg = container.querySelector('svg.pentagram')!
+    // The arithmetic is done off what the component actually renders, not off
+    // its constants: the floor is a physical size, so it depends on the
+    // `viewBox` and on the width cap together, and either one moving alone
+    // undoes it. Narrow the cap to 240 and this fails — which is the drift a
+    // test against `VERTEX_HIT_R` could not see.
+    //
+    // Written as 240 rather than as the Tailwind class it would be: v4 scans
+    // this file too, and the arbitrary-value class spelled out in a *comment*
+    // here put a real `max-width:240px` utility into the shipped stylesheet —
+    // the whole visible diff of a bundle rebuild, from a sentence nobody
+    // meant to be code.
+    const box = Number(svg.getAttribute('viewBox')!.split(/\s+/)[2])
+    const cap = Number(/max-w-\[(\d+)px\]/.exec(svg.getAttribute('class')!)![1])
+    const unitPx = cap / box
+
+    const vertices = Array.from(container.querySelectorAll('.pentagram-vertex'))
+    expect(vertices).toHaveLength(5)
+    for (const v of vertices) {
+      // The hit disc is the transparent one; the painted disc and its halo
+      // carry a real fill and may be any size the drawing wants.
+      const hit = Array.from(v.querySelectorAll('circle'))
+        .filter((c) => c.getAttribute('fill') === 'transparent')
+        .map((c) => Number(c.getAttribute('r')))
+      const widest = Math.max(0, ...hit)
+      expect(2 * widest * unitPx).toBeGreaterThanOrEqual(44)
+      // And it may not reach a neighbour: the five sit `140 * sin(36°)` apart,
+      // so half that is the most a target may claim before it starts stealing
+      // the taps meant for the colour next to it.
+      expect(widest).toBeLessThan(140 * Math.sin((36 * Math.PI) / 180))
+    }
+  })
+
   it('picks the mono combination behind a vertex', () => {
     const { onPick } = draw()
     fireEvent.click(target('Mono-G'))

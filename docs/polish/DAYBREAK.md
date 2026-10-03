@@ -237,6 +237,32 @@ should keep a non-moving half of their press under reduced motion, which is
 the same correction applied backwards to an already-argued rule. Ledger: Red,
 2026-10-03 (night, the Queen).
 
+**Green: the colour wheel's five discs now answer a thumb, and its ten guild
+lines cannot — 44px there is geometry, not effort.** The 44px floor #509 took
+is a `min-height` under `(pointer: coarse)`, and an SVG shape has no
+min-height, so the fifteen controls in the wheel were never covered by it:
+measured on a phone, a disc was **38px** and a guild line is **14.6px** across.
+The discs are fixed on `polish/green-2026-10-03` (an invisible hit circle,
+**38 → 46px** measured live, mutation-verified test; and, by your ruling on
+the walk, the five discs now wear the official symbols every other pip wears,
+with the drawn marks as the fallback — the one thing on the branch that
+renders differently). The lines would need a **60-user-unit** band each — ten of them,
+converging on five points — so every pair would overlap and the star's
+crossings would belong to whichever line was drawn last. · *Cost of leaving
+it:* a thumb on a phone picks the wrong guild, or none; `/learn` carries 32
+real `/colors/…` links, so nobody is shut out of the page, they just lose the
+diagram as a way in. · **Where to look, when you want to:** `web-dev` and
+`mtglab-ui` in `.claude/launch.json` (Vite on 5173 against the Go server on
+8765), then `/learn` → *The colours* at a phone width — the wheel is the
+pentagram under the tabs. Nothing animates there, so there is no cycle to wait
+out; the only thing to check by eye is that it looks **exactly** as it did, and
+the only thing to check by hand is tapping a disc near its edge. ·
+**Recommendation:** merge the branch for the five discs, and for the ten lines
+take the phone-only answer rather than a wider band — the wheel stays the
+pointer's affordance and the guild list beneath it is the finger's, which is
+also what the hover caption already implies (`(hover: hover)` is false on a
+phone). Ledger: Green, 2026-10-03.
+
 **Red: a deploy takes no snapshot, and the boot after a merge is the moment
 the volume is most at risk.** Fly snapshots daily on its own clock; the ladder
 is forward-only and applies unwatched, and the `deploy` job in

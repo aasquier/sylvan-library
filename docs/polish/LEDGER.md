@@ -9688,10 +9688,142 @@ written blind, at the top row (flush, the rail alight) and at the bottom
 *Browser, mobile & accessibility · cloud resource watch · scalability &
 user adaptability · hosted-first alignment*
 
-- **Last run:** 2026-10-02 (the library gathered again, the owed line).
-  Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow),
-  2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24 (rainbow),
-  2026-08-19 (rainbow), 2026-08-16 (rainbow).
+- **Last run:** 2026-10-03 (night) — the wheel's five discs get a thumb.
+  Previous: 2026-10-02 (the library gathered again), 2026-09-26 (rainbow),
+  2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night),
+  2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-16 (rainbow).
+
+### 2026-10-03 (night) — the wheel's five discs get a thumb, and a sentence that shipped a CSS rule
+
+*One lane of a serial night run; PR TBD on `polish/green-2026-10-03`, held for
+Aaron's eye because it changes how a surface answers a finger. The phone sweep
+and the authenticated census the 09-26 entry recorded as owed are taken here —
+on a local dev server at a real 390x844 with `(pointer: coarse)` true and
+`(hover: hover)` false, auth off locally, read back from `innerWidth` before
+anything was believed (green.md's standing trap; the preset is still not
+trusted, explicit pixels are).*
+
+**The census is clean everywhere it was run, and that is the first finding
+rather than the absence of one.** Four routes at 390px against Vite on the
+branch's own source — the door `/`, `/learn`, `/colors/green`, `/search`:
+
+| route | controls | anonymous | fields | unlabelled | `img` with no `alt` | `tabindex > 0` | `scrollWidth` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/` | 16 | **0** | 5 | **0** | **0** | 0 | 390 = `innerWidth` |
+| `/learn` | 68 | **0** | 0 | — | **0** | 0 | 390 |
+| `/colors/green` | 20 | **0** | 0 | — | **0** | 0 | 390 |
+| `/search` | 14 | **0** | 6 | **0** | **0** | 0 | 390 |
+
+The census associates (`el.labels` / `aria-label` / `aria-labelledby` /
+ancestor `<label>`) rather than counting anonymous buttons, and it waits for
+the route's own `h1` before counting — the two instrument lessons from
+09-12, both honoured, both still necessary. 83 of `/learn`'s 84 images carry
+`alt=""`, which is the decorative mark and the right answer. No page scrolls
+sideways. `.canopy-photo` sits 6px past the viewport and `.scene-backdrop-wash`
+24px, on every route — both are bleed inside an `overflow` clip, and the
+document's own `scrollWidth` says so.
+
+**The 44px floor has a hole in it, and the hole has a shape: the floor is CSS
+and the colour wheel is SVG.** #509 put the floor on the `.btn` families as a
+`min-height` under `(pointer: coarse)`. `components/pentagram.tsx` draws
+**fifteen** controls — five `g[role="button"]` discs and ten guild lines, all
+`tabIndex=0`, all named, none of them a `.btn` and none of them reachable by a
+`min-height`. Measured live with `elementFromPoint` sweeping outward from each
+centre, at a 390px viewport where the wheel draws **292px** wide (user unit =
+0.73 CSS px):
+
+- a **disc** was **38 x 38** — the painted `r=26`, because the vertices had no
+  hit shape of their own;
+- a **guild line** is **14.6px** across perpendicular (a transparent
+  `strokeWidth={20}` hit line the component already carries, with the visible
+  4px line set `pointer-events: none` beside it — somebody solved this once,
+  for a mouse).
+
+A thumb's contact patch is about nine millimetres. **Fixed for the five
+discs:** a transparent `r=32` circle, drawn first so nothing paints over the
+picture, **38px → 46px measured live after the change**, with the neighbour
+re-probed and still owning its own centre. 32 and not 30 because the cap is
+`max-w-[300px]` (0.75 px/unit at its widest, so the floor is `44/0.75/2` =
+29.4) and the real draw is a little narrower than the cap. It cannot steal a
+neighbour: the five sit `140·sin36°` = 82 units apart. **Nothing renders
+differently** — the only bundle change is `pentagram.js`, and `index.css`
+rebuilt byte-identical after the comment fix below.
+
+- **The test evaluates, it does not match.** `pentagram.test.tsx` reads the
+  `viewBox` and the `max-w-` cap off the rendered element and does the
+  arithmetic — `2·r·(cap/box) >= 44` — so narrowing the cap alone fails it,
+  which a test against `VERTEX_HIT_R` could not see. Second clause: the radius
+  must stay under half the vertex spacing. Mutation-verified both ways:
+  `VERTEX_HIT_R = 29` fails `expected 43.5 to be greater than or equal to 44`,
+  `= 90` fails `expected 90 to be less than 82.28993532094624`, restored to 32
+  and 19 tests green.
+- **(open) The ten guild lines keep their 14.6px band, and the reason is
+  geometry rather than effort.** 44px at this scale is **60 user units** per
+  band, for ten bands that already converge on five points 164 units apart:
+  every pair would overlap along most of its length and the crossings in the
+  middle would belong to whichever line React drew last. The mitigation that
+  is already true: `/learn` carries **32** real `/colors/…` links, so every
+  guild on the wheel has a text route to the same page — the wheel is a
+  shortcut, not the only door, which is what keeps this a comfort question
+  rather than a commandment 2 one. Queued for a ruling.
+
+**A Tailwind-shaped string inside a comment became a rule in the shipped
+stylesheet.** The first rebuild after the test landed changed `index.css` as
+well as `pentagram.js`. Diffed rule-by-rule (minified CSS is one line; split on
+`}` and sort, 4625 rules before, 4626 after) the whole difference was
+`.max-w-[240px]{max-width:240px}` — v4 scans `*.test.tsx` too, and the test's
+comment had spelled the narrowed cap as the class it would be. The sentence now
+says `240`. **A Tailwind arbitrary-value class is code wherever it appears,
+prose included**, and a one-line minified artifact hides it: `git diff` shows
+the whole file changed and says nothing about what.
+
+**Browser floor, second-tier sweep (facet 3).** `browserfloor_test.go`'s
+vocabulary is 29 markers and they are the right ones; this leg looked for what
+it does not name, over the whole 1,713,291-byte bundle. Present and above
+Safari 16.4: `scrollend` (6), `popover` (3), `::view-transition` (9) —
+**every one of them React 19's own DOM-property dispatch tables**
+(`case 'onScrollEnd': ... Q('scrollend', e)`), not a line this app wrote, and
+`web/src` names none of them. **So those three can never be bundle markers**:
+adding them would fail the suite on React's vocabulary rather than on ours.
+Absent entirely: `@scope`, `transition-behavior`, `allow-discrete`,
+`:user-valid` / `:user-invalid`, `anchor-name`, `field-sizing`, `light-dark(`,
+`text-box`, `subgrid`, `animation-timeline`, `requestIdleCallback`,
+`URLPattern`, `Temporal.`, `Promise.try`, `checkVisibility`, Set's
+`union`/`intersection`/`isSubsetOf`. `content-visibility` and `overlay` appear
+once each, inside Tailwind's `transition-property` list. `backdrop-filter` (2
+declarations) and the mask family (32 `mask-image`, 8 others) **both carry
+their `-webkit-` siblings** — Lightning CSS prefixed them, and unprefixed
+`backdrop-filter` is Safari 18, so without those this would have been the
+finding. `100vh` appears exactly once and no `dvh`/`svh` anywhere, which is
+worth one future look on a real phone rather than a change made blind.
+
+- *Instrument note, because it nearly wrote a false finding:* `grep -F
+  "-webkit-backdrop-filter"` answers **0** — the pattern starts with a dash and
+  `grep` reads it as flags. Use `grep -F -e "-webkit-…"`. The first pass of
+  this sweep had `backdrop-filter: 6, -webkit-backdrop-filter: 0` and that was
+  the tool, not the bundle.
+
+**Cloud resource watch.** `/api/health` from outside, 200 in **0.303 s**:
+`pool_age_days` **1**, bulk files `2026-10-02`, oracle **35,460**, printings
+**109,332**, decks **25**, `disk_free_mb` **2539** (3 GB volume
+`vol_vwnqxewn1y00oy9v`, `mtglab_data`, iad, encrypted), `schema_version` 17,
+`app_db` true, `pool_stale` false. Two machines: the app
+`84e19ef25041e8` **started**, `shared-cpu-2x:1024MB`, checks 1/1, and
+`forge-worker` **stopped** at `performance-4x:8192MB` — both last updated
+05:08–05:09Z, which is tonight's merge of `c4fb8ca` reaching the instance while
+this lane ran. The pool file's named trigger (next refresh ~125 MB closes the
+question, past ~145 MB weigh `price_history`) is one refresh away and nothing
+is owed before it. The held-awake trigger has not arrived: primary development
+is visibly not done.
+
+**Hosted-first: the one-copy rule holds.** `ls -la decks/` is empty — no
+scratch deck older than this session, nothing for a local server to be holding.
+
+**Not re-run tonight, and said rather than implied:** the concurrency probe
+(09-26 ran it; nothing in this diff moves a lane), contrast readings in both
+themes, and the authenticated phone walk through the seat — the seat's tab was
+borrowed for one read on another lane's behalf and the walk wants the whole
+tab. The deployed surface this lane did touch answered 200 on both reads.
 
 ### 2026-10-02 — the library gathered again, after *Reality Fracture*
 
