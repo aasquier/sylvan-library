@@ -41,6 +41,33 @@ const CY = 200
 const R = 140
 const VERTEX_R = 26
 
+/** The box the geometry above is drawn in, and the `viewBox` below. */
+const BOX = 400
+/**
+ * A vertex's invisible hit disc, in user units.
+ *
+ * The discs are drawn at [VERTEX_R] = 26, which is **38 CSS pixels** on a
+ * phone — under the 44px floor the rest of the app took in #509, and out of
+ * reach of that fix by construction: the floor is a `min-height` on the `.btn`
+ * families under `(pointer: coarse)`, and an SVG shape has no min-height. The
+ * edges beside these already carry the same trick one size down (a transparent
+ * `strokeWidth={20}` line); this is the vertices' copy of it.
+ *
+ * 32 rather than 30: the wheel is capped at `max-w-[300px]` below, so a user
+ * unit is 0.75 CSS pixels at its widest and the floor needs `44 / 0.75 / 2` =
+ * 29.4 units. The two spare are the margin for the page padding that makes the
+ * real draw narrower than the cap (292px measured at a 390px viewport, where 32
+ * units still read 46.7px). `pentagram.test.tsx` does that arithmetic off the
+ * rendered `viewBox` and `max-w-` rather than off this number, so narrowing the
+ * cap fails there instead of quietly undoing the floor.
+ *
+ * Safe at any radius under half the vertex spacing, which is
+ * `140 * sin(36°)` = 82 units — so a neighbour's taps are never stolen, and
+ * the ten edges only lose their last 32 units at each end, where the vertex is
+ * the thing a thumb was reaching for anyway.
+ */
+const VERTEX_HIT_R = 32
+
 /**
  * Vertex `i` of a five-pointed wheel, clockwise from the top.
  *
@@ -270,7 +297,7 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
     // the panel empty under the text.
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-8">
       <svg
-        viewBox="0 0 400 400"
+        viewBox={`0 0 ${BOX} ${BOX}`}
         className="pentagram w-full max-w-[300px] shrink-0"
         role="group"
         aria-label="The colour wheel: five colours, ten guilds"
@@ -344,6 +371,12 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
           const glyph = GLYPH_PATH[code]
           return (
             <g key={code} {...handlers(combo)} className="pentagram-vertex">
+              {/* The thumb's disc: invisible, drawn first so nothing paints
+                  over the picture, and the reason a vertex clears the 44px
+                  floor ([VERTEX_HIT_R] argues the number). A 26-unit disc is
+                  38 CSS pixels on a phone, which is under three millimetres of
+                  a nine-millimetre contact patch. */}
+              <circle cx={p.x} cy={p.y} r={VERTEX_HIT_R} fill="transparent" />
               {/* The halo is the focus and hover indicator. Drawn under the
                   disc so it reads as a glow rather than a border, and sized
                   in the same units so it cannot drift from the disc. */}
