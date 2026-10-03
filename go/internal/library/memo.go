@@ -46,7 +46,11 @@ import (
 //
 // Counted from the start -- hits and misses, like `cache.Store.Counts` and
 // the door's `etagCounts` -- so a test can hold the serving path to actually
-// reaching the memo, and rendered nowhere (commandment 10). A nil Memo is a
+// reaching the memo. All three are read out of a running instance on `GET
+// /api/admin/stats/system`, behind the admin prefix: machine facts for the
+// one admin, and nothing a player can see renders them (commandment 10).
+//
+// A nil Memo is a
 // file tier that remembers nothing: every lookup misses without counting and
 // every store is dropped, which is what the CLI and the door's slug-only
 // readers get.

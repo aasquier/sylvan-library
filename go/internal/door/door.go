@@ -235,7 +235,15 @@ func New(cfg Config) (*Door, error) {
 		// passes a recorder, which is how no test here sends mail.
 		EmailSender: cfg.EmailSender, Mail: cfg.Mail,
 		ClientIPHeader: cfg.ClientIPHeader, Claude: cfg.Claude,
-		Forge: cfg.Forge})
+		Forge: cfg.Forge,
+		// The one cache in this process the API cannot see: the static
+		// tiers' ETag memo, built above at `newStaticSite` and so already in
+		// hand. Handed over as a reader because the import only goes this
+		// way, which is what makes the admin stats route able to report all
+		// three registers rather than the two it owns. Drop this line and
+		// the `etag` row goes null -- which is exactly how
+		// `TestTheDoorHandsItsETagRegisterToTheStatsRoute` fails.
+		ETagCounts: site.etagCounts})
 	// The Coliseum at Night (ADR 46), around the routes' own bout player --
 	// the seam has two ends and the door ties them: the runner fights through
 	// the API's player, the API's admin routes read and steer this runner.
