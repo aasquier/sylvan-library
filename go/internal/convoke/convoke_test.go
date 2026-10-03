@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aasquier/sylvan-library/go/internal/convoke"
 )
@@ -95,11 +96,24 @@ func TestAPanicReRaisesOnTheCaller(t *testing.T) {
 			t.Fatalf("all %d pieces ran despite the panic", n)
 		}
 	}()
+	// **Every piece but the one that panics costs a millisecond, and the
+	// assertion above is unmeasurable without it.** The flag goes up inside
+	// the worker's recover, which is a panic unwind away from the `panic`
+	// statement -- microseconds, more under coverage instrumentation -- and
+	// an atomic increment is nanoseconds, so the other worker could drain
+	// all 996 remaining pieces inside that window and "stops the hand-out"
+	// failed in public on CI's arm64 leg with the mechanism working exactly
+	// as designed. A millisecond a piece turns that window from a race at
+	// even odds into a second of margin against a flag that lands in
+	// microseconds; the test still finishes in a few milliseconds, because
+	// the stop is what keeps the second worker from ever reaching the sleep
+	// a thousand times.
 	convoke.Indexed(1000, 2, func(i int) {
 		ran.Add(1)
 		if i == 3 {
 			panic("tier1: Run needs at least one game")
 		}
+		time.Sleep(time.Millisecond)
 	})
 }
 
