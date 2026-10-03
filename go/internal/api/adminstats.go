@@ -170,11 +170,15 @@ func (a *API) appDBReading() (opens any, version any) {
 	if _, err := os.Stat(a.dbPath); err != nil {
 		return nil, nil
 	}
-	db, err := sql.Open("sqlite", "file:"+url.PathEscape(a.dbPath)+"?mode=ro")
-	if err != nil {
-		a.log.Warn("could not read app.db schema version", "error", err)
-		return false, nil
-	}
+	// **The error `sql.Open` declares is not asked for, because it cannot
+	// arrive.** `sql.Open` records the DSN and opens nothing unless the driver
+	// implements [driver.DriverContext], and this one does not — so there is no
+	// parse for it to refuse, and the warn-and-degrade arm that used to stand
+	// here could not be entered by any fixture. The fault this reading exists
+	// for — a file that is there and is not a database — lands on the statement
+	// below, where the one arm belongs and where
+	// `TestTheSchemaReadingIsAbsentRatherThanWrong` drives it.
+	db, _ := sql.Open("sqlite", "file:"+url.PathEscape(a.dbPath)+"?mode=ro") //nolint:errcheck // argued above
 	defer func() { _ = db.Close() }()
 	var applied int
 	if err := db.QueryRow("PRAGMA user_version").Scan(&applied); err != nil {
@@ -254,8 +258,16 @@ func sizeOf(path string) *int64 {
 	if !info.IsDir() {
 		return nil
 	}
+	// **The walk's own error is not asked for, because the callback never
+	// returns one.** [filepath.WalkDir] hands back whatever the callback hands
+	// it, and this one answers `nil` to every entry it cannot read — a vanished
+	// file, a directory this process may not open — because a storage figure
+	// that refused to add up over one unreadable entry would report *nothing*
+	// where it could report nearly everything. With no error path out of the
+	// callback there is no error path out of the walk, and the arm that used to
+	// stand here could not be entered by any fixture.
 	var total int64
-	err = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil //nolint:nilerr // a vanished entry is skipped, as rglob skips it
 		}
@@ -264,9 +276,6 @@ func sizeOf(path string) *int64 {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil
-	}
 	return &total
 }
 
