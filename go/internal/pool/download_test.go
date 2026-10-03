@@ -425,3 +425,45 @@ func write(t *testing.T, path, text string, gzipped bool) {
 		t.Fatal(err)
 	}
 }
+
+// [pool.DownloadBulk] — the production default, the one spelling of Scryfall's
+// index the app ships with.
+//
+// **A seam's default is the line the deployed binary runs and no test does.**
+// Every test above drives [pool.DownloadBulkFrom] against a stub, which is
+// what the injected index URL is for; what nothing asked is whether the
+// wrapper that composes it with [pool.BulkIndex] still points at Scryfall.
+// A second constant added for a mirror, a staging host left in by a
+// debugging session, a `kind` and `destDir` transposed — each is invisible
+// today, and each breaks `mtglab data refresh` on the instance while the
+// whole file above stays green.
+//
+// It asks without a network. A context cancelled before the call is refused
+// inside `http.Transport.RoundTrip`'s first select, before any dial or DNS
+// lookup, and `http.Client` wraps the refusal in a `*url.Error` that carries
+// the URL it was *going* to ask — which is exactly the fact under test. A
+// cancelled context is also the one failure this path cannot reach any other
+// way, since the index is otherwise a constant.
+//
+// The sibling defaults in this shape are `config.Load`,
+// `claude.EndpointFromEnv`, `claude.SettingsFromEnv` and
+// `tier3.LoadSettings`.
+func TestTheBulkDownloadsDefaultAsksScryfallsOwnIndex(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	path, err := pool.DownloadBulk(ctx, "oracle_cards", t.TempDir())
+	if err == nil {
+		t.Fatalf("a cancelled download reported success at %q", path)
+	}
+	if path != "" {
+		t.Errorf("it named a file at %q", path)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("the refusal is %v, want the cancelled context", err)
+	}
+	if !strings.Contains(err.Error(), pool.BulkIndex) {
+		t.Errorf("the refusal reads %q and does not name %s — the default is "+
+			"not asking Scryfall's own index", err, pool.BulkIndex)
+	}
+}

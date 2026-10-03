@@ -124,12 +124,16 @@ run reports green, and the bugs are somewhere the file never looks.
 ## Part three — the tooling
 
 The developer shelf is artifacts in the plainest sense — and part of it is
-still an absence. The cache register is half-built (`mtglab sim cache` lists
-the Tier 1 cache's contents and can clear them; both caches in the tree count
-their own use in-process — the door's ETag memo through `etagCounts` in
-`go/internal/door/static.go`, the Tier 1 store through `cache.Store.Counts` in
-`go/internal/sim/cache/store.go` — and nothing yet reads either count out of a
-running instance).
+still an absence, but **less of it than this section said for a month.** The
+cache register is **done**, as of Black's 2026-10-03 night leg:
+`GET /api/admin/stats/system` carries a `caches` object with a `{hits, misses}`
+row for the Tier 1 store, the deck shelf's memo and the door's ETag memo, and
+`null` rather than `{0,0}` where a source is genuinely absent, because zeros
+read as "this cache has never once answered" and absence is an ordinary state.
+`mtglab sim cache` still lists and clears the Tier 1 cache's contents. **Do
+not re-queue "read a cache's counts out of a running instance"** — it was the
+third of this section's three standing items and it is answered; the remaining
+two are below, and both are still runners rather than instruments.
 
 **"There is no bench suite" stopped being true on 2026-09-26 and the standing
 item is narrower now.** Benchmarks live beside the code as `*_bench_test.go`;
@@ -162,6 +166,16 @@ plan for a tool the toolchain made redundant.
   cd tools && .venv/bin/animist verify   # committed assets vs their recipes
   ```
 
+  Two facts about that one command, both bought. **`tools/.venv` hard-points at
+  the main checkout**, so a lane running in a worktree verifies whatever branch
+  the main tree happens to have checked out and reports it as its own — which
+  is why the 2026-09-26 parallel lane could not run it honestly and a serial
+  night in the main tree always can. And **this instrument has no shrunken-run
+  hole**: `cmd_animist_verify` exits non-zero with *"refused: no recipes named
+  and none found"* rather than printing nothing in green, so the one failure
+  mode the bullet below warns about is already closed here. It prints one line
+  per recipe and no total, so the count is `| grep -c ': held$'`.
+
   For the retired instruments the question is the rebuild item itself: is it
   still queued, still shaped right, and has anything landed that changes what
   the Go shelf should measure first. The colorless questions the old tools
@@ -184,16 +198,18 @@ plan for a tool the toolchain made redundant.
   are a finding about the pass, not about the suite.
 - Ask what the shelf is still missing, and notice how the list keeps
   shortening: `gremlins` answered the exhaustive-mutator item, every cache in
-  the tree counts its hits, and benchmarks now exist outside the kernels. So
-  three standing items remain and each is a *runner* or a *record* rather than
-  a first instance: `benchstat`, which is the difference between a benchmark
-  delta and a benchmark *finding* (installed on demand, never in the
-  toolchain); the bench suite's one command and its results ledger; and reading
-  a cache's counts out of a running instance. **Every one of the three is
-  plumbing over an instrument that already exists**, which is a real fact about
-  the shape of the rebuild and worth saying out loud each run rather than
-  re-deriving. Anything else proposed here is a new dependency — queued with
-  the arithmetic, never adopted mid-run.
+  the tree counts its hits, benchmarks now exist outside the kernels, and the
+  cache register was read off a running box on 2026-10-03. So **two** standing
+  items remain, and each is a *runner* or a *record* rather than a first
+  instance: `benchstat`, which is the difference between a benchmark delta and
+  a benchmark *finding* (installed on demand, never in the toolchain); and the
+  bench suite's one command plus its results ledger. **Both are plumbing over
+  an instrument that already exists**, which is a real fact about the shape of
+  the rebuild and worth saying out loud each run rather than re-deriving — and
+  the list has now shortened four runs running, which is itself the answer to
+  "is the rebuild still shaped right": it is finishing, not growing. Anything
+  else proposed here is a new dependency — queued with the arithmetic, never
+  adopted mid-run.
 
 ## Part four — the leftovers
 

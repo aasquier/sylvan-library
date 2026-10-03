@@ -172,6 +172,42 @@ func TestEveryLineBoundaryIsOneTheCorpusKnows(t *testing.T) {
 	}
 }
 
+// A terminator at the very end of the string, which the corpus sweeps above
+// cannot reach: both of them wrap the boundary in `"a" + … + "b"`, so the CR
+// branch's own `i < len(s)` lookahead — the one line of [textutil.SplitLines]
+// that reads *past* the rune it is holding — is never asked about the last
+// byte. Found by mutation testing: `gremlins unleash ./internal/textutil/`
+// read `i < len(s)` moved to `i <= len(s)` as a survivor, and that mutant does
+// not answer wrongly, it panics with an index out of range on any text whose
+// final byte is a carriage return. A deck's YAML pasted from a Windows editor
+// is exactly such a text.
+func TestATerminatorAtTheVeryEndAddsNoEmptyLine(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"a bare CR last", "one\rtwo\r", []string{"one", "two"}},
+		{"a CRLF last", "one\r\ntwo\r\n", []string{"one", "two"}},
+		{"a CR alone", "\r", []string{""}},
+		{"a CR then nothing but LF", "\r\n", []string{""}},
+		{"an LF last", "one\ntwo\n", []string{"one", "two"}},
+	} {
+		got := textutil.SplitLines(c.in)
+		if len(got) != len(c.want) {
+			t.Errorf("%s: SplitLines(%q) = %q, want %q", c.name, c.in, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("%s: SplitLines(%q) = %q, want %q", c.name, c.in, got, c.want)
+				break
+			}
+		}
+	}
+}
+
 // TestUnitSeparatorIsWhitespaceButNotABoundary states the near-miss on its
 // own, because it is the single fact most likely to be got wrong by somebody
 // deriving one table from the other.
