@@ -6710,11 +6710,276 @@ runs against a cache nobody emptied.
 
 *CI/CD · alerting & self-healing · the hot-spot patrol · controls*
 
-- **Last run:** 2026-09-26 (rainbow). Previous: 2026-09-19 (rainbow),
+- **Last run:** 2026-10-03 (night). Previous: 2026-09-26 (rainbow),
+  2026-09-19 (rainbow),
   2026-09-12 (rainbow),
   2026-09-05 (rainbow, night), 2026-08-24 (rainbow), 2026-08-19 (rainbow),
   2026-08-18 (punch-list item 5, with Blue), and 2026-08-16 (rainbow), the
   first Red run and the baseline the numbers below are a trend against.
+
+### 2026-10-03 (night)
+
+*One PR, test-only and therefore mergeable: the press clause of commandment 17
+becomes a register. The design pass it measures is Aaron's and is queued.*
+
+- **(open) Landed: commandment 17 names three replies and only two of them
+  were held by anything. The third is a register now, and it was born at
+  fifteen classes.** `barebutton_test.go` refuses an undressed control and
+  `focusstates_test.go` refuses a `:hover` face with no `:focus-visible`
+  face; nothing in the tree had ever asked the press question, which is the
+  standing question this facet is supposed to ask — *which of these
+  absolutes is enforced by nothing?* — answered for the first time against
+  the clause rather than against the vocabulary.
+  `go/cmd/mtglab/pressstates_test.go`,
+  `TestEveryButtonThatAnswersHoverAnswersThePress`. Raw census, the run that
+  landed it:
+
+  ```
+  press census: 226 buttons read, 34 answering hover and not the
+  press, through 15 class(es) (ceiling 15):
+    armed                  1 button(s)
+    art-pick-tile          2 button(s)
+    card-action            10 button(s)
+    card-action-danger     2 button(s)
+    disclosure-toggle      5 button(s)
+    field-hint             1 button(s)
+    hand-folded            1 button(s)
+    is-on                  2 button(s)
+    lab-note               1 button(s)
+    menu-row               1 button(s)
+    reader-tile            1 button(s)
+    strip-tab              9 button(s)
+    tarot-hinge            1 button(s)
+    wheel-fold-btn         1 button(s)
+    wheel-folded           1 button(s)
+  ```
+
+  **The sharpest line in that list is `.strip-tab`, because commandment 17's
+  own text names it.** The commandment points at "`.chip-toggle`,
+  `.strip-tab` and their siblings for controls that are places rather than
+  actions", and `.chip-toggle:active` exists with a comment above it arguing
+  exactly this fault — *"there was no `:active` on this family at all, so a
+  chip took a click in complete silence — on a toggle, where the only other
+  feedback is a state change the eye has to go looking for."* That argument
+  was made for one family and never generalised to its named sibling, which
+  is nine buttons across the Coliseum, the deck page, the artifacts strip,
+  Admin and Library. `.disclosure-toggle` is the same shape one commandment
+  later: five buttons, the control commandment 20 exists to insist on, and
+  no reply to the press that opens the panel.
+  Thirty-three classes in the sheet *do* answer `:active`, so this is a gap
+  in a vocabulary that exists rather than a vocabulary that does not.
+- **Why the register is a ratchet and not a ban, and why the unit is a class
+  rather than a button.** A ban is born red on fifteen classes, which is a
+  design pass across four rooms — not a thing a guard may demand in the diff
+  that introduces it, and not a thing a night run renders. So this is
+  `datedcomments_test.go`'s shape: the number may not rise, and a branch that
+  lowers it re-types the constant in the same diff (the fall side errors too,
+  exactly so a win is banked rather than leaving room for the next one to
+  return unnoticed). The count is of **classes**, not of the thirty-four
+  button sites, because `.card-action` alone is ten of them: gating on sites
+  would turn "somebody added a tenth card action" into a red check about an
+  omission somebody else made in the stylesheet, which is how a guard gets
+  deleted in anger. The sites are printed in the failure anyway, because the
+  fix wants looking at on a page.
+  **It lives in Go rather than Vitest for `focusstates_test.go`'s measured
+  reason**, re-read rather than re-learned: `import css from
+  './index.css?raw'` hands Vitest an empty string, every class reads as an
+  empty wardrobe, and the guard reports almost nothing.
+- **Mutation-verified four ways.** Ceiling to 14 → fires the rise branch
+  naming all thirty-four sites; ceiling to 16 → fires the fall branch
+  (*"only 15 class(es) … lower `pressSilentClassCeiling` to 15"*); appending
+  `.strip-tab:active { transform: translateY(1px); }` to `index.css` → the
+  census reads **14** and the fall branch fires, which is the one that proves
+  the guard reads the stylesheet rather than a list; renaming
+  `.chip-toggle:active` → the canary fatals by name. `index.css` was restored
+  and the restore proven by `git status --porcelain` (only the new test file
+  outstanding). The reader's own fixtures pin nine shapes, including the one
+  that matters for correctness here — a sibling class's `:active` answers for
+  the whole element, which is how a `<button className="btn btn-sm">` passes
+  on `.btn`'s own press rule while `.btn-sm` has none of its own (and why
+  `.btn:not(.arena-gate):active` is read as `.btn`'s: `classAnswers` steps
+  over an interposed `:not(…)`, which its fixtures pin).
+- **CI, measured: both Go legs grew about 15% in a week and the critical path
+  did not move.** Per-job medians over the ten most recent `tests` runs on
+  `main` (`started_at`/`completed_at` per job from the API; raw rows in this
+  run's scratch `jobs_main.tsv`, 80 lines):
+  `go (amd64)` **370.0s** (244–379, n=9, was 316) · `go (arm64)` **308.0s**
+  (274–365, n=9, was 270) · `image` **185.5s** (133–262, was 184) ·
+  `deploy` **178.5s** (137–237, n=8, was 171.5) · `frontend` **86.5s**
+  (61–93, was 87) · `go-lint` **40.0s** (31–50, was 40) · `tools` **35.0s**
+  (28–37, was 33) · `no-secrets-or-card-data` **6.0s** (4–8, was 6).
+  **amd64 +17%, arm64 +14%** — and the thing worth reading is that the ratio
+  barely moved, which is a different story from 09-26's. That night one leg
+  grew three times as fast as the other and the named cause was the coverage
+  step landing on arm64 alone; this week both legs grew together, which is
+  what a suite that simply got bigger looks like (the eight rulings in #521,
+  the deck shelf in #524, the dossier in #526, the library in #527, the
+  determinism replay and the skip census in #528, Blue's verb refusals in
+  `bee83a1`). No step moved; the work did.
+  **`go (amd64)` is still the critical path, in 8 of the 9 runs where a Go
+  leg finished last**, and its lead over arm64 widened from ~46s to **~57s
+  median** — the eight gaps are 10, 15, 39, 49, 65, 66, 83 and 102 seconds,
+  against one run where arm64 finished 64s *after* amd64. So 09-26's
+  standing trigger —
+  *if arm64 ever passes amd64, the floor step is where the time is and the
+  09-12 reasoning gets re-read* — **has moved further from firing, not
+  closer.** The arm64 leg carries the coverage computation and is still a
+  minute faster than the leg that does not; `ci.yml`'s own comment that amd64
+  runs "~140s longer than this leg to begin with" survives the arithmetic
+  (308 − ~47 = ~261 against 370). Nothing to do. Both legs sit against a
+  20-minute `timeout-minutes` and the slowest observed job in the window was
+  379s, so there is **nearly fourteen minutes of headroom** — the ceiling is
+  not the thing to watch; the ratio is.
+  **Required contexts, read back: EIGHT, unchanged** — `frontend`, `image`,
+  `no-secrets-or-card-data`, `dependency-review`, `go (amd64)`,
+  `go (arm64)`, `go-lint`, `tools`. `concurrency` is configured and still
+  cancels on pull requests only.
+- **The 09-29 entry left the deploy step's 409 shape for "the next Red run
+  to read and decide". Decided: print the body, and it rides queued item 6
+  rather than becoming a question of its own.** The host's
+  `mem_overcommit_exceeded` reached the log as six bare
+  `curl: (22) The requested URL returned error: 409` lines because `-f`
+  discards the body, and the diagnosis cost a session with a person in it.
+  The exact diff, so the morning's PR is typing rather than thinking — the
+  update `POST` at `ci.yml`'s *Point the forge-worker machine at it* step:
+
+  ```diff
+  -            curl -fsS "${RETRY[@]}" -X POST -H "$AUTH" \
+  +            code=$(curl -sS "${RETRY[@]}" -X POST -H "$AUTH" \
+                 -H 'Content-Type: application/json' \
+                 -d "$(jq -n --argjson c "$config" '{config: $c}')" \
+  -              "$API/machines/$id" > /dev/null
+  -            echo "updated forge-worker machine $id"
+  +              -o update.json -w '%{http_code}' "$API/machines/$id")
+  +            if [ "$code" != "200" ]; then
+  +              echo "::error::forge-worker update answered $code:"
+  +              cat update.json
+  +              exit 1
+  +            fi
+  +            echo "updated forge-worker machine $id"
+  ```
+
+  It keeps `"${RETRY[@]}"` on the line, which is what
+  `TestEveryMachinesAPICallInTheDeployRetries` reads (that guard asks for the
+  array on every `curl ` line in the step and for at least six calls in it,
+  nothing about `-f`), so the guard stays green — checked rather than
+  assumed, because a workflow change that trips its own guard is the
+  "CI is never a surprise" failure in miniature.
+  **The second half of 09-29's pair — treating a stopped worker's update as
+  best-effort — is deliberately NOT taken.** It would convert a real signal
+  into silence: the app deploy is already proven before this step runs, so
+  the red check is *correct* about the worker being a sha behind, and the
+  complaint was never that it was red but that it would not say why. Printing
+  the body answers the actual complaint. **No new daybreak line**: the queue
+  already holds a `deploy.yml` item needing a watched deploy (item 6, the
+  snapshot step), there is no new question for Aaron here, and two lines
+  asking for one morning's attention to the same job is how a queue stops
+  being read.
+- **Hot-spot patrol: `internal/api`, and the finding is in allocation
+  again — this time inside `sim/tier1`, which is the one package where it
+  may not simply be fixed.** `-cpuprofile` and `-memprofile` over the `api`
+  suite (38.35s, load ~1.9 at the start):
+
+  ```
+  internal/api  CPU: Duration 38.35s, total samples 228.69s (596.38%)
+    156.01s 68.22%  runtime.cgocall              <- the documented blind spot
+     37.98s 16.61%  syscall.rawsyscalln          <- sqlite WAL, app.db
+     18.75s  8.20%  <unknown>
+      3.61s  1.58%  [api.test]
+    cum: database/sql.(*DB).Exec 125.32s 54.80% · duckdb_execute_pending
+      53.06s 23.20% · sqlite3VdbeExec 25.78s 11.27% · pagerWalFrames
+      19.99s 8.74% · full_fsync 9.22s 4.03%
+  internal/api  ALLOC: 1,813.53MB total
+      589.00MB 32.48%  argon2.initBlocks            <- the legitimate remainder
+      249.07MB 13.73%  tier1.SimulateGame   (697.64MB cum, 38.47%)
+      179.53MB  9.90%  tier1.expandUnits (inline)
+      151.53MB  8.36%  tier1.pickLand.func1 (207.54MB cum, 11.44%)
+       72.13MB  3.98%  duckdb.(*Stmt).bind
+       57.29MB  3.16%  encoding/json.(*Decoder).refill
+       39.01MB  2.15%  tier1.canPay         (56.01MB cum)
+       35.00MB  1.93%  tier1.consume        (78.01MB cum)
+       24.53MB  1.35%  reflect.growslice
+       22.02MB  1.21%  database/sql.driverArgsConnLocked
+  ```
+
+  **The CPU profile is 85% cgo plus raw syscall and there is nothing to read
+  in it** — exactly what the shelf says the pool and `app.db` look like from
+  a profiler, and the second patrol running to confirm it rather than
+  discovering it. The allocation profile is where the shape is, and after
+  password hashing (589MB, legitimate and irreducible by design) the whole
+  remainder is one package: **`tier1.SimulateGame` is 697.64MB cumulative,
+  38.47% of everything the `api` suite allocates**, with `expandUnits`
+  179.53MB flat and `pickLand`'s closure 151.53MB flat. Test-shaped load is
+  not request-shaped load — but `/api/sim` runs real games, so for that route
+  a fat per-game allocator is request-shaped, which is more than the usual
+  caveat allows.
+  **Handed to Black as a *where*, with the caveat that is the whole reason
+  Red does not take it**: `internal/sim/tier1` is one of the five
+  fingerprinted packages, so *any* edit there — including a reflowed
+  comment — changes `engineSources`' hash and discards the deployed Tier 1
+  cache (ADR 18). A win in `expandUnits` has to be worth the entire cache,
+  which is a different calculation from the door's compressor and belongs to
+  the discipline that owns it.
+  **The patrol's ranking normally goes into Black's section as a pointer and
+  this one is left here instead, deliberately**: Black's own run of the same
+  night has an entry open at the top of that section, and a second lane
+  writing into it the same night buys a merge conflict for a filing
+  preference. The handoff is this bullet; a Black run reading its own
+  section for its next patrol target should read Red's dated entries too,
+  which is cheaper than the convention it replaces.
+- **The expiry calendar, re-read from the sources. Nothing inside fourteen
+  days, and one prediction worth checking next run.** **TLS 2026-11-11**
+  (live cert, `notAfter=Nov 11 14:11:46 2026 GMT`, `notBefore=Aug 13`,
+  issuer Let's Encrypt `YE2` — **the same certificate as 09-19 and 09-26,
+  still unturned; 39 days out**. 09-26 predicted the renewal around
+  **2026-10-12** on Fly's ~30-day lead; that date has not arrived, so the
+  next Red run after it reads a new `notBefore` or has a real finding) ·
+  **domain 2027-08-13** (whois: Porkbun, `Registry Expiry Date:
+  2027-08-13T02:28:05Z`) · **`github-actions-deploy` token 2027-08-14**,
+  `Mtglab API` 2126-07-27 (`fly tokens list -a sylvan-library`, neither
+  revoked — and note the `-a`: a bare `fly tokens list` in this working tree
+  answers *"the config for your app is missing an app name"*, because
+  `fly.toml` carries no `app` field) · **`fly auth login` ~2026-10-14**
+  (`fly auth whoami` answered `squieraaron@gmail.com` and every `fly` call
+  this run; eleven days out, a laptop ceiling rather than a site outage,
+  and the next Red run is the one that meets it) · **Anthropic key through
+  year-end** (not re-read; reading the digest needs `fly secrets list` and
+  nothing suggests a rotation).
+- **The restore drill is NOT due, and this is the first run that can say so
+  from the rule rather than from the date.** The reference's test is a drill
+  older than the newest schema migration, because the ladder is forward-only
+  and a restore crosses it. The drill is dated **2026-09-13**; the newest
+  rung is **0017**, which landed **2026-09-06** in `029285f` (#448, the
+  games' records) — `git log -1 -- go/internal/auth/migrations/0017.sql`.
+  The live instance reads `schema_version: 17`, so the ladder has not moved
+  since the drill walked it and there is nothing for a new drill to cross.
+  Due when rung 18 lands, which is also the migration window already queued.
+- **Live probe (2026-10-03 ~04:45Z, release v444, from this Mac):** `GET /`
+  200 **264ms**, 5,756b · `/api/health` 200 **256ms**, body `pool true,
+  35,460 oracle / 109,332 printings, bulk 2026-10-02 ×2, 25 decks,
+  pool_stale false, app_db true, disk_free_mb 2539, pool_age_days 1,
+  schema_version 17`. The pool counts moved for the first time in three
+  patrols (35,517 → 35,460 oracle, 108,583 → 109,332 printings) — the
+  Reality Fracture refresh of 10-02, and the oracle count falling while
+  printings rose is the Alchemy drop Green's entry of that date explains,
+  not a loss.
+- **Instance and alerting posture — every line unchanged except the
+  release.** App machine `84e19ef25041e8` **started**, 1/1 checks passing,
+  release **v444**, image `deployment-01M3ZZ8R1NN4DMK0V8MGGJQ9XT`, last
+  updated 2026-10-03T04:12:23Z · volume `mtglab_data` 3GB encrypted,
+  **5 snapshots, newest 13h, 5-day retention, 1.2 GiB stored** (the 4-day-old
+  one 905 MiB, the dailies 58–82 MiB) · `fly.toml` HTTP check GET
+  `/api/health` (stops routing on failure, restarts nothing) · machine
+  restart policy on process exit only · deploy-job failure email ·
+  **external uptime monitoring: none · phone alerting: none** (queued item 1,
+  still the biggest gap and still the only one that costs money). Held-awake
+  block still on. No new platform feature this run: `fly synthetics` is the
+  same on-platform agent 09-26 recorded and declined for fate-sharing.
+- **Queue movement: one arrives, nothing leaves.** The press design pass is
+  Aaron's call and renders, so it is the night's one new daybreak line. Items
+  **1** (off-platform uptime + phone), **2** (GET not HEAD, kept as the
+  monitor's configuration note) and **6** (a snapshot before a deploy)
+  are unchanged and still his; **11**'s own line already recommends close.
 
 ### 2026-09-29 — the worker's 409, read off the machine and repaired by hand
 
