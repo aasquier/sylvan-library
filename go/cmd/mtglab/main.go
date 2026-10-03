@@ -23,6 +23,36 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
+// family is a command that exists to hold subcommands: `decks`, `users`,
+// `sim` and the rest. It runs nothing of its own, but it is deliberately
+// *runnable*, and that is the whole reason it is built here rather than as a
+// bare `&cobra.Command{Use, Short}` at each site.
+//
+// **A non-runnable command answers a typo with its help text and a green
+// exit.** cobra consults `Args` only after it has decided a command is
+// runnable; a command with no `RunE` short-circuits to help before that, so
+// its `Args`, set or not, is never read. `mtglab decks frobnicate` therefore
+// printed the family's help and exited 0 -- a misspelt verb in a runbook line
+// or a cron entry reporting success. The root escapes by accident: cobra's
+// legacy argument rule refuses an unknown name *at the root only*, which is
+// also why the root does not use this helper -- that rule carries the "did you
+// mean" suggestions [cobra.NoArgs] lacks, and setting `Args` on a
+// non-runnable root switches the rule off without putting anything in its
+// place.
+//
+// With [cobra.NoArgs] and a `RunE` that prints the help, a bare
+// `mtglab decks` still answers with its help, and `mtglab decks frobnicate`
+// answers `unknown command "frobnicate" for "mtglab decks"` and a non-zero
+// exit. `familycommands_test.go` drives every family and the root.
+func family(use, short string) *cobra.Command {
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+	}
+}
+
 // newRoot is the whole command tree, assembled around one [config.Config].
 //
 // **The configuration is an argument, not a lookup.** ADR 39 made the

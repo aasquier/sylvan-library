@@ -27,10 +27,7 @@ import (
 // reconciles the maintainer (ADR 17) — so the CLI and the app agree about who
 // administers the instance no matter which one ran last.
 func usersCommand(cfg config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "users",
-		Short: "Accounts: create, invite, list, and administer",
-	}
+	cmd := family("users", "Accounts: create, invite, list, and administer")
 	cmd.AddCommand(usersAddCommand(cfg), usersInviteCommand(cfg), usersListCommand(cfg),
 		usersPasswdCommand(cfg), usersDisableCommand(cfg), usersEnableCommand(cfg),
 		usersPromoteCommand(cfg), usersDemoteCommand(cfg), usersTierCommand(cfg),

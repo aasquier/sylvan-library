@@ -18,10 +18,7 @@ import (
 // that serves it — the runbook's `fly ssh console -C "mtglab data refresh"`
 // depends on the binary alone.
 func dataCommand(cfg config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "data",
-		Short: "Fetch and load the card pool",
-	}
+	cmd := family("data", "Fetch and load the card pool")
 	// Scryfall's bulk index is named once, here, where the tree is assembled:
 	// [dataRefreshCommand] takes it as an argument for the same reason
 	// [pool.RefreshOptions] carries it as a field rather than reading a

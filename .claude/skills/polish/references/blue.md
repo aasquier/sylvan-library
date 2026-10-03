@@ -113,7 +113,10 @@ The sweep list, roughly by how much the replacement buys:
   goroutine to something already fast buys nothing and costs a race surface.
   The question is never "could this be concurrent" but "what is waiting" —
   and if the answer is a profile Black has not taken yet, the finding belongs
-  to Black. What belongs *here* is the shape: a goroutine with no way to
+  to Black. **Count launch sites with both spellings** — `^\s*go ` statements
+  *and* `wg.Go(` — three runs reported "3 goroutine sites" off a grep for
+  `go func` while the tree held a `go p.reap()` and four `wg.Go` bodies.
+  What belongs *here* is the shape: a goroutine with no way to
   report its error, a `context` that is accepted and never checked, a
   goroutine whose lifetime is longer than the request that started it, a
   channel where a mutex would read plainer. **Every new goroutine gets a
@@ -222,9 +225,10 @@ Work the list:
   `MTGLAB_ADMIN_EMAIL`. **Warnings, never a refusal** — merging deploys
   (ADR 23), so a boot that refuses takes the site down for a setting the site
   does not need to serve an anonymous page, and the argument is written where
-  the function is. Still open: the half-set `MTGLAB_FORGE_*` pair, which needs
-  a predicate `tier3` does not export yet (`Configured()` answers the whole
-  question, not which half is missing).
+  the function is. The half-set `MTGLAB_FORGE_*` pair is the fifth:
+  `tier3.Settings.WorkerHalfSet` answers which half is missing and
+  `configComplaints` names it (this bullet called that predicate unbuilt for
+  a month after it landed — re-read the function, not the bullet).
 - ~~**Say what it decided, once, at boot.**~~ **CLOSED 2026-08-24**:
   `serve()` logs one `configuration` line — auth, cookie mode, schema, data
   dir, decks dir, web-dist, tarot, pool present, base URL, which mail sender,
@@ -262,8 +266,13 @@ Work the list:
   injectable `osExit` that a test once swapped for a recorder is gone —
   `cmd/mtglab/decks.go` says why); `SilenceUsage` and `SilenceErrors` set
   at the root so an operational failure prints one error rather than a wall of
-  usage; `Args:` declared on every command; no orphan flag, and no flag
-  described in words the code does not honour.
+  usage; `Args:` declared on every leaf, **and every family refuses a
+  mistyped verb** — a command that only holds subcommands is non-runnable by
+  default, and cobra answers a typo under one with its help text and exit 0
+  before it ever reads `Args`; `family()` in `cmd/mtglab/main.go` is the
+  shape and `familycommands_test.go` drives every family off the tree, RunE
+  throughout held beside it; no orphan flag, and no flag described in words
+  the code does not honour.
 - **Fly's half of the same question.** `fly.toml` is the only Fly-specific
   file and holds no secrets; deployed switches travel by `fly secrets set`.
   Drift between the code's names and the instance's is invisible until a

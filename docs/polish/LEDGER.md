@@ -2386,10 +2386,11 @@ record is here because that is where a licence record belongs.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-09-26 (rainbow) — **its entry is at the END of this
-  section, not the top**: four lanes ran in parallel that day and each
-  appended at its own section's foot so the colours could not conflict.
-  Previous: 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
+- **Last run:** 2026-10-02 (night) — **its entry is at the END of this
+  section, not the top**, after the 09-26 rainbow's, which first appended
+  there because four lanes ran in parallel that day and each wrote at its own
+  section's foot so the colours could not conflict.
+  Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
   night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
 - **Read every block below the 2026-08-24 one as history, not as state.**
   All of it is about the retired Python app — `src/mtglab`, pytest, `cli.py`'s
@@ -4264,6 +4265,144 @@ pip's real target measured by `elementFromPoint`: **40 × 32** (`.help-pip
 ::after` at `inset: -6px -9px`) — past WCAG 2.5.8's 24×24, under the house's
 44, **left alone deliberately** because that asymmetry was argued when the pip
 was built and re-opening it here would trade one bad tap for another.
+
+### 2026-10-02 (night) — the families learn to refuse a typo, and three counts this section had been quoting wrong
+
+Bare `/polish` at 20:14 PDT on a Friday, Blue picked by staleness (Blue and
+Colorless both last ran 09-26; WUBRG breaks the tie), the Nightbound rules
+governing. Appended at the section's foot like 09-26's entries, because that
+is where the last run is now and the next reader looks there first.
+
+- **Fixed: every command family answered a typo with its help text and a
+  green exit.** `mtglab decks frobnicate` printed the deck verbs and exited 0;
+  so did `sim`, `users`, `data`, `cards` and `claude`, while the root alone
+  refused and every leaf refused an extra argument. Measured on the `a199cea`
+  binary before a line moved: root typo exit 1, family typo exit 0, leaf
+  extra-arg exit 1. The mechanism was read off cobra v1.10.2's source rather
+  than guessed: `execute` returns `flag.ErrHelp` for a non-runnable command
+  *before* `ValidateArgs`, so a family's `Args`, set or not, is never read; and
+  `Find` applies `legacyArgs` only while `Args == nil`, which errors on an
+  unknown name at the root only. blue.md's "`Args:` declared on every command"
+  was therefore both untrue (seven families had none) and insufficient (one on
+  a non-runnable family changes nothing).
+  - `family(use, short)` in `cmd/mtglab/main.go`: `Args: cobra.NoArgs` plus a
+    `RunE` that returns `cmd.Help()`, so a bare `mtglab decks` still prints
+    its help and `mtglab decks frobnicate` answers `unknown command
+    "frobnicate" for "mtglab decks"` and exits 1. Six sites rewritten, 24
+    lines deleted. **The root stays on the legacy rule on purpose** — it is
+    the one place cobra adds "did you mean" suggestions, and `Args` on a
+    non-runnable root would switch that rule off with nothing in its place;
+    the helper's comment carries the trap.
+  - `familycommands_test.go`, three guards, all derived from the tree rather
+    than a list: a mistyped verb under every family *and* the root refuses and
+    names the verb (7 walked, floor asserted); a bare family still prints
+    `Available Commands:`; no command anywhere is wired through `Run` — RunE
+    throughout, blue.md's claim, now held (35 commands walked). **Mutation-
+    verified both ways, restored, the restore grepped:** `Args` dropped from
+    the helper → six families fail by name; `RunE` → `Run` → six fail by name.
+  - A CLI exit code is not a rendered change and the UI never calls the tree,
+    so this merges tonight under the Nightbound rule.
+- **The standing question, answered three times against this section's own
+  prose — each a claim the reference or the ledger made that the tree
+  contradicted.**
+  1. blue.md said the half-set `MTGLAB_FORGE_*` complaint was "still open,
+     needs a predicate `tier3` does not export yet". `WorkerHalfSet` landed
+     2026-09-05 in #432 — Blue's own night — and `configComplaints` has named
+     the missing half since. Four Blue runs re-read that bullet and none
+     re-read the function. Fixed in the reference.
+  2. "3 non-test goroutine sites, none added since 09-19" (the 09-19 and 09-26
+     entries). The grep was `go func`. Counted with both spellings tonight:
+     **4 `go` statements** (`ui.go`'s listener, `shim.go`'s watchdog,
+     `tier3/run.go`, and **`pool.go:280 go p.reap()`**, there since #441 on
+     2026-09-06) **plus 4 `wg.Go` bodies** (`auth/sweep.go`, `convoke`,
+     `night/runner.go` twice) — eight launch sites, not three. The reaper is
+     argued where it stands (one timer per Pool, never stopped, a no-op after
+     `Close`) and tested in three files; the `wg.Go` sites are the sweep
+     table's *modern* spelling already — `wg.Add(` is 0 outside tests. The
+     two-spelling recipe is written into blue.md's concurrency bullet.
+  3. "`sort.Slice` is down to 2, both in `internal/jobs`". Three:
+     `internal/library/source.go:155` orders deck file paths, a total order
+     over distinct strings with no tie to move; ruled the same way — a
+     spelling change in a file nobody is touching, carried, not swapped.
+- **Boot and config, the two numbers, unchanged:** 2 process reads (both
+  `internal/flymetrics`' argued fallbacks) and 6 composition-root hand-ins;
+  the naive grep reads 15 in 7 files. `.env.example` 35 documented against 42
+  in code, both `comm` directions empty for shipping names, the seven outside
+  all test-only and held by `configrecord_test.go`. `fly secrets list` answers
+  7 names and every one has a reader; `[env]` carries `MTGLAB_FORGE_WORKER=1`
+  and the two placeholders; still no `MTGLAB_NIGHT_*`, so Settings' "torches
+  are not lit" line is still a fact and its daybreak line stands.
+- **Modern-Go inventory (non-test), nothing new to sweep:** `interface{}` 0 ·
+  `ioutil` 0 · `rand.Seed` 0 · `strings.Title` 0 · `sort.Slice` 3 (ruled) ·
+  `sort.SliceStable` 21 · `sort.Strings` 62 · `sort.Ints` 4 · `sync.RWMutex`
+  0 · `sync.Mutex` 23 · `errgroup` 0 · `wg.Add(` 0 · `wg.Go(` 4 · `sync.Once`
+  2 · `slices.` 47 · `maps.` 1 · `atomic.` 13 · `errors.Join` 2 · C-style
+  counting loops 20 (09-26's ruling carried). `go.dev` read tonight:
+  go1.27.1 / go1.26.8 still the latest, nothing since 2026-09-01; local sdk
+  1.26.7, `go.mod` 1.26.0, reopen trigger Go 1.28 unchanged.
+- **Package docs: 55 packages, every one has a doc comment that argues.** The
+  five shortest (`decklog` 5 lines, `analyze` and `gate` 6, `cards` 6,
+  `suggest` 7) each carry a why — decklog's `IS ?` over `= ?`, cards' lookup
+  against similarity — and none merely names contents. `cmd/mtglab` opens
+  `// Command mtglab`.
+- **TS craft, audit only:** 0 regex lookbehind, 0 `forwardRef`/`memo`/
+  `defaultProps` across 116 non-test files. `web/src` moved in 22 files since
+  09-26 (the Coliseum custodes, `tarot.tsx`, `DeckDetail`, `term`,
+  `swapboard`, `board`, `hint`, `index.css`); `web/README.md`'s lazy claim
+  held — 13 `lazy(() => import` lines, 3 eager. No bundle rebuild owed;
+  `web_dist/` untouched by this branch.
+- **Docs and memory:** every repository path CLAUDE.md names exists (the one
+  miss, `swaps.md`, is a deck artifact's name, not a repo file). Memory 190
+  files (183 on 09-26), both index directions empty by script; the
+  relative-date sweep found 8 hits, 7 of them rule phrasings and one dated
+  claim, converted ("today's layout" → the 2026-09-07 merge of #449).
+- **The spirit of Magic — six lore facts none of the earlier runs had
+  checked, all held, every card through the pool and every date through
+  Scryfall:** edh-origin (Nicol Bolas `Legendary Creature — Elder Dragon`,
+  Legends 1994-06-01); combo-winter (Memory Jar, Urza's Legacy 1999-02-15,
+  the March 1999 emergency ban "weeks after release"); dan-frazier's
+  "returned decades later" (145 printings since 2015 under his name, Mox
+  Jasper 2025-04-11 among them); chaos-orb's "a foot in the air" (oracle:
+  "a height of at least one foot"); one-with-nothing (Saviors of Kamigawa
+  2005-06-03, `{B}` instant, "Discard your hand."); mindslaver (oracle
+  verbatim). The sweep half: rendered strings added under `web/src` since
+  09-26 are the two shelf words in `term.tsx`'s doc comment and two oracle
+  quotations in `board.tsx`'s; nothing to flavour.
+- **The two walks, honestly.** The `gyome` seat was signed in through Aaron's
+  Chrome, so `/claude` was read as its author: it renders, 16 images and none
+  broken, all four painter credits present (Poole, Avon, Guay, McKinnon), the
+  Simic heading up. But the tab reported `document.hidden: true`, so fourteen
+  lazy images and all four autoplay loops were unpainted — the hidden-pane
+  trap, not a page fault, and not evidence about the motion either. **The
+  fortune-teller's table (commandment 15), through the "Help me decide" door
+  on `/new`:** the first attempt froze — the renderer timed out under the
+  gauntlet's own load, 361 at 20:52 — and the second, once the suite had
+  finished, dealt a reading: the Table *Strength, reversed*, the Root
+  *Emperor Apatzec Intli IV* reversed after The Emperor with "art by Johan
+  Grenier" beside it, the Turning *Three of Pentacles*; seven paintings, all
+  painted, none broken; the séance-room loop present and paused because the
+  tab was hidden. The realest art and the credit are there; whether it still
+  *moves* like the belle of the ball is a question only a fronted tab or
+  Aaron's eye can answer, and this run does not claim it.
+- **Queued for Aaron: nothing new.** No design decision, spend, dependency or
+  security question; the queue stays at seven and `DAYBREAK.md` is untouched.
+- **Deferred, triggers unchanged:** the "Shuffling up…" flavour pair; the
+  three local env readers; the dropped-name counter; pprof's live half; and
+  the local sdk's go1.26.8 point release, which is the Mac's toolchain and
+  Aaron's hand, reopened by Go 1.28 like the rest.
+- **Measured (2026-10-02, this Mac, one lane, Aaron's Chrome open, load 3.3
+  at the gauntlet's start):**
+  - Go gauntlet, from `go/`: `gofmt -l .` prints nothing; `go vet ./...`
+    clean; `go test -race -count=1 ./...` **all ok, 4m07s wall (20:49:28 →
+    20:53:35), load 3.3 → 151 by its end**; `golangci-lint run ./...` **0
+    issues**. The three family guards alone: `go test -race -count=1 -run
+    'Family|InsideItsOwnBody' ./cmd/mtglab/` ok in 3.2s. `npm --prefix web
+    run check` green (tsc, oxlint, Vitest; `web/src` untouched so no bundle rebuild owed). `tools/` did not move. `data/app.db` dated Sep 27
+    before and after.
+  - 2,619 top-level test functions (2,614 on 10-02 afternoon; three are this
+    branch's); `time.Sleep` sites in tests 14 (15 on 10-02 afternoon).
+  - 214 non-test Go files; 55 packages with doc comments; 7 families and 35
+    commands in the tree.
 
 ## Black — Ruthless Efficiency
 
