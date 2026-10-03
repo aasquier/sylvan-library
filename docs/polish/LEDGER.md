@@ -19,7 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-10-02 (solo, daylight). Previous: 2026-09-26 (rainbow,
+- **Last run:** 2026-10-03 (night, the coverage lane). Previous: 2026-10-02
+  (solo, daylight), 2026-09-26 (rainbow,
   and its second leg — the grind), 2026-09-24 (the coverage climb, outside
   the rainbow), 2026-09-19
   (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24,
@@ -31,6 +32,197 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-10-03 (night, coverage) — four seams nothing had ever run, two of the rebuild's refusals, and the environment doctrine made checkable
+
+The coverage lane of a serial night run, measured either side with `ci.yml`'s
+own formula (`go test -count=1 -coverprofile -coverpkg=./... ./...`, then
+`go tool cover -func`) rather than with the hand merge, which reads a tenth
+differently and is not the gate.
+
+- **The numbers, before and after.** `-func` **97.0% → 97.0%**; merged
+  **97.00% → 97.04%**, **655 → 646 missing of 21,814**, **391 → 387 functions
+  with a gap**. Nine statements and four functions off zero. The suite with
+  `-coverpkg` takes **~2 minutes** on this Mac, not the five the lane file
+  budgeted. Denominator unchanged: nothing landed outside a `_test.go`.
+- **The floor does not move, by its own written rule.** `ci.yml`'s comment
+  says the next click is 96.0 "once a merged main prints 97.5 or better, never
+  sooner" (Aaron, 2026-09-29: ratchet, and the gap is kept). The tree prints
+  97.0. `MINIMUM` stays **95.5** and no workflow file was touched, which is
+  what makes this branch mergeable without a watcher.
+- **The worklist, by function rather than by file.** Ranked by missing
+  statements attributed to the function each uncovered block falls in
+  (`rank.py` in the lane's scratch: merge the profile by block key, bisect
+  each uncovered block's start line into `-func`'s own function starts). The
+  top of it before the work: `deckyaml.orderedValue` 13 and `sortedKeys` 5
+  (both *Left deliberately*), `deckread.CommanderDossier` 10 (blocked —
+  queued below), `pool/rebuild`'s `startRebuild` 6 and `finish` 6,
+  `users.go:prompt.secret` 5 (*Left deliberately*, closed by argument), then
+  **a floor of singletons**: everything else in the tree is a function missing
+  one to five statements, 1.7 on average.
+
+**A seam's own default is the one line the deployed binary runs and no test
+does, and the tree had four of them at exactly 0%.** This is lever 8's shape
+(`httpPost`, `realTransport`) and the climb never swept for the rest of it.
+The injection the tree has applied everywhere — a reader of the process
+becomes a lookup handed in, a package constant becomes a field — leaves behind
+a one-line wrapper composing the real thing, and every test by construction
+drives the injected half. Each of the four is now driven, and each was
+mutation-verified by breaking the production line, watching the named test
+fail, restoring, and proving the restore with `git diff`:
+
+  1. **`convoke.(*Panic).Unwrap`** (2 statements) is the sharpest of them,
+     because it is not only the wrapper — it is a *documented behaviour* that
+     nothing asked for. Every panic the package's tests raise is a string
+     (`TestAPanicReRaisesOnTheCaller` raises `"tier1: Run needs at least one
+     game"`), so the type assertion inside `Unwrap` had never been given an
+     error. A sweep is N calls of a kernel and a kernel refuses a programming
+     error by panicking; a caller that recovers and branches on
+     `errors.Is(err, sentinel)` reads **false** through an `Unwrap` that
+     answers nil, so the refusal arrives as "a panic" in the one place a stack
+     trace was already hard to read. Two tests: a panic carrying a typed error
+     that wraps a sentinel (both `errors.Is` and `errors.As` must read
+     through), and a string panic that must unwrap to nil rather than match
+     something by accident. Mutation: `return nil` — both reads fail by name.
+  2. **`tier3.LoadSettings`** (1) is the one reader of the Forge and Fly
+     variables, called once from `main`. The question a test *can* ask without
+     writing the process environment — which Go refuses beside `t.Parallel`,
+     which is the whole reason the seam exists — is whether the loaded
+     settings carry what this process's environment actually says. `PATH` is
+     the lever: it is set in every process that can run a Go test, it is the
+     one variable `LoadSettingsFrom` copies verbatim rather than defaulting,
+     and the JVM hunt walks it. Mutation: `LoadSettingsFrom(func(string)
+     string { return "" })` — a blank-lookup default produces settings that
+     could never find Java, and the test says so with both strings in the
+     message.
+  3. **`pool.DownloadBulk`** (1) is the production spelling of Scryfall's bulk
+     index, and `DownloadBulkFrom` carries the comment "no production caller
+     has a second way to spell the real index" — a claim nothing held. Asked
+     **without a network**: `http.Transport.RoundTrip` selects on `ctx.Done()`
+     before it dials, so a context cancelled before the call is refused with
+     no DNS lookup, and `http.Client` wraps the refusal in a `*url.Error`
+     carrying the URL it was *going* to ask. The test runs in 0.00s. Mutation:
+     a mirror URL in the wrapper — the refusal names the mirror and the test
+     prints both.
+  4. **`api.nightPlayer.Play`** (1) is the seam `night.Runner` holds. `door.New`
+     hands it over and the runner calls it on its own schedule, so on a machine
+     where the night never fires the one line joining the arena to the
+     scheduler never runs — while `night_test.go` already called
+     `a.NightPlayer()` (so the *constructor* read as covered) and every bout
+     test called `playNightBout` directly. Asserted as **agreement rather than
+     as a restated message**: over the thinnest state with a definite answer
+     (no job registry), the seam and the method must answer the same way,
+     whatever that way is. Mutation: `return 0, nil` — "the seam reported
+     success where the method refused".
+
+**Two of the rebuild's refusals, which is the step that can destroy a
+library** (`internal/pool/loaderfaults_test.go`, in-package because
+`startRebuild` and `finish` are unexported; `pooltest` cannot be imported from
+`package pool` without a cycle). The property both assert is the rebuild's own
+safety argument — the old pool is still there, and the litter is gone:
+
+  - **A handle that already has the rebuild catalog attached** (3 statements,
+    the whole ATTACH arm) is a previous rebuild that never let go: `abandon`'s
+    DETACH failed, or the process died between the ATTACH and the tidy. ATTACH
+    is per DuckDB *instance* rather than per connection, so the stale name is
+    visible on the fresh connection `startRebuild` takes and the second ATTACH
+    is refused by name. The assertion worth having is not the message but the
+    tidying: the file this run created before it reached the ATTACH has to be
+    removed on the way out, or the next refresh finds a pool-shaped file under
+    the build name. Mutation: drop the `removeBuild` on that arm — "the
+    half-built … survived a refused ATTACH, so the next refresh inherits it".
+  - **A served path that cannot become a file** (1) reaches `finish`'s last
+    statement, the rename. A non-empty **directory** where the pool should be
+    is what a volume mounted one level too deep looks like from in here, and
+    `startRebuild(ctx, db, dbPath)` takes the handle and the path as separate
+    arguments precisely because the file being replaced and the handle being
+    read are separate things — so the fixture is a real pool handle and a
+    directory. Everything before the rename succeeds (history carried, prices
+    recorded, both handles released) and the refusal still names the step.
+    Mutation: swallow the rename's error — "a rebuild renamed a pool over a
+    directory".
+
+**The night's one checked claim, which is the spend COVERAGE.md argues for at
+this altitude** (`go/cmd/mtglab/processreaders_test.go`, `addressreach_test.go`'s
+move on a different rule). **The tree applies the environment doctrine
+everywhere and enforced it nowhere.** ADR 39 made the configuration a value,
+ADR 40 the Claude endpoint, and `CLAUDE.md` states the general form; the reason
+is recorded beside the first one — eighty-eight tests in `cmd/mtglab` were
+serial because the only way to say "this deployment keeps its decks over there"
+was `t.Setenv`, and not one of them was about the environment. Nothing held it.
+A new package reading `os.Getenv` where it wants the value compiles, passes,
+and makes the next test that needs to describe a deployment serial again, and
+the failure arrives weeks later as a `t.Setenv` somebody could not avoid. The
+register walks every non-test `.go` file in `go/`, matches the **selector**
+rather than the call (one registered reader passes `os.Getenv` as a *value* —
+`envOr(os.Getenv, …)` in `ui.go` — and a `CallExpr` sweep would miss exactly
+the shape the tree is full of), covers `Getenv`, `LookupEnv`, `Environ` and
+`ExpandEnv` so a different spelling is not a way around it, and is held equal
+in both directions over a vacuity floor of four. It logs **7 readers, every
+one argued**, in three shapes: the composition root's four defaults
+(`config.Load`, `claude.EndpointFromEnv`, `claude.SettingsFromEnv`,
+`tier3.LoadSettings`), one Cobra flag pair whose `--help` names the variable
+(`uiCommand`), and two handed-in-first fallbacks (`flymetrics.Panel.token`,
+`valueOr`). Mutation-verified **both ways**: an `os.Getenv` added to
+`traffic.ClassOf` is named by package and function and line; handing `valueOr`
+its lookup instead is reported as a register entry that stopped mattering.
+The count is deliberately not written into the file's prose — the test logs
+the number it walked, which is the lesson the parallel register learned the
+hard way.
+
+- **Considered and rejected.**
+  - **`startRebuild`'s `OpenWriter` arm** (1 statement) has no cross-platform
+    fixture. `OpenWriter` `MkdirAll`s its own parent, so the only route is a
+    parent directory that is not writable — and then `removeBuild`'s
+    `os.Remove` of a name that is not there answers ENOENT on Linux and is not
+    guaranteed to on every platform the gate runs, which would land on the
+    *covered* branch instead and turn a green `main` red for a reason nobody
+    would read as this. Left; named here so the next lane does not re-derive it.
+  - **`finish`'s four middle arms** (snapshot, DETACH, `conn.Close`,
+    `db.Close`) want a pool handle that fails after the first statement
+    succeeded, which is exactly `pooltest.OpenFaulty` — and these are
+    `package pool` tests, so importing `pooltest` is an import cycle. A second
+    faulty connector written in-package would duplicate the one lever 33
+    argued. Left.
+  - **`internal/deckedit/ops.go`'s 27 single-statement gaps** are lever 26 one
+    layer up: `blockHeader`'s regex matches `key:` and `key: []` and nothing
+    else, so a top-level key written **quoted** (`"cards": []`) parses, holds
+    the right cards, and scans to nothing. One fixture family would reach
+    several of them. Not taken tonight — it is the grind the daybreak ruling
+    above is about, and it is the best-shaped grind left if the answer comes
+    back the other way.
+  - **`rebuild.go`'s ATTACH builds its statement by concatenation**
+    (`"ATTACH '"+buildPath+"' AS "+rebuildCatalog`), so a pool path containing
+    an apostrophe is a malformed statement rather than a named refusal. Not
+    queued and not fixed: the path comes from `MTGLAB_DATA_DIR`, the deployed
+    value is `/data`, and this is an operator-set value rather than anything a
+    user can reach — so it is a robustness nit, not an injection. The fix if
+    anybody ever wants it is doubling the quote, one line, with the ATTACH test
+    above already in place beside it.
+
+- **(open) `internal/deckread`'s commander dossier is the largest
+  non-deliberate gap in the tree — ten statements, 1.5% of everything still
+  missing, in one function — the fixture that would reach it exists, and the
+  item asking whether to plug it in left this queue without being answered.**
+  `pooltest.OpenFaulty` is a real pool behind a budgeted connector; `deckread`
+  reaches the pool through a `*pool.Pool`, and a `Pool` opens its own file
+  inside `acquire`. One field on `pool.Pool` closes this and three siblings.
+  COVERAGE.md recorded it as "a daybreak item (White, 2026-09-26)" while
+  **DAYBREAK.md did not have it** — it went during the 09-28 regroup without a
+  ruling, and a coverage lane four nights later read that sentence, went
+  looking for the item, and found nothing. That is this project's own rot
+  warning happening inside the map whose job is to carry it. Queued under *a watched deploy* (it is a change to the serving
+  hot path); COVERAGE.md's claim corrected in the same diff to say the item is
+  re-queued rather than still queued.
+- **(open) The climb has no lever left bigger than two statements, and the
+  floor's next click asks for a number the tree cannot reach by grinding.**
+  646 missing over 387 functions, every remaining *class* already named in
+  *Left deliberately*, and 0.5 points is 109 statements — sixty-four more
+  bespoke fixtures at tonight's rate. The recommendation is that 95.5 becomes
+  a regression guard rather than a target and that the next lane's mandate is
+  a LIVED mutant in covered code, which is the sentence COVERAGE.md has ended
+  on since it was written. Queued under *a ruling, and nothing else* — a group
+  the 09-29 morning emptied and this re-opens.
 
 ### 2026-10-02 (solo, daylight) — the replay comes back, the census becomes a register, and the compile kernel gets its first baseline
 
