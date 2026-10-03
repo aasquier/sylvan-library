@@ -237,8 +237,10 @@ is a `min-height` under `(pointer: coarse)`, and an SVG shape has no
 min-height, so the fifteen controls in the wheel were never covered by it:
 measured on a phone, a disc was **38px** and a guild line is **14.6px** across.
 The discs are fixed on `polish/green-2026-10-03` (an invisible hit circle,
-**38 → 46px** measured live, nothing renders differently, mutation-verified
-test). The lines would need a **60-user-unit** band each — ten of them,
+**38 → 46px** measured live, mutation-verified test; and, by your ruling on
+the walk, the five discs now wear the official symbols every other pip wears,
+with the drawn marks as the fallback — the one thing on the branch that
+renders differently). The lines would need a **60-user-unit** band each — ten of them,
 converging on five points — so every pair would overlap and the star's
 crossings would belong to whichever line was drawn last. · *Cost of leaving
 it:* a thumb on a phone picks the wrong guild, or none; `/learn` carries 32

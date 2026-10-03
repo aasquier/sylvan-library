@@ -32,6 +32,7 @@ import { useState } from 'react'
 import type { Combination } from '../lib/api'
 import { COLOR_NAMES, COLOR_VAR, WUBRG } from '../lib/mtg'
 import { GLYPH_PATH } from '../lib/managlyphs'
+import { noteOfficialSymbolFailed, officialSymbolFailed } from '../lib/symbolmemo'
 
 /* ---------------------------------------------------------------- geometry */
 
@@ -261,6 +262,10 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
   // same caption a mouse would surface. `null` means "nothing under the
   // pointer", which is a different caption from any combination.
   const [active, setActive] = useState<string | null>(null)
+  // Vertices whose official symbol failed to load *this render tree*; the
+  // module-level memo in `manasymbol.tsx` remembers across trees, and this
+  // is what makes the fallback appear without a reload the moment it fails.
+  const [missing, setMissing] = useState<ReadonlySet<string>>(() => new Set())
 
   const byKey = new Map(combinations.map((c) => [c.key, c]))
   const marked = selected && DRAWABLE.has(selected) ? selected : null
@@ -369,6 +374,7 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
           // drawing if one ever goes missing -- a vertex without its mark
           // beats a vertex that throws while rendering the wheel.
           const glyph = GLYPH_PATH[code]
+          const official = !missing.has(code) && !officialSymbolFailed(code)
           return (
             <g key={code} {...handlers(combo)} className="pentagram-vertex">
               {/* The thumb's disc: invisible, drawn first so nothing paints
@@ -391,11 +397,24 @@ export function ColorPentagram({ combinations, onPick, selected }: PentagramProp
                 stroke="var(--hairline)"
                 strokeWidth={1}
               />
-              {/* The colour's own icon, at the size the wheel gives it. Drawn
-                  from the same paths as every pip in the app, so the disc a
-                  vertex shows here is the disc a cost shows on a card — the
-                  diagram teaches a mark the rest of the app then uses. */}
-              {glyph && (
+              {/* The official symbol (ADR 33), the whole disc included, laid
+                  over the painted disc that stands in while it loads — the
+                  order every pip in the app keeps, so a vertex here is the
+                  mark a card shows and not this file's own drawing of it. The
+                  drawn path is the fallback: it appears the moment the image
+                  fails, and the memo in `manasymbol.tsx` keeps a cold cache
+                  from being asked five times per render. */}
+              {official ? (
+                <image
+                  href={`/api/symbols/${code}.svg`}
+                  x={p.x - VERTEX_R} y={p.y - VERTEX_R}
+                  width={VERTEX_R * 2} height={VERTEX_R * 2}
+                  onError={() => {
+                    noteOfficialSymbolFailed(code)
+                    setMissing((prev) => new Set(prev).add(code))
+                  }}
+                />
+              ) : glyph && (
                 <g transform={`translate(${p.x - 18} ${p.y - 18}) scale(0.36)`}>
                   <path d={glyph.d} fill="#141414"
                         fillRule={glyph.evenOdd ? 'evenodd' : 'nonzero'} />

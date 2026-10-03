@@ -99,6 +99,28 @@ describe('the colour wheel', () => {
     expect(container.querySelectorAll('.pentagram-edge')).toHaveLength(10)
   })
 
+  it('wears the official symbol on every vertex, and the drawn mark only when it fails', () => {
+    const { container } = draw()
+    // Five images, one per colour, each asking the app's own origin for the
+    // real symbol (ADR 33) — the same URL every pip in prose asks for, so the
+    // wheel teaches the mark a card shows rather than a drawing of it.
+    const hrefs = [...container.querySelectorAll('.pentagram-vertex image')]
+      .map((el) => el.getAttribute('href'))
+    expect(hrefs).toEqual(['W', 'U', 'B', 'R', 'G'].map((c) => `/api/symbols/${c}.svg`))
+    // And no drawn path until one is needed.
+    expect(container.querySelectorAll('.pentagram-vertex path')).toHaveLength(0)
+
+    // The cache is cold or the network is away: the image fails, and that
+    // vertex alone falls back to the drawn mark while the other four keep
+    // asking. A wheel with one blank disc teaches less than one with a
+    // drawing on it.
+    const blue = target('Mono-U').querySelector('image')!
+    fireEvent.error(blue)
+    expect(target('Mono-U').querySelector('image')).toBeNull()
+    expect(target('Mono-U').querySelectorAll('path')).toHaveLength(1)
+    expect(container.querySelectorAll('.pentagram-vertex image')).toHaveLength(4)
+  })
+
   it('gives every vertex a thumb-sized target, measured in CSS pixels', () => {
     const { container } = draw()
     const svg = container.querySelector('svg.pentagram')!
