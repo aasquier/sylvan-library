@@ -74,6 +74,7 @@ lever and a grind is visible before the work starts.
 | **the climb to 99, 2026-10-03 (eight lanes, one integration PR)** | **99.4%** | 136 missing of 21,694, 85 functions |
 | wave two, 2026-10-03 (three lanes on the pool seam and the `sql.Open` / `crypto/rand` classes) | **99.5%** | 106 missing of 21,677, 67 functions |
 | floor in `ci.yml` | **98.0** (ratcheted 2026-10-03 at the arm64 leg's 99.4 on #549; the gap is kept; next click 98.5 at a printed 99.7) | |
+| floor in `ci.yml` | **99.0** (Aaron, 2026-10-04: "set the guard to 99" — at main's own print of 99.5 after #553; the kept-gap rule is replaced by "stay above 99") | |
 
 **Leg two is the leg that says the climb is over**, and the number is the
 argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
@@ -109,8 +110,10 @@ package costs coverage" trap below, paid knowingly and kept small — the first
 `authtest/faulty.go` paid forty-nine of them. **CI's arm64 print on the merged
 branch is the authority; neither lane's local number is.**
 
-The gate is at 98.0 and the tree is over 99 because Aaron asked, on
-2026-09-29, for exactly this pair's shape (then 95 under 96): a diff can cost a few tenths of honest refactoring without going
+The gate is at 99.0 and the tree measures 99.5 because Aaron ruled, on
+2026-10-04, that the tree is to stay above 99 — a half-point margin, about a
+hundred statements, replacing the wider gap he had asked for on 2026-09-29
+(then 95 under 96): a diff can cost a few tenths of honest refactoring without going
 red, and a diff that costs a whole point is what the floor exists to notice.
 
 **How the climb was paid for.** Nine lanes, one per package group, each
