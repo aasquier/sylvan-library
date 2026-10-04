@@ -169,7 +169,7 @@ func (a *API) playNightBout(ctx context.Context, b night.Bout) (int64, error) {
 // house and the admin ever sees.
 func (a *API) nightDeck(ctx context.Context, seat night.Seat) (*deck.Deck, string, *int64, error) {
 	if seat.House() {
-		d, err := library.NewFileSource(a.decksDir, false).Get(ctx, seat.Slug)
+		d, err := library.NewFileSource(a.decksDir, false).WithMemo(a.deckMemo).Get(ctx, seat.Slug)
 		return d, "the house's " + seat.Slug, nil, err
 	}
 	address := fmt.Sprintf("account %d's %s", *seat.Owner, seat.Slug)

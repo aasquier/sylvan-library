@@ -125,12 +125,26 @@ func (e *untrustworthy) Is(target error) bool { return target == ErrResultsUntru
 
 // CardsfolderPath is `coverage.cardsfolder_path`.
 func (s Settings) CardsfolderPath() (string, error) {
+	path, _, err := s.cardsfolderStat()
+	return path, err
+}
+
+// cardsfolderStat is the card data and what the index keys off it, read in one
+// stat.
+//
+// **One question asked once.** [Settings.ImplementedNames] used to call
+// [Settings.CardsfolderPath] and then stat the very same path again for the
+// key's mtime and size, which is two syscalls for one fact and a second refusal
+// that only a file vanishing between them could reach. The refusal's words are
+// unchanged: they are what the recorded messages say.
+func (s Settings) cardsfolderStat() (string, os.FileInfo, error) {
 	path := filepath.Join(s.Home, cardsfolder)
-	if _, err := os.Stat(path); err != nil {
-		return "", NotInstalled("no Forge card data at %s -- set "+
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", nil, NotInstalled("no Forge card data at %s -- set "+
 			"MTGLAB_FORGE_HOME to an unpacked Forge distribution", path)
 	}
-	return path, nil
+	return path, info, nil
 }
 
 // indexKey is `(path, mtime, size)`: upgrading Forge in place invalidates the
@@ -218,14 +232,9 @@ func (x *CardIndex) remember(key indexKey, names map[string]bool) {
 // ImplementedNames is every card name Forge implements, read from its own card
 // scripts — from [Settings.Index] when it has been read before on this machine.
 func (s Settings) ImplementedNames() (map[string]bool, error) {
-	path, err := s.CardsfolderPath()
+	path, info, err := s.cardsfolderStat()
 	if err != nil {
 		return nil, err
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, NotInstalled("no Forge card data at %s -- set "+
-			"MTGLAB_FORGE_HOME to an unpacked Forge distribution", path)
 	}
 	key := indexKey{path: path, mtime: info.ModTime().Unix(), size: info.Size()}
 
@@ -252,18 +261,20 @@ func readNames(path string) (map[string]bool, error) {
 		if info.FileInfo().IsDir() || !strings.HasSuffix(info.Name, ".txt") {
 			continue
 		}
-		if err := func() error {
+		// **A card script that will not open or will not read costs that card,
+		// not the whole pre-flight** — the `errors="replace"` argument, one
+		// level up. So this closure hands nothing back: there is no failure
+		// here that is the index's to report, and an error return beside it
+		// read as though there might be.
+		func() {
 			f, err := info.Open()
 			if err != nil {
-				// A card script that will not open costs that card, not the
-				// whole pre-flight — the `errors="replace"` argument, one
-				// level up.
-				return nil
+				return
 			}
 			defer f.Close()
 			body, err := io.ReadAll(f)
 			if err != nil {
-				return nil
+				return
 			}
 			// `replace` rather than strict decoding: a decoding error in one
 			// card script should cost that card, not the whole pre-flight.
@@ -274,10 +285,7 @@ func readNames(path string) (map[string]bool, error) {
 					names[textutil.Strip(line[5:])] = true
 				}
 			}
-			return nil
-		}(); err != nil {
-			return nil, err
-		}
+		}()
 	}
 	return names, nil
 }

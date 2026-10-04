@@ -65,15 +65,21 @@ func Indexed(n, workers int, fn func(int)) {
 	call := func(i int) (ok bool) {
 		defer func() {
 			if p := recover(); p != nil {
-				// The stack is read here, on the worker, while the frames
-				// that raised it are still below this one.
+				// The flag goes up first. The stack read below is slow --
+				// milliseconds under coverage on CI's arm64 leg -- and while
+				// it ran the other worker drained a thousand trivially cheap
+				// pieces, which is "stops the hand-out" failing in public
+				// (`TestAPanicReRaisesOnTheCaller`; the Red ledger has the
+				// night). The stack is
+				// still read here, on the worker, while the frames that
+				// raised it are below this one.
+				stop.Store(true)
 				stack := debug.Stack()
 				panicMu.Lock()
 				if caught == nil {
 					caught = &Panic{Value: p, Stack: stack}
 				}
 				panicMu.Unlock()
-				stop.Store(true)
 			}
 		}()
 		fn(i)

@@ -26,10 +26,7 @@ import (
 // the integration broke or the key simply lapsed (docs/HOSTING.md); and
 // `usage`, what it has all cost.
 func claudeCommand(cfg config.Config, pipe claude.Endpoint) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "claude",
-		Short: "The Claude pipe",
-	}
+	cmd := family("claude", "The Claude pipe")
 	cmd.AddCommand(claudeCheckCommand(pipe), claudeUsageCommand(cfg))
 	return cmd
 }
@@ -112,10 +109,10 @@ func claudeUsageCommand(cfg config.Config) *cobra.Command {
 				fmt.Fprintln(out, "  nothing on this box has asked Claude anything yet")
 				return nil
 			}
-			db, err := auth.Open(path)
-			if err != nil {
-				return err
-			}
+			// No error asked for: `auth.Open` is `sql.Open`, argued in full
+			// at [openAppDB]. The ledger's real state is discovered by the
+			// window query below.
+			db := auth.Open(path)
 			defer func() { _ = db.Close() }()
 			roll, err := ledger.RecorderFrom(db, nil).
 				Window(cmd.Context(), since, prices.Today())

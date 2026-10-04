@@ -61,7 +61,6 @@ package opening
 import (
 	"context"
 	crand "crypto/rand"
-	"fmt"
 	"math/big"
 	"math/bits"
 	"sort"
@@ -186,11 +185,17 @@ func Deal(d *deck.Deck, cards map[string]*pool.CardRecord, seed *big.Int) (*Hand
 		return nil, err
 	}
 	if seed == nil {
-		fresh, err := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 32))
-		if err != nil {
-			return nil, fmt.Errorf("opening: %w", err)
-		}
-		seed = fresh
+		// **No error asked for, because neither half of this can give one.**
+		// `crypto/rand.Int` panics for a ceiling of zero or less and otherwise
+		// answers whatever `io.ReadFull` on the reader does -- and `rand.Reader`
+		// never returns an error: `rand.Read`'s own documentation says so, and
+		// the reader it reads through crashes the program irrecoverably rather
+		// than fail. The ceiling here is a literal 2**32. So the arm that used
+		// to stand here was a refusal nobody could reach, wearing the same
+		// shape as the two real refusals above it -- the deck with no pool
+		// behind it and the deck that compiles to nothing -- which are the
+		// refusals a person is meant to read.
+		seed, _ = crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 32))
 	}
 	rng := mt19937.NewFromBig(seed)
 

@@ -2,6 +2,7 @@ package deckread
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -80,18 +81,30 @@ func CommanderDossier(ctx context.Context, c *pool.Conn, d *deck.Deck) (wire.Ord
 	if err != nil {
 		return nil, err
 	}
+	// **The scan's refusal is folded into the walk's, and the walk's was not
+	// being asked at all** -- which was the bug, and it is the worse half.
+	// Every destination below is a `*any`, and `database/sql`'s converter ends
+	// `case *any: *d = src; return nil`: there is no driver value it refuses
+	// and no NULL it cannot take, so the branch that used to sit here could
+	// not be entered by any pool. `rows.Err()` *can* fail -- a pool that goes
+	// away between two rows is a volume detaching mid-read, which
+	// `pooltest.OpenFaultyPool` is -- and without this question a related-cards
+	// strip cut short came back as the whole of what shares the character's
+	// name. Nothing is dropped by the fold: the scan's error is still reported,
+	// once, where the iteration's is.
+	var scanned error
 	for rows.Next() {
 		var v [5]any
-		ptrs := []any{&v[0], &v[1], &v[2], &v[3], &v[4]}
-		if err := rows.Scan(ptrs...); err != nil {
-			_ = rows.Close()
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&v[0], &v[1], &v[2], &v[3], &v[4]))
 		others = append(others, wire.OrderedMap{{Key: "name", Value: pool.AsStringPtr(v[0])},
 			{Key: "type_line", Value: pool.AsStringPtr(v[1])}, {Key: "mana_cost", Value: pool.AsStringPtr(v[2])},
 			{Key: "image", Value: pool.AsStringPtr(v[3])}, {Key: "art_crop", Value: pool.AsStringPtr(v[4])}})
 	}
+	walked := errors.Join(scanned, rows.Err())
 	_ = rows.Close()
+	if walked != nil {
+		return nil, walked
+	}
 	// Scryfall's stable id for the *card*, across every printing of it. Two
 	// things need it and neither is decorative: the art picker lists a card's
 	// printings by it, and ADR 19 keys a cached dossier on it -- a dossier is

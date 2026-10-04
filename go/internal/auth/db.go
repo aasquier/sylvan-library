@@ -39,15 +39,28 @@ import (
 // The busy timeout matches every other handle here (5000ms). Journal mode is
 // not set -- WAL is persistent in the file, `Migrate` set it at creation,
 // and a read-only connection may not change it anyway.
-func Open(path string) (*sql.DB, error) {
+// **There is no failure here, and so it does not offer one.**
+// [sql.Open] records the DSN and looks the driver up by name; it only answers
+// an error for a name nobody registered, and this file's import list is what
+// registers "sqlite". Nothing is opened until the first statement, which is
+// what [Ping] is for. So the `if err != nil` that used to stand here was a
+// safety the program did not have -- a branch no fixture could enter, read by
+// every reader as though the file being unopenable were handled.
+//
+// The error used to stay in the signature anyway, on the grounds that every
+// caller already asked for one. That was the expensive half: an error nobody
+// can produce, offered to eighteen call sites, is eighteen `if err != nil`
+// arms that look like the volume-did-not-mount handling and are not -- and
+// two of them really were the only thing standing between a reader and a
+// diagnosis. The signature is one value now; the fault a missing or
+// unreadable `app.db` produces lands on the first *statement* through the
+// handle, which is where [Ping] and every caller's own first query answer it.
+func Open(path string) *sql.DB {
 	dsn := "file:" + url.PathEscape(path) + "?mode=ro&_pragma=busy_timeout(5000)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open app.db: %w", err)
-	}
+	db, _ := sql.Open("sqlite", dsn)
 	// A handful of readers is plenty: every lookup is a primary-key hit.
 	db.SetMaxOpenConns(4)
-	return db, nil
+	return db
 }
 
 // Ping opens a connection and proves the users table is there -- the check a

@@ -36,14 +36,8 @@ import (
 func goneDB(t *testing.T) *API {
 	t.Helper()
 	path := appDB(t)
-	db, err := auth.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeDB, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(path)
+	writeDB := auth.OpenReadWrite(path)
 	a := New(Config{
 		Pool: pooltest.Open(t), DecksDir: decksDir(t),
 		AdminEmail: "alice@example.com", AppDB: db, AppWriteDB: writeDB,

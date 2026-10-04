@@ -35,10 +35,7 @@ func newWriteRig(t *testing.T, set claude.Settings) *writeRig {
 	t.Helper()
 	decks := decksDir(t)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)

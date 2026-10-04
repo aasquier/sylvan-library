@@ -36,10 +36,7 @@ import (
 func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
 	t.Parallel()
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	defer db.Close()
 	store, err := cache.Open(dbPath, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -99,10 +96,7 @@ func TestASimulationJobStoresItsResultAfterTheRequestHasGone(t *testing.T) {
 func TestAMissingDeckCarriesTheBareSlugIntoTheJob(t *testing.T) {
 	t.Parallel()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer db.Close()
 	reg := jobs.New(jobs.Config{Logger: quiet})
 	a := New(Config{Logger: quiet, Pool: pooltest.Open(t), DecksDir: decksDir(t),

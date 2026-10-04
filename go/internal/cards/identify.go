@@ -8,6 +8,7 @@ package cards
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -89,14 +90,21 @@ func SetCodes(ctx context.Context, c *pool.Conn) (map[string]bool, error) {
 	}
 	defer rows.Close()
 	out := map[string]bool{}
+	// The scan's refusal joins the walk's rather than branching here: the
+	// destinations are columns the pool declares NOT NULL, so the NULL that
+	// would refuse one cannot arrive -- while the walk's own failure, a pool
+	// that answers two rows and then goes away, is the one that hands back a
+	// short list and says nothing. `pool.scanRecord` carries the argument.
+	var scanned error
 	for rows.Next() {
 		var code string
-		if err := rows.Scan(&code); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&code))
 		out[code] = true
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // FromCorner reads a set code and a collector number out of the raw corner
@@ -178,14 +186,13 @@ func ByPrinting(ctx context.Context, c *pool.Conn, setCode, collectorNumber stri
 	}
 	defer rows.Close()
 	names := []string{}
+	var scanned error // see [SetCodes]
 	for rows.Next() {
 		var n string
-		if err := rows.Scan(&n); err != nil {
-			return "", err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&n))
 		names = append(names, n)
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return "", err
 	}
 	if len(names) == 1 {
@@ -218,14 +225,16 @@ func ByTitle(ctx context.Context, c *pool.Conn, title string, limit int) ([]Cand
 		return nil, err
 	}
 	defer rows.Close()
+	var scanned error // see [SetCodes]
 	for rows.Next() {
 		var cand Candidate
-		if err := rows.Scan(&cand.Name, &cand.Score); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&cand.Name, &cand.Score))
 		out = append(out, cand)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Read reads a batch of captures, in the order they were taken: one Reading

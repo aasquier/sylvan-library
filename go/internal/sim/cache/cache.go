@@ -221,8 +221,14 @@ type Input struct {
 // struct exists to keep true -- and `KeepRule` goes in whole rather than
 // field by field, so a new mulligan lever is in the key the day it is added
 // instead of the day somebody remembers it.
-func Key(kind string, in Input) string {
-	engine := Fingerprint()
+func Key(kind string, in Input) string { return keyFrom(Fingerprint(), kind, in) }
+
+// keyFrom is the key over whichever engine it is handed — [fingerprintOf]'s
+// split, one layer up and for the same reason. **An engine nobody could identify
+// has no key**, and a caller holding "" is a caller that computes rather than
+// guesses; without the engine as an argument that answer was only reachable in a
+// binary whose own embedded source would not read, which is to say never.
+func keyFrom(engine, kind string, in Input) string {
 	if engine == "" {
 		return ""
 	}

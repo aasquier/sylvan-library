@@ -111,10 +111,7 @@ var noCredential = claude.Settings{}
 // than what the caller gets.
 func deckAPIWithLog(t *testing.T, set claude.Settings, into *bytes.Buffer) (*API, func()) {
 	t.Helper()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	a := New(Config{
 		Claude:   set,
 		Logger:   slog.New(slog.NewTextHandler(into, &slog.HandlerOptions{Level: slog.LevelDebug})),

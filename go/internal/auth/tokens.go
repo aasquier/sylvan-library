@@ -293,7 +293,12 @@ func RedeemToken(ctx context.Context, db *sql.DB, token, password string,
 	if err != nil {
 		return nil, err
 	}
-	if refreshed == nil { // unreachable in practice
+	// The account the link belonged to is gone between the commit and this
+	// read -- a trigger, or somebody deleting it in the same breath. The
+	// sentence is the same one a bad link gets, because a holder is owed no
+	// account of why, and the refusal matters more than the reason: the
+	// alternative is a nil account returned with no error at all.
+	if refreshed == nil {
 		return nil, failf("%w: that link is not valid", ErrTokenInvalid)
 	}
 	return refreshed, nil

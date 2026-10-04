@@ -49,10 +49,13 @@ import { POURED, POURING, SERVE_MS, potLabel } from '../lib/cauldroncopy'
 import { costumeFor } from '../lib/costumes'
 import { reducedMotion } from '../lib/motion'
 import { COLOR_VAR } from '../lib/mtg'
+import { createPortal } from 'react-dom'
 import { personaAccent, personaArt } from '../lib/personart'
+import { roomFootage } from '../lib/roomfootage'
 import { useStashed } from '../lib/stash'
 import { effectivePin, fetchClaudeStatus, useStance } from '../lib/stance'
 import { SceneBackdrop } from './forest'
+import { RoomPlate } from './roomplate'
 import { ArmedButton, CardHover, ColorRing, ErrorNote, Spinner } from './ui'
 import { ReplayGlyph } from './glyphs'
 import { StanceReadout } from './stance'
@@ -716,10 +719,15 @@ function CombinationPanel({ combo, rank, sources, onPick }: {
 
 export function ThemeInterview({
   onPick, onLeave, persona = 'plain', seed = null, pot = null, intro,
-  leaveLabel,
+  leaveLabel, controlsHost = null,
 }: {
   onPick: (key: string, card: ThemeCommander) => void
   onLeave: () => void
+  /** Somewhere else to put "Start over" and the way out — the tarot table's
+   *  own control row, for a room that is footage, so the corner holds one
+   *  line of buttons rather than two. Null keeps them where they have always
+   *  been, in this room's top row. */
+  controlsHost?: HTMLElement | null
   /** Which voice is asking (ADR 21). Fixed for the life of the conversation —
    *  the tarot door remounts this component when the reader changes, which is
    *  what makes "changing it restarts" a fact rather than a request. */
@@ -747,6 +755,9 @@ export function ThemeInterview({
   const [report, setReport] = useState<ThemeReport | null>(null)
   const [answer, setAnswer] = useState('')
   const [budget, setBudget] = useState('')
+  // The aside's fold (Aaron, first footage walk): closed until asked for.
+  const [ledgerOpen, setLedgerOpen] = useState(false)
+  const ledgerId = useId()
   const [busy, setBusy] = useState<'' | 'asking' | 'proposing'>('')
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -1125,6 +1136,10 @@ export function ThemeInterview({
   // the viewport, its accent on the chrome, its sign by the door. `plain`
   // keeps a bare room on purpose — no costume includes the walls.
   const roomArt = personaArt(persona)
+  // A room that is footage wears the loop instead of the painting's wash
+  // (`lib/roomfootage.ts`), and says nothing about a painting, because there
+  // is none in the room to credit.
+  const footage = roomFootage(persona)
   const accent = personaAccent(persona)
   // And what this room is wearing (`lib/costumes.ts`): the fortune-teller's
   // question card is a scroll, her words arrive wet, her answer box takes a
@@ -1132,6 +1147,29 @@ export function ThemeInterview({
   // costumed room to build — the costume is the reader's, not the
   // interview's, and now it is a record rather than an `if`.
   const costume = costumeFor(persona)
+
+  /** "Start over" and the way out — this room's own two controls, rendered
+   *  once and placed by whoever has the corner (`controlsHost`). */
+  const roomControls = (
+    <>
+      {/* Armed, on ADR 27's pattern, because this is destructive twice
+          over: it throws the conversation away *and* the empty transcript
+          immediately draws a fresh opening question, which is a paid turn.
+          It was reported as reading like an undo — a control that looks
+          free, costs money, and gave no sign it had done anything. The
+          armed label names both halves. */}
+      {transcript.length > 0 && (
+        <ArmedButton armedLabel="Discard and ask again"
+                     title="Clears these answers and starts a new opening question"
+                     onConfirm={startOver}>
+          Start over
+        </ArmedButton>
+      )}
+      <button onClick={onLeave} className="btn btn-quiet btn-sm">
+        {leaveLabel ?? '← Pick colours myself'}
+      </button>
+    </>
+  )
 
   /**
    * What is printed where the question goes when there is no question.
@@ -1226,19 +1264,34 @@ export function ThemeInterview({
   return (
     <>
     {say}
-    <section className="persona-room space-y-5"
+    {/* `is-footage`: the room is the picture, so the conversation keeps to
+        the foot of the window and the picture's middle stays clear
+        (`.persona-room.is-footage` in index.css). */}
+    <section className={`persona-room space-y-5${footage ? ' is-footage' : ''}`}
              style={{ '--room-accent': accent } as CSSProperties}>
       {/* The fortune-teller's room drifts with mana rather than mist — the
           crystal ball's violet light, given the whole floor. */}
-      {roomArt && <SceneBackdrop art={roomArt.art} mood={costume.mood} />}
+      {footage
+        ? <RoomPlate footage={footage} />
+        : roomArt && <SceneBackdrop art={roomArt.art} mood={costume.mood} />}
+      {/* The whole top row steps out of a footage room once its controls have
+          somewhere else to be: nothing would be left in it. */}
+      {!(footage && controlsHost) && (
       <div className="flex flex-wrap items-center gap-3">
-        <RoomSign persona={persona} />
+        {/* In a room that is footage the sign and the title ride the chat
+            card instead (Aaron's third walk: a sign floating over a tavern
+            with nothing under it is "disembodied"), and the intro paragraph
+            is not said at all — the tile already said it and the picture
+            says the rest. The top row keeps only the way out. */}
+        {!footage && <RoomSign persona={persona} />}
         {/* The framing paragraph only frames an *empty* table. Once the
             conversation exists it speaks for itself, and a fixed paragraph
             sitting above every exchange read as a script the interview was
             following — "a hard-coded prompt", reported twice, about the one
             surface where every sentence is actually generated. */}
-        {transcript.length === 0
+        {footage
+          ? null
+          : transcript.length === 0
           ? (
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
@@ -1249,18 +1302,10 @@ export function ThemeInterview({
                   + 'about you. Magic’s five colours started life as five '
                   + 'philosophies, so this is less of a detour than it sounds.'}
               </p>
-              {roomArt && (
+              {roomArt && !footage && (
                 <p className="mt-1 text-[10px]"
                    style={{ color: 'var(--text-muted)' }}>
                   The room wears {roomArt.credit}&rsquo;s painting.
-                  {/* And the hut is a whole painting rather than a card crop,
-                      so it is named the way a painting is named. Credited
-                      where it renders, which is the rule whether the licence
-                      makes it one or not. */}
-                  {pot && (
-                    <> The pot is John William Waterhouse&rsquo;s{' '}
-                    <em>The Magic Circle</em>, 1886.</>
-                  )}
                 </p>
               )}
             </div>
@@ -1272,24 +1317,12 @@ export function ThemeInterview({
             </p>
             )}
         <div className="ml-auto flex items-center gap-2">
-          {/* Armed, on ADR 27's pattern, because this is destructive twice
-              over: it throws the conversation away *and* the empty transcript
-              immediately draws a fresh opening question, which is a paid turn.
-              It was reported as reading like an undo — a control that looks
-              free, costs money, and gave no sign it had done anything. The
-              armed label names both halves. */}
-          {transcript.length > 0 && (
-            <ArmedButton armedLabel="Discard and ask again"
-                         title="Clears these answers and starts a new opening question"
-                         onConfirm={startOver}>
-              Start over
-            </ArmedButton>
-          )}
-          <button onClick={onLeave} className="btn btn-quiet btn-sm">
-            {leaveLabel ?? '← Pick colours myself'}
-          </button>
+          {roomControls}
         </div>
       </div>
+      )}
+      {/* ...and when they do have somewhere else to be, they go there. */}
+      {footage && controlsHost && createPortal(roomControls, controlsHost)}
 
       {/* Through the one component every refusal in the app comes through, for
           its `role="alert"` — a failure is the one message that must not wait
@@ -1298,7 +1331,7 @@ export function ThemeInterview({
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {!proposal && (
-        <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
+        <div className="room-floor grid gap-5 lg:grid-cols-[1fr_18rem]">
           <div className="space-y-4">
             {/* The pot, folded (`components/cauldron.tsx`). A rail **above the
                 conversation column** rather than floating in the middle of the
@@ -1376,6 +1409,16 @@ export function ThemeInterview({
                 get torn with it), which is why the costume owns this whole
                 class list rather than adding to one. */}
             <div className={costume.scroll}>
+              {/* The room's sign, in the card's own corner: the emblem and
+                  the room's name, small caps in the room's accent, where a
+                  letterhead sits. Footage rooms only — the painted rooms keep
+                  it by the door above. */}
+              {footage && (
+                <div className="fireside-sign" aria-hidden="true">
+                  <RoomSign persona={persona} />
+                  <span>{intro?.title ?? 'Working you out'}</span>
+                </div>
+              )}
               <p className={`text-base leading-relaxed${
                    busy === 'asking' ? ' thinking-pulse' : ''}${
                    costume.question ? ` ${costume.question}` : ''}`}
@@ -1548,42 +1591,78 @@ export function ThemeInterview({
           </div>
 
           <aside className="space-y-3">
-            <p className="text-[10px] uppercase tracking-wide"
-               style={{ color: 'var(--text-muted)' }}>
-              What it has picked up
-            </p>
-            {slots.length === 0 && (
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Nothing yet — it only counts things you have actually said.
-              </p>
-            )}
-            {slots.map((s) => <Chip key={s.kind} slot={s} />)}
+            {/* Folded by default. On the first footage walk the column of
+                ledger, budget field and stance readout beside a room was, in
+                Aaron's words, "very distracting", and nothing in it is needed
+                until somebody wants it: the ledger is a readout, the budget
+                is optional, the stance is a setting. So it is a disclosure —
+                commandment 20's shape, a button that changes what is in
+                front of you and says which state it is in — and the one line
+                it leaves showing is the one a person actually wants: how far
+                along the interview is. The room's own action stays OUTSIDE
+                the fold, below, because a folded primary button is a button
+                nobody finds. */}
+            <button type="button"
+                    className="btn btn-quiet btn-sm flex w-full items-center justify-between"
+                    aria-expanded={ledgerOpen} aria-controls={ledgerId}
+                    onClick={() => setLedgerOpen((v) => !v)}>
+              <span className="text-[10px] uppercase tracking-wide">
+                What it has picked up
+              </span>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                {`${grounded} of ${floor}`}
+                {budget ? ` · budget ${budget}` : ''}
+                {ledgerOpen ? ' \u25B4' : ' \u25BE'}
+              </span>
+            </button>
+            {ledgerOpen && (
+              <div id={ledgerId} className="space-y-3">
+                {slots.length === 0 && (
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Nothing yet — it only counts things you have actually said.
+                  </p>
+                )}
+                {slots.map((s) => <Chip key={s.kind} slot={s} />)}
 
-            {/* A number that climbs is a model inventing preferences, which is
-                exactly the failure the grounding check exists for. Rendered
-                rather than logged, for the same reason the interview shows
-                how many of its answers were not questions. */}
-            {!!report?.slots_dropped && (
-              <p className="text-xs" style={{ color: 'var(--status-warning)' }}>
-                {droppedNote(report.slots_dropped)}
-              </p>
+                {/* A number that climbs is a model inventing preferences, which
+                    is exactly the failure the grounding check exists for.
+                    Rendered rather than logged, for the same reason the
+                    interview shows how many of its answers were not
+                    questions. */}
+                {!!report?.slots_dropped && (
+                  <p className="text-xs" style={{ color: 'var(--status-warning)' }}>
+                    {droppedNote(report.slots_dropped)}
+                  </p>
+                )}
+
+                <div className="border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
+                  <label className="block">
+                    <span className="text-[10px] uppercase tracking-wide"
+                          style={{ color: 'var(--text-muted)' }}>
+                      Budget for the deck (optional)
+                    </span>
+                    <input value={budget} inputMode="decimal"
+                           onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))}
+                           placeholder="150"
+                           className="mt-1 w-full rounded-md px-3 py-1.5 text-sm"
+                           style={{ background: 'var(--page)', color: 'var(--text-primary)',
+                                    border: '1px solid var(--hairline)' }} />
+                  </label>
+                </div>
+
+                {/* Last in the fold, because it is a setting rather than a
+                    step. The control itself is the header's Claude menu now;
+                    this line reports what that setting resolves to for this
+                    conversation. `table`, because there is no deck here yet. */}
+                <div className="border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
+                  <StanceReadout status={status} pin={pin} surface="table" />
+                </div>
+              </div>
             )}
 
-            <div className="border-t pt-3" style={{ borderColor: 'var(--hairline)' }}>
-              <label className="block">
-                <span className="text-[10px] uppercase tracking-wide"
-                      style={{ color: 'var(--text-muted)' }}>
-                  Budget for the deck (optional)
-                </span>
-                <input value={budget} inputMode="decimal"
-                       onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))}
-                       placeholder="150"
-                       className="mt-1 w-full rounded-md px-3 py-1.5 text-sm"
-                       style={{ background: 'var(--page)', color: 'var(--text-primary)',
-                                border: '1px solid var(--hairline)' }} />
-              </label>
+            <div>
               <button onClick={proposeIt} disabled={!ready || !!busy}
-                      className={`btn mt-3 w-full ${ready
+                      className={`btn w-full ${ready
                         ? costume.action || 'btn-primary btn-accent-2'
                         : 'btn-quiet'}`}
                       style={ready && !costume.action
@@ -1611,17 +1690,6 @@ export function ThemeInterview({
                     ? 'Ready whenever you are — or keep talking.'
                     : `${grounded} of ${floor} things known so far.`}
               </p>
-            </div>
-
-            {/* Last in the column, because it is a setting rather than a step.
-                The control itself is the header's Claude menu now; this line
-                reports what that setting resolves to for this conversation. */}
-            <div className="border-t pt-2" style={{ borderColor: 'var(--hairline)' }}>
-              {/* `table`, because there is no deck here yet — this is the
-                  surface somebody arrives at before there is one, and the
-                  readout's default phrase named a thing the room does not
-                  have. */}
-              <StanceReadout status={status} pin={pin} surface="table" />
             </div>
           </aside>
         </div>

@@ -133,11 +133,12 @@ func New(cfg Config) *Registry {
 
 // defaultCPUWorkers is the machine's answer, floored at one so a runtime that
 // reported nonsense still runs work.
+// The floor is stated as a floor rather than as a branch: [runtime.GOMAXPROCS]
+// is documented to return a positive number, so an `if n > 0` beside it has a
+// second arm nothing can enter, while `max` keeps exactly the same promise in
+// one statement.
 func defaultCPUWorkers() int {
-	if n := runtime.GOMAXPROCS(0); n > 0 {
-		return n
-	}
-	return 1
+	return max(runtime.GOMAXPROCS(0), 1)
 }
 
 // Width is how many jobs a lane runs at once. Exported because it is the
@@ -155,14 +156,16 @@ func (r *Registry) Width(l Lane) int {
 // of a random (version 4) UUID, which are all random --
 // the version nibble sits at index 12 and the variant at 16 -- so six bytes
 // from crypto/rand is the same distribution rather than merely a similar one.
+// The panic that used to stand over the read is gone, and the reason is that
+// the standard library took the job over: [rand.Read] documents itself as never
+// returning an error and always filling the slice, and it crashes the program
+// irrecoverably rather than hand back a short read. "A registry that silently
+// hands out one id to two jobs" is not a state that can be arrived at, so the
+// guard against it was a branch no fixture could enter.
 func randomID() string {
 	var raw [6]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		// crypto/rand.Read does not fail on any platform this runs on, and
-		// the alternative to a panic here is a registry that silently hands
-		// out one id to two jobs.
-		panic("jobs: no randomness for a job id: " + err.Error())
-	}
+	// No error asked for, because there is none: see above.
+	_, _ = rand.Read(raw[:])
 	return hex.EncodeToString(raw[:])
 }
 

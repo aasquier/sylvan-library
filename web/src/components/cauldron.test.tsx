@@ -129,6 +129,13 @@ function sockets(): HTMLElement[] {
 
 beforeEach(() => {
   localStorage.clear()
+  // jsdom's media elements refuse to play with a logged "not implemented";
+  // the film path calls both, and the room must not be judged by jsdom's
+  // decoder. Resolved, so a reaction that was asked to play reads as playing.
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
+    () => Promise.resolve())
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
+    () => undefined)
   vi.mocked(fetchClaudeStatus).mockReset().mockResolvedValue(STATUS)
   vi.mocked(api.themeAsk).mockReset().mockResolvedValue(job(report()) as never)
   vi.mocked(api.themePropose).mockReset()
@@ -410,5 +417,102 @@ describe('a room with nothing on its table', () => {
     expect(sockets()).toHaveLength(0)
     expect(document.querySelector('.cauldron-strip')).toBeNull()
     expect(document.querySelector('.cauldron-beat-line')).toBeNull()
+  })
+})
+
+describe('the footage', () => {
+  it('plays the place’s own reaction when its slot grounds, and draws no toss',
+     async () => {
+    hut()
+    await waitFor(() => expect(sockets()).toHaveLength(3))
+    // All three reels are mounted from the start, fetched before they are
+    // wanted, and none is playing.
+    expect(document.querySelectorAll('.cauldron-reaction')).toHaveLength(3)
+    expect(document.querySelector('.cauldron-reaction.is-playing')).toBeNull()
+    await answer('a', report({
+      question: 'Q', grounded: 1, slots: [slot('taste', 'a')],
+    }))
+    await waitFor(() => {
+      expect(document.querySelector('.cauldron-reaction.is-playing')
+        ?.getAttribute('data-slot')).toBe('taste')
+    })
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled()
+    // The footage IS the fall: nothing drawn is thrown.
+    expect(document.querySelector('.cauldron-toss')).toBeNull()
+    // The landing is still said, on the clip's own beat.
+    await waitFor(() => {
+      expect(region()?.textContent).toContain('The Base takes the rose hips')
+    })
+    // And the clip ending is the reel going dark again.
+    const reel = document.querySelector<HTMLVideoElement>(
+      '.cauldron-reaction[data-slot="taste"]')!
+    fireEvent.ended(reel)
+    expect(reel.className).not.toContain('is-playing')
+  })
+
+  it('falls back to the drawn arc when the ambience switch is off',
+     async () => {
+    localStorage.setItem('mtglab-ambience', '0')
+    hut()
+    await waitFor(() => expect(sockets()).toHaveLength(3))
+    expect(document.querySelector('.cauldron-reaction')).toBeNull()
+    await answer('a', report({
+      question: 'Q', grounded: 1, slots: [slot('taste', 'a')],
+    }))
+    await waitFor(() => {
+      expect(document.querySelector('.cauldron-toss')).not.toBeNull()
+    })
+  })
+
+  it('asks the forest to step out while the hut is open', async () => {
+    const { unmount } = hut()
+    // Inside the wait, not after it: the room mounts once the status fetch
+    // lands, outside `act`, so its effects flush a tick after its DOM.
+    await waitFor(() => {
+      expect(document.body.classList.contains('in-footage-room')).toBe(true)
+    })
+    unmount()
+    expect(document.body.classList.contains('in-footage-room')).toBe(false)
+  })
+
+  it('carries the hut’s own sound, behind the switch', async () => {
+    hut()
+    await waitFor(() => expect(sockets()).toHaveLength(3))
+    const bed = document.querySelector<HTMLAudioElement>('.cauldron-pot audio')
+    expect(bed).not.toBeNull()
+    expect(bed!.loop).toBe(true)
+    // Off by default: nothing was asked to play when the room opened.
+    expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+  })
+})
+
+/* A room with no pot but with footage of its own. Here rather than in
+ * `roomplate.test.tsx` because it needs the interview's scaffolding above
+ * (the api mock, the status) to open the room at all. */
+describe('a room that is footage', () => {
+  it('wears the loop and claims no painting', async () => {
+    render(
+      <ThemeInterview onPick={() => {}} onLeave={() => {}} persona="barkeep"
+                      seed={null} pot={null} />)
+    await waitFor(() => {
+      expect(document.body.querySelector('.room-plate')).not.toBeNull()
+    })
+    // The tile's painting stays on the tile; the room is the clip, so the
+    // "room wears" line — true of a painted room — is not said here, and
+    // the painted room's backdrop is not mounted beside the plate.
+    expect(screen.queryByText(/The room wears/)).toBeNull()
+    expect(document.body.querySelector('.scene-backdrop')).toBeNull()
+    expect(document.body.querySelector('.room-plate .room-plate-film')).not.toBeNull()
+    expect(document.body.querySelector('.room-plate audio')).not.toBeNull()
+  })
+
+  it('a painted room still wears its painting, and says so', async () => {
+    render(
+      <ThemeInterview onPick={() => {}} onLeave={() => {}} persona="chef"
+                      seed={null} pot={null} />)
+    await waitFor(() => {
+      expect(screen.queryByText(/The room wears/)).not.toBeNull()
+    })
+    expect(document.body.querySelector('.room-plate')).toBeNull()
   })
 })

@@ -214,10 +214,12 @@ func (a *API) createDeck(w http.ResponseWriter, r *http.Request) {
 	}
 	built := &deck.Deck{Slug: slug, Name: name, Status: status, Stage: "draft",
 		Shared: true, Commander: commander, Companion: companionPtr, Bracket: bracket}
-	text, err := built.Dump()
-	if a.refuseWrite(w, "create", err) {
-		return
-	}
+	// `Dump` has exactly one refusal in it -- a `strategy` that is not prose,
+	// which a whole-file dump cannot write -- and the deck two lines above has
+	// no strategy at all, because a new deck has nothing yet to be a strategy
+	// about. The field is not on this route's body and never has been, so the
+	// error is not a fault to answer but a value nothing can produce.
+	text, _ := built.Dump()
 	if err := writer.Create(r.Context(), slug, text); err != nil {
 		var exists library.ErrExists
 		if errors.As(err, &exists) {
@@ -564,15 +566,11 @@ func (a *API) deleteDeck(w http.ResponseWriter, r *http.Request) {
 	// so every verb against it must be a 404, and a 403 raised first would
 	// confirm it exists. `writeTarget` keeps the same order for the nine
 	// editing routes.
-	src, d, ok := a.writeTarget(w, r)
+	src, writer, d, ok := a.writeTargetWith(w, r)
 	if !ok {
 		return
 	}
 	slug := r.PathValue("slug")
-	writer, err := library.WriterFor(src, slug)
-	if a.refuseWrite(w, "delete", err) {
-		return
-	}
 
 	typed := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("confirm")))
 	if typed != strings.ToLower(slug) && typed != deleteWord {
@@ -850,11 +848,14 @@ func (a *API) myCrypts(w http.ResponseWriter, r *http.Request) ([]ownedCrypt, bo
 	}
 	out := []ownedCrypt{}
 	for _, owned := range visible {
-		if !owned.Source.Writable() {
-			continue
-		}
-		crypt, err := library.CryptFor(owned.Source)
-		if err != nil {
+		// `library.CryptFor`'s own two conditions, asked as the filter they
+		// are rather than as a refusal to swallow: it answers ErrReadOnly for a
+		// source that is not a crypt and for one that is not writable, and
+		// either way this loop's answer is to move on. Asking it and dropping
+		// the error left a `continue` that the first condition had already
+		// made unreachable.
+		crypt, isCrypt := owned.Source.(library.Crypt)
+		if !isCrypt || !owned.Source.Writable() {
 			continue
 		}
 		out = append(out, ownedCrypt{crypt: crypt, src: owned.Source})
@@ -893,15 +894,11 @@ func (a *API) setDeckShared(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Then the deck, then writability -- ADR 5's order, as in `deleteDeck`.
-	src, _, ok := a.writeTarget(w, r)
+	_, writer, _, ok := a.writeTargetWith(w, r)
 	if !ok {
 		return
 	}
 	slug := r.PathValue("slug")
-	writer, err := library.WriterFor(src, slug)
-	if a.refuseWrite(w, "shared", err) {
-		return
-	}
 	if err := writer.SetShared(r.Context(), slug, truthy(raw)); a.refuseWrite(w, "shared", err) {
 		return
 	}
@@ -941,15 +938,11 @@ func (a *API) setDeckColiseumAtNight(w http.ResponseWriter, r *http.Request) {
 		wire.Detail(w, http.StatusUnprocessableEntity, nightField+" is required")
 		return
 	}
-	src, _, ok := a.writeTarget(w, r)
+	_, writer, _, ok := a.writeTargetWith(w, r)
 	if !ok {
 		return
 	}
 	slug := r.PathValue("slug")
-	writer, err := library.WriterFor(src, slug)
-	if a.refuseWrite(w, nightField, err) {
-		return
-	}
 	if err := writer.SetColiseumAtNight(r.Context(), slug, truthy(raw)); a.refuseWrite(w, nightField, err) {
 		return
 	}
@@ -1015,10 +1008,7 @@ func (a *API) setEveryDeckFlag(w http.ResponseWriter, r *http.Request, field str
 	}
 	changed := 0
 	for _, o := range owned {
-		writer, err := library.WriterFor(o.Source, "")
-		if a.refuseWrite(w, field, err) {
-			return
-		}
+		writer := o.writer
 		// Slugs rather than All: this writes a flag and reads no deck, so
 		// parsing ninety-nine cards apiece to find out what to name is work
 		// nobody asked for.
@@ -1046,7 +1036,15 @@ func (a *API) setEveryDeckFlag(w http.ResponseWriter, r *http.Request, field str
 // A caller with nothing to write gets the ordinary read-only refusal rather
 // than a 200 over an empty list, so "the master switch did nothing" is never
 // reported as success.
-func (a *API) myWritableLibraries(w http.ResponseWriter, r *http.Request) ([]library.Owned, bool) {
+// A library and the write half of it, which is one answer rather than two: the
+// filter below IS `library.WriterFor`'s test, so a caller that asked again
+// afterwards was checking a refusal its own loop condition had ruled out.
+type ownedWriter struct {
+	library.Owned
+	writer library.Writer
+}
+
+func (a *API) myWritableLibraries(w http.ResponseWriter, r *http.Request) ([]ownedWriter, bool) {
 	lib, err := a.library(r.Context())
 	if a.refuse(w, "decks", err) {
 		return nil, false
@@ -1055,10 +1053,10 @@ func (a *API) myWritableLibraries(w http.ResponseWriter, r *http.Request) ([]lib
 	if a.refuse(w, "decks", err) {
 		return nil, false
 	}
-	out := []library.Owned{}
+	out := []ownedWriter{}
 	for _, owned := range visible {
-		if owned.Source.Writable() {
-			out = append(out, owned)
+		if writer, ok := owned.Source.(library.Writer); ok && owned.Source.Writable() {
+			out = append(out, ownedWriter{Owned: owned, writer: writer})
 		}
 	}
 	if len(out) == 0 {

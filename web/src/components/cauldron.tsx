@@ -36,26 +36,77 @@
  * **Commandment 19: every `filter` here is on a layer we drew.** There is no
  * card art in this room at all — the witch's painting reaches the page only
  * through `SceneBackdrop`, credited in words in the same room — and the plate
- * is a committed public-domain painting whose treatment (the dusk) is a
- * stylesheet layer over it rather than a level baked into the bytes.
+ * is Aaron's own footage (`assets/agatha/PROVENANCE.md`), which owes nobody a
+ * credit and gets no treatment at all.
  *
- * Cycle times, for the walk (commandment 16 — nobody should stare at a hole
- * waiting for a snake that comes out once a minute): a bubble breaks every
+ * **The plate is a film, and the film does most of what this file used to
+ * draw.** Before the footage the plate was a Waterhouse oil and every beat in
+ * the room — the bubbles, the steam, the embers' breath, the splash and its
+ * bloom — was drawn over it, because a photograph of a painting does not
+ * move. The hut is footage now: the pot simmers on its own, and each place
+ * has a reaction cut from the same render, so when a slot grounds the clip
+ * plays and the drawn fall does not. Aaron's ruling on the first clips was
+ * not to go crazy with effects on top of them, and this file keeps it: on the
+ * film path the stack is the loop and the three reactions, and that is all —
+ * the colour step over the mouth was tried as a tint on the real surface and
+ * Aaron cut it on the fifth walk ("the animation is sufficient"). The level
+ * still rides `data-level` for the sockets and the words; nothing paints it. The drawn stack survives for exactly
+ * the readers who do not get the film — reduced motion, or the ambience
+ * switch off — because for them the still is the floor and a pot with nothing
+ * moving on it stops reading as liquid.
+ *
+ * Cycle times, for the walk (commandment 16): the idle loop is 2.7s of steam
+ * and bubbles on the film path. On the drawn path a bubble breaks every
  * 1.4–2.9s, a steam wisp sets off every 3.4–5.8s and takes 8.6–13s to cross
- * the frame, the fire breathes on 4.4s, the brew on 5.4s, the surface caustic
- * runs on 12.6s, the room's light on 8.3s, and the vortex — ready only — turns
- * once every 22s. **The fire is the one that is always going**: everything
- * else in this room is an event, and a painting with no idle beat in it is a
- * page that just sits there (commandment 6).
+ * the frame, the brew breathes on 5.4s, the surface caustic runs on 12.6s,
+ * the room's light on 8.3s, and the vortex — ready only — turns once every
+ * 22s.
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { BrewIngredient } from '../lib/api'
 import { STILL_TO_COME, stirredLine } from '../lib/cauldroncopy'
+import { useForestStepsOut } from '../lib/forestfloor'
 import { reducedMotion } from '../lib/motion'
+import { useAmbience } from '../lib/prefs'
+import { clip } from '../lib/tablesounds'
+import { RoomTone } from './roomtone'
 import { VideoBackdrop } from './videofx'
-import plateUrl from '../assets/agatha/agatha-hut-plate.webp'
+import baseMp4 from '../assets/agatha/agatha-brew-base.mp4'
+import baseTone from '../assets/agatha/agatha-brew-base.m4a'
+import baseWebm from '../assets/agatha/agatha-brew-base.webm'
+import bindingMp4 from '../assets/agatha/agatha-brew-binding.mp4'
+import bindingTone from '../assets/agatha/agatha-brew-binding.m4a'
+import bindingWebm from '../assets/agatha/agatha-brew-binding.webm'
+import heatMp4 from '../assets/agatha/agatha-brew-heat.mp4'
+import heatTone from '../assets/agatha/agatha-brew-heat.m4a'
+import heatWebm from '../assets/agatha/agatha-brew-heat.webm'
+import hutMp4 from '../assets/agatha/agatha-hut-loop.mp4'
+import hutStill from '../assets/agatha/agatha-hut-still.webp'
+import hutTone from '../assets/agatha/agatha-hut-tone.m4a'
+import hutWebm from '../assets/agatha/agatha-hut-loop.webm'
+
+/**
+ * The three reactions, one per place, cut from the same render as the idle
+ * loop (`assets/agatha/PROVENANCE.md` has the frame numbers). Each is a
+ * one-shot: the thing falls, the pot answers, the hut goes back to its
+ * simmer, and the loop underneath is what it fades to. `landAt` is the
+ * millisecond the thing meets the surface in the clip, read off the frames,
+ * and it is when the colour steps and the line is said — the same rule the
+ * drawn fall keeps with `FALL_MS`: the brew changes AT the landing.
+ *
+ * Keyed on the slot kind because that is what the wire carries; a kind this
+ * room was not cut for gets the drawn fall instead, which is what an ADR 20
+ * kind the footage never met should do.
+ */
+const REACTIONS: Record<string, {
+  webm: string; mp4: string; tone: string; landAt: number
+}> = {
+  taste: { webm: baseWebm, mp4: baseMp4, tone: baseTone, landAt: 500 },
+  temperament: { webm: heatWebm, mp4: heatMp4, tone: heatTone, landAt: 850 },
+  posture: { webm: bindingWebm, mp4: bindingMp4, tone: bindingTone, landAt: 900 },
+}
 
 /**
  * Where each place's ingredient hits the surface, as a fraction across the
@@ -174,10 +225,10 @@ interface Wisp { id: number; x: number; size: number; drift: number; dur: number
  *  stops reading as liquid, which is a thing withheld rather than a thing
  *  calmed. */
 const HELD_BUBBLES: Bubble[] = [
-  { id: -1, x: 62, y: 35.2, size: 9, dur: 0, wobble: 0 },
-  { id: -2, x: 70.5, y: 36.8, size: 6, dur: 0, wobble: 0 },
+  { id: -1, x: 45.2, y: 54.3, size: 9, dur: 0, wobble: 0 },
+  { id: -2, x: 55.3, y: 55.6, size: 6, dur: 0, wobble: 0 },
 ]
-const HELD_WISP: Wisp[] = [{ id: -1, x: 66, size: 120, drift: 0, dur: 0, peak: 0.18 }]
+const HELD_WISP: Wisp[] = [{ id: -1, x: 49.9, size: 120, drift: 0, dur: 0, peak: 0.18 }]
 
 /**
  * The simmer: bubbles and steam, spawned rather than looped.
@@ -218,8 +269,8 @@ function useSimmer(ready: boolean, still: boolean, live: boolean) {
       // percentages. The four numbers again; there is no fifth here either.
       setBubbles((live) => [...live.slice(-5), {
         id,
-        x: 66 + Math.cos(angle) * radius * 11.5,
-        y: 36 + Math.sin(angle) * radius * 3.27,
+        x: 49.9 + Math.cos(angle) * radius * 13.6,
+        y: 54.9 + Math.sin(angle) * radius * 2.65,
         size: 4 + Math.random() * (ready ? 11 : 8),
         dur: 1400 + Math.random() * 1500,
         wobble: Math.random() * 8 - 4,
@@ -229,7 +280,7 @@ function useSimmer(ready: boolean, still: boolean, live: boolean) {
     }
     // **Thinner, slower and further apart than the first cut.** The painting
     // has its own smoke in it, and at their first weight the wisps read as
-    // white smudges laid over Waterhouse's rather than as steam rising through
+    // white smudges laid over the picture rather than as steam rising through
     // it — a thing the eye finds sitting still rather than a thing it catches
     // moving. The peaks are down by about two fifths, the crossing takes half
     // again as long, and they set off further apart so the same two or three
@@ -241,7 +292,7 @@ function useSimmer(ready: boolean, still: boolean, live: boolean) {
       const size = (ready ? 96 : 66) + Math.random() * 60
       setWisps((live) => [...live.slice(-2), {
         id,
-        x: 66 + (Math.random() * 22 - 11),
+        x: 49.9 + (Math.random() * 22 - 11),
         size,
         drift: Math.random() * 120 - 40,
         dur: 8600 + Math.random() * 4400,
@@ -291,15 +342,15 @@ interface Splash { id: number; hit: number; level: number }
 interface Toss { id: number; hit: number; slot: string; name: string; spin: number }
 
 /** The mouth's centre, in plate percentages, offset by where this thing
- *  landed across it. `--pot-x` is 66% and `--pot-d` is 23%, so a landing at
- *  0.38 of the mouth is 66 - 0.12 × 23 = 63.2%. Written here rather than in
- *  CSS because it is one number per drop, and `calc()` would need the
+ *  landed across it. `--pot-x` is 49.9% and `--pot-d` is 27.2%, so a landing
+ *  at 0.38 of the mouth is 49.9 - 0.12 × 27.2 = 46.6%. Written here rather
+ *  than in CSS because it is one number per drop, and `calc()` would need the
  *  fraction on a custom property to do the same arithmetic. */
 function mouthX(hit: number): number {
-  return 66 + (hit - 0.5) * 23
+  return 49.9 + (hit - 0.5) * 27.2
 }
 /** `--pot-y`, as a bare number, for the same reason. */
-const MOUTH_Y = 36
+const MOUTH_Y = 54.9
 
 /* ----------------------------------------------------------------- the pot */
 
@@ -337,10 +388,23 @@ export function Cauldron({
   children,
 }: CauldronProps) {
   const host = useRef<HTMLDivElement>(null)
+  // The hut is footage, full-size or folded, so the forest steps out of it
+  // the way it does for the tavern (`lib/forestfloor.ts`).
+  useForestStepsOut()
   // Read once per mount, the deal `videofx.tsx` offers: a live change of the
   // OS setting takes effect on the next navigation.
   const [still] = useState(() => reducedMotion())
   const onScreen = useOnScreen(host)
+  // The film path: the loop plays and the reactions are footage. Off under
+  // reduced motion (the plate is its still) and under the ambience switch
+  // (`videofx.tsx` shows the still for `art` mode too), and in both cases the
+  // drawn stack below is what the room has instead.
+  const [ambience] = useAmbience()
+  const film = !still && ambience
+  /** Which reactions are on screen right now, by slot kind. A list, because
+   *  two slots can ground in one turn. */
+  const [reeling, setReeling] = useState<string[]>([])
+  const reels = useRef<Record<string, HTMLVideoElement | null>>({})
 
   /** What is actually in the pot: an ingredient whose slot the transcript has
    *  grounded, in the order the pot took them. `anchor` grounds too and has no
@@ -370,7 +434,8 @@ export function Cauldron({
     rang.current = onReady
   })
 
-  const drop = useCallback((ingredient: BrewIngredient, count: number, arc: boolean) => {
+  const drop = useCallback((ingredient: BrewIngredient, count: number,
+                            arc: boolean, reel: boolean) => {
     const id = next.current++
     const hit = LANDING[ingredient.slot] ?? 0.5
     const land = () => {
@@ -381,6 +446,25 @@ export function Cauldron({
     }
     if (!arc) {
       land()
+      return
+    }
+    // The footage answers, when there is footage for this place: the clip
+    // plays over the loop, its own sound goes with it behind the switch, and
+    // the landing is called on the clip's beat rather than the drawn fall's.
+    const reaction = REACTIONS[ingredient.slot]
+    const el = reels.current[ingredient.slot]
+    if (reel && reaction && el) {
+      setReeling((live) => [...live, ingredient.slot])
+      try { el.currentTime = 0 } catch { /* not yet loaded; it starts at 0 */ }
+      let p: Promise<void> | undefined
+      try {
+        p = el.play() as Promise<void> | undefined
+      } catch { /* jsdom */ }
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => setReeling((live) => live.filter((s) => s !== ingredient.slot)))
+      }
+      clip(reaction.tone)
+      timers.current.push(window.setTimeout(land, reaction.landAt))
       return
     }
     setTosses((live) => [...live, {
@@ -408,7 +492,7 @@ export function Cauldron({
     if (fresh.length === 0) return
     fresh.forEach((ingredient, n) => {
       const count = before.length + n + 1
-      drop(ingredient, count, !still)
+      drop(ingredient, count, !still, film)
     })
     if (kinds.length >= ingredients.length && ingredients.length > 0) {
       timers.current.push(window.setTimeout(() => {
@@ -419,97 +503,116 @@ export function Cauldron({
     // `inPot` is derived from the two arrays in the list; listing it as well
     // would re-run this on every render, which is how a pot replays a drop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grounded, ingredients, still, drop])
+  }, [grounded, ingredients, still, film, drop])
 
-  const { bubbles, wisps } = useSimmer(ready, still, onScreen)
+  // The drawn boil only runs where the film does not: the loop IS the boil.
+  const { bubbles, wisps } = useSimmer(ready, still, onScreen && !film)
 
   const scene = (
     <>
-      {/* LAYER 0 · the plate. `art` mode, not `ambience`: this is a painting
-          brought to life, so the still is the floor and the loop is what
-          plays over it — remove it and the ingredients fall into nothing.
-          Today there is no loop and `VideoBackdrop` answers with the
-          fallback, which is exactly the shape the footage drops into: add
-          `webmSrc`/`mp4Src` and nothing else on this page moves. */}
-      <VideoBackdrop mode="art" className="cauldron-plate" poster={plateUrl}
-                     fallback={<img className="cauldron-plate" src={plateUrl}
+      {/* LAYER 0 · the plate. `art` mode: the still is the floor and the loop
+          is what plays over it — remove it and the ingredients fall into
+          nothing. The loop is the hut simmering on its own, 2.7s of steam and
+          slow bubbles, cut from the one render the reactions below also come
+          from, so the idle pot and the reacting pot are the same pot. */}
+      <VideoBackdrop webmSrc={hutWebm} mp4Src={hutMp4} mode="art"
+                     className="cauldron-plate" poster={hutStill}
+                     fallback={<img className="cauldron-plate" src={hutStill}
                                     alt="" aria-hidden />} />
-      {/* LAYER 0b · the dusk. The painting is daylit — mean luma 104 against
-          the séance room's 52 — and it is held back HERE rather than in the
-          file, `fabrica.recipe.yaml`'s rule: a level baked into the byte
-          stream is a decision the stylesheet can no longer argue with. Open
-          over the cauldron, closing to dusk at the frame's edges. */}
-      <span className="cauldron-dusk" aria-hidden="true" />
-      {/* LAYER 0c · the fire, and it is the room's idle heartbeat. A
-          photograph of a painting does not move, and every other beat here is
-          an event somebody caused; the embers are the one thing that would
-          never be still whether anybody was in the room or not. Anchored on
-          the fire itself (67.8% / 52.6% of the plate) rather than on the
-          mouth — the two are different hotspots and this is the only rule
-          that reads the second one. */}
-      <span className="cauldron-embers" aria-hidden="true" />
-      {/* LAYERS 1-4 · siblings, every one. The dim is the layer the whole
-          effect turns on: the mouth's interior is multiplied down to a warm
-          near-black before anything is put into it (`.seance-glass-dim`'s
-          argument, one room over) — but not all the way down, or the painted
-          rim light goes with it and the brew has to supply every photon in
-          the pot, which is how it came out the colour of milk. */}
-      <span className="cauldron-dim" aria-hidden="true" />
-      <span className="cauldron-brew" aria-hidden="true" />
-      <span className="cauldron-caustic" aria-hidden="true" />
-      {/* The one highlight that says the surface is WET, lying on the ember
-          side of the mouth because that is where the light in this room comes
-          from. */}
-      <span className="cauldron-gloss" aria-hidden="true" />
-      <span className="cauldron-vortex" aria-hidden="true" />
-      <span className="cauldron-glow" aria-hidden="true" />
-      <div className="cauldron-steam" aria-hidden="true">
-        {wisps.map((w) => (
-          <span key={w.id} className="cauldron-wisp" style={{
-            left: `${w.x}%`,
-            width: `${w.size}px`,
-            height: `${w.size * 0.72}px`,
-            '--wisp-drift': `${w.drift}px`,
-            '--wisp-dur': `${w.dur}ms`,
-            '--wisp-peak': w.peak,
-          } as React.CSSProperties} />
-        ))}
-      </div>
-      {/* The masked host: everything that happens IN the liquid lives here, so
-          a ring dies against the pot wall instead of running out across the
-          hut. The mask is the same four percentages as a gradient. */}
-      <div className="cauldron-surface" aria-hidden="true">
-        {bubbles.map((b) => (
-          <span key={b.id} className="cauldron-bubble" style={{
-            left: `${b.x}%`,
-            top: `${b.y}%`,
-            width: `${b.size}px`,
-            height: `${b.size * 0.78}px`,
-            '--bubble-dur': `${b.dur}ms`,
-            '--bubble-wobble': `${b.wobble}px`,
-          } as React.CSSProperties} />
-        ))}
-        {splashes.map((s) => (
-          <Splashing key={s.id} hit={s.hit} level={s.level} />
-        ))}
-      </div>
-      {/* The unmasked host: what happens ABOVE the pot. The falling thing is
-          not clipped by the surface, and neither is the wash the bloom throws
-          off the pot and onto the hut. */}
-      <div className="cauldron-air" aria-hidden="true">
-        {tosses.map((t) => (
-          <Falling key={t.id} hit={t.hit} slot={t.slot} name={t.name}
-                   spin={t.spin} />
-        ))}
-        {splashes.map((s) => (
-          <span key={s.id} className="cauldron-wash" style={{
-            left: `${mouthX(s.hit)}%`,
-            '--bloom-to': `var(--brew-${s.level})`,
-          } as React.CSSProperties} />
-        ))}
-      </div>
+      {film
+        ? (
+          <>
+            {/* Nothing drawn over the pot on the film path: the footage is
+                the pot. The reactions, all three mounted from the start so they are
+                fetched while the conversation is still finding its feet and
+                play the instant a slot grounds, rather than being fetched at
+                the moment they are wanted. Each shows only while it plays and
+                fades to the loop when it ends. */}
+            <div className="cauldron-reactions" aria-hidden="true">
+              {Object.entries(REACTIONS).map(([kind, r]) => (
+                <video key={kind}
+                       ref={(el) => { reels.current[kind] = el }}
+                       className={`cauldron-reaction${reeling.includes(kind) ? ' is-playing' : ''}`}
+                       data-slot={kind}
+                       muted playsInline preload="auto"
+                       onEnded={() => setReeling((live) => live.filter((k) => k !== kind))}>
+                  <source src={r.webm} type="video/webm" />
+                  <source src={r.mp4} type="video/mp4" />
+                </video>
+              ))}
+            </div>
+          </>
+        )
+        : (
+          <>
+            {/* LAYERS 1-4 · the drawn stack, siblings every one, for the
+                readers who get the still rather than the film. The dim is the
+                layer the whole effect turns on: the mouth's interior is
+                multiplied down to a warm near-black before anything is put
+                into it (`.seance-glass-dim`'s argument, one room over) — but
+                not all the way down, or the rim light goes with it and the
+                brew has to supply every photon in the pot, which is how it
+                came out the colour of milk. */}
+            <span className="cauldron-dim" aria-hidden="true" />
+            <span className="cauldron-brew" aria-hidden="true" />
+            <span className="cauldron-caustic" aria-hidden="true" />
+            {/* The one highlight that says the surface is WET, lying on the
+                ember side of the mouth because that is where the light in this
+                room comes from. */}
+            <span className="cauldron-gloss" aria-hidden="true" />
+            <span className="cauldron-vortex" aria-hidden="true" />
+            <span className="cauldron-glow" aria-hidden="true" />
+            <div className="cauldron-steam" aria-hidden="true">
+              {wisps.map((w) => (
+                <span key={w.id} className="cauldron-wisp" style={{
+                  left: `${w.x}%`,
+                  width: `${w.size}px`,
+                  height: `${w.size * 0.72}px`,
+                  '--wisp-drift': `${w.drift}px`,
+                  '--wisp-dur': `${w.dur}ms`,
+                  '--wisp-peak': w.peak,
+                } as React.CSSProperties} />
+              ))}
+            </div>
+            {/* The masked host: everything that happens IN the liquid lives
+                here, so a ring dies against the pot wall instead of running
+                out across the hut. The mask is the same four percentages as a
+                gradient. */}
+            <div className="cauldron-surface" aria-hidden="true">
+              {bubbles.map((b) => (
+                <span key={b.id} className="cauldron-bubble" style={{
+                  left: `${b.x}%`,
+                  top: `${b.y}%`,
+                  width: `${b.size}px`,
+                  height: `${b.size * 0.78}px`,
+                  '--bubble-dur': `${b.dur}ms`,
+                  '--bubble-wobble': `${b.wobble}px`,
+                } as React.CSSProperties} />
+              ))}
+              {splashes.map((s) => (
+                <Splashing key={s.id} hit={s.hit} level={s.level} />
+              ))}
+            </div>
+            {/* The unmasked host: what happens ABOVE the pot. The falling
+                thing is not clipped by the surface, and neither is the wash
+                the bloom throws off the pot and onto the hut. */}
+            <div className="cauldron-air" aria-hidden="true">
+              {tosses.map((t) => (
+                <Falling key={t.id} hit={t.hit} slot={t.slot} name={t.name}
+                         spin={t.spin} />
+              ))}
+              {splashes.map((s) => (
+                <span key={s.id} className="cauldron-wash" style={{
+                  left: `${mouthX(s.hit)}%`,
+                  '--bloom-to': `var(--brew-${s.level})`,
+                } as React.CSSProperties} />
+              ))}
+            </div>
+          </>
+        )}
       {/* The pour: a ladle of light drawn up out of the surface, and a vial
-          taking that light as it rises clear. */}
+          taking that light as it rises clear. Drawn on both paths — it is the
+          one event the footage has no clip for. */}
       <div className="cauldron-serve" aria-hidden="true">
         <span className="cauldron-ladle" />
         <span className="cauldron-vial">
@@ -523,6 +626,8 @@ export function Cauldron({
           </svg>
         </span>
       </div>
+      {/* The hut's own sound — the pot ticking over — behind the switch. */}
+      <RoomTone src={hutTone} />
     </>
   )
 
@@ -535,7 +640,7 @@ export function Cauldron({
   // silently`, with the polarity flipped: here the property is defined, in the
   // wrong place.)
   const state = `cauldron-window${ready ? ' is-ready' : ''}`
-    + `${serving ? ' is-serving' : ''}`
+    + `${serving ? ' is-serving' : ''}${film ? ' is-film' : ''}`
 
   if (view === 'strip') {
     return (

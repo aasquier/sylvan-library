@@ -188,7 +188,11 @@ var themeLog = slog.Default().With("logger", "mtglab.claude.theme")
 // different clothes" from "the model wrote it that way" is to know whether
 // anything was substituted at all.
 func Prose(text any) string {
-	raw := plainOr(text)
+	// A `\u2014` the model wrote INSIDE a field's text survives the wire's
+	// one decode as six characters of punctuation; `textutil.Unescape` says
+	// why and how narrowly it is repaired. First, so the control-character
+	// sweep below sees the characters rather than the escapes.
+	raw := textutil.Unescape(plainOr(text))
 	removed := 0
 	cleaned := controlChars.ReplaceAllStringFunc(raw, func(string) string {
 		removed++
@@ -756,15 +760,18 @@ func themeMessages(transcript []TranscriptTurn, closing, frame string) []anthrop
 // same two strings gives the same prompt every time. `GetMode` returns the
 // registry's Mode by value, so the copy's name and instructions are the only
 // things that move.
-func themeMode(base string, who Persona) (Mode, error) {
-	mode, err := GetMode(base)
-	if err != nil {
-		return Mode{}, err
-	}
+//
+// It answers a Mode and nothing else: `base` is one of this package's own two
+// theme constants at both call sites, so `modeOf` is the lookup and there is no
+// refusal to pass up to a caller. What that removed was three statements in this
+// function and two more in `RunAsk` and `RunProposal`, each of them an error
+// hand-off for a mode name that cannot be wrong.
+func themeMode(base string, who Persona) Mode {
+	mode := modeOf(base)
 	// Appended, never substituted: the instructions carry the rules that make
 	// this feature work, and a persona is not allowed a say in them.
 	mode.Name, mode.Instructions = WithVoice(mode.Name, mode.Instructions, who)
-	return mode, nil
+	return mode
 }
 
 // readingFor is the spread this conversation is being read from, or nil.
@@ -1145,10 +1152,7 @@ func RunAsk(ctx context.Context, conn *pool.Conn, plan *AskPlan, run ThemeRun) (
 	if err != nil {
 		return nil, err
 	}
-	mode, err := themeMode(ModeThemeConversation, who)
-	if err != nil {
-		return nil, err
-	}
+	mode := themeMode(ModeThemeConversation, who)
 	turn, err := Converse(ctx, mode, Request{
 		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,
@@ -1444,10 +1448,7 @@ func RunProposal(ctx context.Context, conn *pool.Conn, plan *ProposalPlan, run T
 	if err != nil {
 		return nil, err
 	}
-	mode, err := themeMode(ModeThemeProposal, who)
-	if err != nil {
-		return nil, err
-	}
+	mode := themeMode(ModeThemeProposal, who)
 	turn, err := Converse(ctx, mode, Request{
 		Endpoint: plan.Endpoint,
 		Messages: themeMessages(plan.History,

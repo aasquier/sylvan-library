@@ -55,7 +55,7 @@
  */
 
 import type { DeckSummary, ForgeGameRow } from '../lib/api'
-import { shortName, turnsTaken } from '../lib/theater'
+import { shortName, spell, turnsTaken, whatIsLeft } from '../lib/theater'
 
 /** How many games the stage keeps in view. The feed is the last few blows,
  *  not the record — `forge.rows` renders in full below it. */
@@ -171,6 +171,10 @@ export function MatchTheater({ seats, games, rows, running }: {
   // anybody wanted to show.
   const heat = games > 0 ? Math.min(100, (played / games) * 100) : 0
   const feed = rows.slice(-FEED).reverse()
+  // Null until there are two games to measure, and null again once the last
+  // one has landed — the sentence under the feed falls back to the room's
+  // general words in both cases rather than guessing.
+  const ahead = whatIsLeft(rows, games)
 
   // Short names in the feed: a row is one line and a deck's full name is
   // most of it. The panels above still carry the whole name, so nothing is
@@ -288,12 +292,42 @@ export function MatchTheater({ seats, games, rows, running }: {
       {/* What a person waiting is owed: how long this is going to take, in
           the units it actually varies in. Kept from the bar this stage
           replaced — a match is minutes, and a screen that goes quiet without
-          saying so reads as a screen that has broken. */}
+          saying so reads as a screen that has broken.
+
+          **And once the match has fought two games it says how much longer**,
+          because until then this paragraph was a factor of twenty wide — "a
+          few seconds … two minutes" over a match of ten — and a person who
+          cannot tell forty seconds from twenty minutes cannot decide whether
+          to wait. The figure is this match's own pace rather than a rule of
+          thumb (`whatIsLeft`), which is the only version of it that is true of
+          *these* two decks on *this* evening.
+
+          **Said as a guide and not a promise, on purpose.** The copy above it
+          lost a "within half a minute" for being a promise the deployed arena
+          could not keep, and the lesson generalises: an estimate a wait
+          overruns reads as a broken page. So the sentence names where the
+          number came from and admits what moves it.
+
+          `role="status"` so the wait is audible as well as visible: the text
+          changes once per game landed — at most twenty times across a match's
+          whole length — and that is precisely the news somebody who cannot see
+          the bar is waiting for. The progressbar's `aria-valuenow` moves with
+          it and announces nothing unless it is focused. */}
       {running && feed.length > 0 && (
-        <p className="theater-quiet" style={{ marginTop: '8px' }}>
-          Whole games of Commander, one at a time — a typical game takes a few
-          seconds, and a wide board can take two minutes while the pilot
-          thinks.
+        <p className="theater-quiet" role="status" style={{ marginTop: '8px' }}>
+          {ahead
+            ? <>
+                {ahead.games === 1 ? 'One more game to fight'
+                  : `${ahead.games} more games to fight`}
+                {' — about '}{spell(ahead.seconds)}, at the pace of the ones
+                already fought. A wide board takes longer while the pilot
+                thinks, so it is a guide and not a promise.
+              </>
+            : <>
+                Whole games of Commander, one at a time — a typical game takes
+                a few seconds, and a wide board can take two minutes while the
+                pilot thinks.
+              </>}
         </p>
       )}
     </section>

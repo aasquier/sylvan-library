@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+
+	"github.com/aasquier/sylvan-library/go/internal/pool"
 )
 
 // The pool that answers for a while and then stops.
@@ -150,23 +152,85 @@ func OpenFaulty(tb testing.TB) (*sql.DB, *Fault) {
 	return db, fault
 }
 
+// OpenFaultyPool is [OpenFaulty] as a `*pool.Pool`: the tiny pool reached the
+// way the *app* reaches the real one — `Use`, a lease, a `*pool.Conn` — with a
+// budget saying how many more statements, or rows, the library will answer.
+//
+// **This is the fixture every reader outside `internal/pool` wanted and could
+// not have.** `deckread`, `cards`, `api` and the rest take a `*pool.Conn` they
+// got from a `*pool.Pool`, and a Pool used to open its own file; a schemaless
+// pool therefore failed them at their *first* statement and nothing could
+// reach the arm after it. `pool.NewOver` is the door, `pool.Connect` argues it,
+// and this is the only caller.
+//
+// Two things to know before arming it:
+//
+//   - **The budget is spent across every statement on the handle**, and a
+//     reader's first move is usually `Columns`, which costs one statement and
+//     one row per column of the table it asks about. Sweep a range rather than
+//     guessing a number.
+//   - **A Pool remembers.** `GetCards` and `Columns` are memoised for as long
+//     as the file's stamp stands, so a second call inside one test may not
+//     reach the database at all. Arm the fault for the call you mean and read
+//     [pool.Pool]'s own comment about the memory before being surprised.
+//
+// Every open the Pool makes — including a re-open after the reaper has handed
+// the file back — goes through the same [Fault], so a budget armed now still
+// governs a lease taken later.
+func OpenFaultyPool(tb testing.TB) (*pool.Pool, *Fault) {
+	tb.Helper()
+	return FaultyPoolOver(tb, Build(tb))
+}
+
+// FaultyPoolOver is [OpenFaultyPool] over a pool file the caller built itself.
+//
+// **It exists for the budget sweep.** A Pool remembers its columns and its card
+// lookups for as long as the file's stamp stands, so a sweep that reused one
+// Pool would find its second pass spending no statements on the reads its first
+// pass already learned — and every budget after the first would be measuring a
+// different sequence. A fresh Pool per budget fixes that, and a fresh *database*
+// per budget would make a twenty-step sweep pay for twenty DuckDB files. Build
+// once, hand the path in, sweep.
+func FaultyPoolOver(tb testing.TB, path string) (*pool.Pool, *Fault) {
+	tb.Helper()
+	fault := &Fault{}
+	fault.Heal()
+	p := pool.NewOver(path, nil,
+		func(context.Context, string) (*sql.DB, error) {
+			return faultyHandleWith(path, fault)
+		})
+	tb.Cleanup(p.Close)
+	return p, fault
+}
+
 func faultyHandle(path string) (*sql.DB, *Fault, error) {
+	fault := &Fault{}
+	fault.Heal()
+	db, err := faultyHandleWith(path, fault)
+	if err != nil {
+		return nil, nil, err
+	}
+	return db, fault, nil
+}
+
+// faultyHandleWith is [faultyHandle] over a [Fault] the caller already holds,
+// so that a Pool re-opening its file lands on the same budget rather than on a
+// fresh one.
+func faultyHandleWith(path string, fault *Fault) (*sql.DB, error) {
 	// The driver is borrowed from a handle rather than named: `sql.OpenDB`
 	// wants a connector, and taking the registered driver off a throwaway
 	// handle avoids registering a second name for what is the same driver.
 	plain, err := sql.Open("duckdb", path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("faulty pool: %w", err)
+		return nil, fmt.Errorf("faulty pool: %w", err)
 	}
 	inner := plain.Driver()
 	if err := plain.Close(); err != nil {
-		return nil, nil, fmt.Errorf("faulty pool: %w", err)
+		return nil, fmt.Errorf("faulty pool: %w", err)
 	}
-	fault := &Fault{}
-	fault.Heal()
 	db := sql.OpenDB(&faultyConnector{dsn: path, driver: inner, fault: fault})
 	db.SetMaxOpenConns(1)
-	return db, fault, nil
+	return db, nil
 }
 
 type faultyConnector struct {
