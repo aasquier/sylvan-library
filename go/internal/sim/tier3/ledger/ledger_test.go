@@ -26,10 +26,7 @@ func scratch(t *testing.T) (*Recorder, *sql.DB) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { db.Close() })
 	return FromDB(db, quiet()), db
 }

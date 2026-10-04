@@ -31,7 +31,7 @@ func Backup(ctx context.Context, path, dest string) (int, error) {
 	// and the argument is written out there. The first thing that can fail is
 	// the pragma read below, which is also the first thing that touches the
 	// file, so that is where a missing or unreadable `app.db` is discovered.
-	db, _ := Open(path)
+	db := Open(path)
 	defer func() { _ = db.Close() }()
 
 	var version int

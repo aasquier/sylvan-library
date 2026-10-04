@@ -29,17 +29,22 @@ import (
 // `database is locked`. `deck_log` is append-only and nothing else writes
 // it, so there is no row two writers can contend over -- only the file's
 // write lock, for the microseconds an insert holds it.
-func openReadWrite(path string) (*sql.DB, error) {
+//
+// **No error, because [sql.Open] has none to give here.** It records the DSN
+// and looks the driver up by name, answering an error only for a name nobody
+// registered -- and this file's import list is what registers "sqlite". The
+// arm that used to stand here read as the handling for an `app.db` that could
+// not be opened and was a branch no fixture could enter; the real fault is
+// found by [ping] on the next line, which is the first thing that touches the
+// file. `internal/auth`'s [auth.Open] carries the long form of the argument.
+func openReadWrite(path string) *sql.DB {
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open app.db for writing: %w", err)
-	}
+	db, _ := sql.Open("sqlite", dsn)
 	// One writer. SQLite serialises them anyway, and a pool of them would
 	// only convert waiting-in-Go into waiting-on-the-file lock.
 	db.SetMaxOpenConns(1)
-	return db, nil
+	return db
 }
 
 // ping proves the file opens and `deck_log` is there. `sql.Open` only records

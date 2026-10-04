@@ -50,10 +50,7 @@ func crypticRig(t *testing.T, mode os.FileMode) (*writeRig, string) {
 	t.Cleanup(func() { _ = os.Chmod(trash, 0o750) })
 
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	recorder, err := decklog.NewRecorder(dbPath, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -193,10 +190,7 @@ func TestTheMasterSwitchRefusesWhenTheShelfWillNotList(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(decks, 0o750) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{DecksDir: decks, AdminEmail: "alice@example.com",
 		AppDB: db, AppWriteDB: db})

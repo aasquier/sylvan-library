@@ -20,14 +20,18 @@ import (
 // the entropy: a session token rides in a cookie and an auth token rides in a
 // URL fragment, and `+` and `/` survive neither reliably.
 //
-// It panics if the OS entropy source fails, deliberately: there is no
-// sensible weaker token, and a caller handed one would
-// mint a guessable session.
+// **The failure it used to panic on is the standard library's to have, and the
+// standard library is louder about it than this was.** [rand.Read] documents
+// itself as never returning an error and always filling b entirely: it calls
+// `io.ReadFull` on `rand.Reader` and *crashes the program irrecoverably* if
+// that ever answers one. So the panic here was a safety sitting behind a
+// bigger one, guarding a branch no fixture can enter -- and a reader of this
+// function was invited to believe a weak token was a state the program had
+// thought about. There is no weaker token; there is no token.
 func TokenURLSafe(n int) string {
 	raw := make([]byte, n)
-	if _, err := rand.Read(raw); err != nil {
-		panic(fmt.Sprintf("auth: no entropy for a token: %v", err))
-	}
+	// Not asked for, because there is none: see above.
+	_, _ = rand.Read(raw)
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 

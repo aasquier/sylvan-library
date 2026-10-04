@@ -69,15 +69,19 @@ type Recorder struct {
 }
 
 // NewRecorder opens app.db for writing.
-func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		return nil, fmt.Errorf("opening app.db for the match ledger: %w", err)
-	}
+//
+// **No error, because there is none to give.** Everything this does is
+// [auth.OpenReadWrite], which records a DSN and names a driver (its own
+// comment carries that argument), and a default logger. Unlike the Claude
+// ledger's recorder next door, this one does not ping: a match row that the
+// file cannot take is warned about at the write, because by then the games
+// have been played and failing the match would be reporting a failure for
+// work that succeeded.
+func NewRecorder(path string, logger *slog.Logger) *Recorder {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Recorder{db: db, log: logger}, nil
+	return &Recorder{db: auth.OpenReadWrite(path), log: logger}
 }
 
 // FromDB wraps a handle somebody else opened — how the API shares one app.db

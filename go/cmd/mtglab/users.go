@@ -49,7 +49,7 @@ func connectUsers(ctx context.Context, cfg config.Config) (*sql.DB, error) {
 	// full at [openAppDB]; the file's real state is discovered by
 	// `EnsureMaintainer` on the next line, which is where an unreadable
 	// `app.db` already refuses.
-	db, _ := auth.OpenReadWrite(path)
+	db := auth.OpenReadWrite(path)
 	if err := auth.EnsureMaintainer(ctx, db, cfg); err != nil {
 		_ = db.Close()
 		return nil, err

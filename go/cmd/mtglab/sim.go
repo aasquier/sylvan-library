@@ -565,13 +565,19 @@ func simCacheCommand(cfg config.Config) *cobra.Command {
 }
 
 // openSimStore attaches to app.db for `sim cache`, or answers with a nil
-// store -- which reports what the command promises over a fresh file: zero
-// rows, caching enabled.
+// store -- which reports zero rows and no caching, because there is nothing
+// there to cache into.
 //
 // The door's rule is that a reader never acquires a database, so an absent
 // file is read as an empty one, never minted. An existing file has the
 // schema ladder run first, so a stale schema is a state this command never
 // sees.
+//
+// This sentence used to say "zero rows, caching enabled", and the store it
+// describes used to agree with it: `Stats` built `Enabled` off the engine
+// fingerprint before it looked at the handle, so a box whose `app.db` could
+// not be opened printed `enabled: yes` under a row count of zero. Both halves
+// are fixed in `Stats`; this is the half that said so out loud.
 func openSimStore(cfg config.Config) *simcache.Store {
 	path := cfg.AppDBPath()
 	if _, err := os.Stat(path); err != nil {
@@ -815,11 +821,11 @@ func recordForgeMatch(cfg config.Config, result *tier3.SimRun, decks []*deck.Dec
 		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
 		return
 	}
-	// No error asked for: `NewRecorder`'s only failure is `auth.OpenReadWrite`,
-	// which is `sql.Open` -- argued in full at [openAppDB]. A ledger that
-	// cannot take the row says so at the write, which `Record` already warns
-	// about rather than failing the match.
-	rec, _ := ledger.NewRecorder(path, nil)
+	// `NewRecorder` offers no error, because its only step was
+	// `auth.OpenReadWrite` -- `sql.Open`, argued in full at [openAppDB]. A
+	// ledger that cannot take the row says so at the write, which `Record`
+	// already warns about rather than failing the match.
+	rec := ledger.NewRecorder(path, nil)
 	defer func() { _ = rec.Close() }()
 	rec.Record(context.Background(), ledger.Match{
 		Run:            result,
@@ -849,8 +855,8 @@ func simMatchesCommand(cfg config.Config) *cobra.Command {
 			if err := auth.Migrate(path); err != nil {
 				return err
 			}
-			// No error asked for: `sql.Open`'s, argued at [openAppDB].
-			rec, _ := ledger.NewRecorder(path, nil)
+			// No error offered: `sql.Open`'s, argued at [openAppDB].
+			rec := ledger.NewRecorder(path, nil)
 			defer func() { _ = rec.Close() }()
 			matches, err := rec.Recent(context.Background(), limit)
 			if err != nil {

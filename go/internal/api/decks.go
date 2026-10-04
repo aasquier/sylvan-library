@@ -57,7 +57,7 @@ func (a *API) appDB() *sql.DB {
 	// produces lands on the first *statement* through this handle, which is
 	// where every caller already answers it; the `os.Stat` above is this
 	// function's own guard for the file that is not there at all.
-	db, _ := auth.Open(a.dbPath)
+	db := auth.Open(a.dbPath)
 	a.lazyDB = db
 	return db
 }

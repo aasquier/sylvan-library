@@ -169,11 +169,11 @@ func New(cfg Config) (*Door, error) {
 	d := &Door{cfg: cfg, log: cfg.Logger, slowRequest: cfg.SlowRequest}
 	if cfg.RequireAuth {
 		// `auth.Open` has no failure to report -- it builds a DSN and names a
-		// driver, which its own comment argues -- so there is nothing to check
-		// here. [Door.Check] is where an `app.db` that cannot be read is
-		// discovered, by reading it, and the command calls it before taking
-		// the port.
-		d.db, _ = auth.Open(cfg.AppDB)
+		// driver, which its own comment argues -- and since it no longer
+		// offers one, there is nothing here to check. [Door.Check] is where an
+		// `app.db` that cannot be read is discovered, by reading it, and the
+		// command calls it before taking the port.
+		d.db = auth.Open(cfg.AppDB)
 	}
 	site, err := newStaticSite(cfg.WebDist, cfg.TarotDir, cfg.Logger)
 	if err != nil {
