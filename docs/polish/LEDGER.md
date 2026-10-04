@@ -97,6 +97,11 @@ reopened *Left deliberately* as a worklist.
   floor's ratchet as #553: **`-func` 99.5%, 106 missing of 21,677,
   67 functions**; `MINIMUM` 95.5 → **98.0** against the arm64 leg's
   99.4 on #549, the gap kept.
+- **The morning after, Aaron moved the guard to 99.0** ("I think we should
+  set the guard to 99% then"), at main's own print of 99.5 after #553. That
+  replaces the kept-gap rule: the tree stays above 99, half a point of margin,
+  and a red floor by a tenth with no test removed is the `system_*.go` pair or
+  the folding order before it is anything else.
 - **Rulings still owed, carried in the PR bodies rather than this queue:**
   `digitValue`'s mathematical digits (a frozen grammar); `argueSweep`'s
   defence-in-depth arm; the intake's commandment-10 leak through

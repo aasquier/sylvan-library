@@ -264,16 +264,19 @@ jobs:
       # A floor set at the measurement would go red on the first of those.
       # 89.5 was set at a measured 90.1, 90.0 at a measured 90.4, 90.5 at a
       # measured 90.8, 90.8 at a measured 91.2, 95.0 at a measured 96.6
-      # (2026-09-24), 95.5 at a measured 97.0 (2026-09-28). **This is 98.0 at
-      # a measured 99.4** -- the arm64 leg's own print on the climb's
-      # integration pull request (#549, 2026-10-03), the morning Aaron asked
-      # for the tree at 99 and eight lanes took it there in one wave. The
-      # wider gap is deliberate rather than slack: a diff can cost a few
-      # tenths of honest refactoring without going red, and a diff that
-      # costs a whole point is the thing this exists to notice. **The gap is
-      # kept as the tree climbs** -- his ruling of 2026-09-29 ("ratchet", not
-      # "anchor"): the next click is to 98.5 once a merged main prints 99.7
-      # or better, never sooner.
+      # (2026-09-24), 95.5 at a measured 97.0 (2026-09-28), 98.0 at a
+      # measured 99.4 (#549, 2026-10-03, the morning Aaron asked for the tree
+      # at 99 and eleven lanes took it there in a day). **This is 99.0 at a
+      # measured 99.5** -- main's own arm64 print after #553 -- and the
+      # narrower gap is Aaron's ruling of 2026-10-04 ("set the guard to 99"),
+      # which replaces the kept-gap rule of 2026-09-29: the tree is to stay
+      # above 99, so a diff that costs it more than half a point goes red.
+      # Half a point is about a hundred statements. What can move the print
+      # without anybody changing a test is still the two things above (the
+      # system_*.go pair and the folding order), each worth about a tenth;
+      # if the floor ever goes red by a tenth with no test removed, that is
+      # the cause to look for first, and the answer is to close the gap, not
+      # lower the floor.
       #
       # **The arm64 leg computes it alone.** The merged number cannot differ
       # by architecture while every Go file compiles on both legs — and it
@@ -291,7 +294,7 @@ jobs:
       - name: Coverage floor
         if: matrix.arch == 'arm64'
         env:
-          MINIMUM: "98.0"
+          MINIMUM: "99.0"
         run: |
           # The suite's output goes to a file rather than to /dev/null, and
           # comes back on failure: a test that fails inside THIS run used to
