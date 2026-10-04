@@ -141,10 +141,7 @@ func TestAPreflightThatBrokeForItsOwnReasonIs500WithASentence(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	appDB, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	appDB := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = appDB.Close() })
 	settings := tier3.Settings{WorkerURL: srv.URL}
 	a := New(Config{Logger: quietLogger(), Pool: pooltest.Open(t),

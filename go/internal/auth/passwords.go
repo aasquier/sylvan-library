@@ -63,9 +63,13 @@ func HashPassword(password string) (string, error) {
 		return "", err
 	}
 	salt := make([]byte, saltLength)
-	if _, err := rand.Read(salt); err != nil {
-		return "", fmt.Errorf("no entropy for a password salt: %w", err)
-	}
+	// No error asked for, because [rand.Read] has none to give: it documents
+	// itself as never returning one and always filling the slice, and it
+	// crashes the program irrecoverably rather than hand back a short read. The
+	// arm that used to stand here was the only reason the *strength* check
+	// above shared a return with it; the error this function answers is now
+	// only ever a password a person can fix.
+	_, _ = rand.Read(salt)
 	return hashWithSalt(password, salt), nil
 }
 

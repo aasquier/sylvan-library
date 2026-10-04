@@ -124,10 +124,7 @@ func TestTheShelfSeparatesAMissingDeckFromAnUnusableOne(t *testing.T) {
 // about the request rather than as a 500.
 func TestTheShelfRefusesWithoutACardPool(t *testing.T) {
 	t.Parallel()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer db.Close()
 	// Everything the working rig has except the pool, so the refusal is
 	// about the pool rather than about resolving the library.

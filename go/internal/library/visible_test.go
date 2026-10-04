@@ -38,10 +38,7 @@ func threeAccounts(t *testing.T) (*sql.DB, string) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	ctx := context.Background()
 	for _, row := range []struct {

@@ -54,10 +54,7 @@ func newAccountsDB(t *testing.T) *sql.DB {
 	if err := seed.Close(); err != nil {
 		t.Fatal(err)
 	}
-	db, err := OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	if err := PingWritable(context.Background(), db); err != nil {
 		t.Fatal(err)
@@ -1022,10 +1019,7 @@ func TestTheProviderRequestCarriesTheUserAgent(t *testing.T) {
 func TestOpenReadWriteDoesNotCreateAMissingFile(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "absent.db")
-	db, err := OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := OpenReadWrite(path)
 	defer func() { _ = db.Close() }()
 	if err := PingWritable(context.Background(), db); err == nil {
 		t.Fatal("the write handle opened a database that does not exist")

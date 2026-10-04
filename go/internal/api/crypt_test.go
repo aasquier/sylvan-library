@@ -89,15 +89,9 @@ func TestACryptIsEveryLibraryTheCallerCanWrite(t *testing.T) {
 	t.Parallel()
 	decks := decksDir(t)
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	defer db.Close()
-	writeDB, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeDB := auth.OpenReadWrite(dbPath)
 	defer writeDB.Close()
 	// The one difference from `newWriteRig`: an admin address no account
 	// carries, so `MaintainerUsername` resolves to nothing.

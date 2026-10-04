@@ -45,15 +45,9 @@ func twoHandles(t *testing.T) (src *library.SQLSource, read, write *sql.DB) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	read, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	read = auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = read.Close() })
-	write, err = auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	write = auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = write.Close() })
 	if _, err := auth.Create(context.Background(), write, "alice", "alice@example.com", false); err != nil {
 		t.Fatal(err)
@@ -215,10 +209,7 @@ func aliceDB(t *testing.T, withDeck bool) *sql.DB {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	ctx := context.Background()
 	if _, err := auth.Create(ctx, db, "alice", "alice@example.com", false); err != nil {

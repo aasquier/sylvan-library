@@ -37,20 +37,14 @@ func newCacheRig(t *testing.T) *cacheRig {
 	t.Helper()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	t.Cleanup(func() { _ = db.Close() })
 	store, err := cache.Open(dbPath, quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	write, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	write := auth.OpenReadWrite(dbPath)
 	t.Cleanup(func() { _ = write.Close() })
 	decks := decksDir(t)
 	reg := jobs.New(jobs.Config{Logger: quiet})
@@ -198,10 +192,7 @@ func TestASweepOfADeckWithNoLandsFailsTheJobRatherThanTheRequest(t *testing.T) {
 func TestEverySimulationFailsRatherThanRunOverAPoolThatCannotAnswer(t *testing.T) {
 	t.Parallel()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = db.Close() })
 	reg := jobs.New(jobs.Config{Logger: quiet})
 	a := New(Config{Pool: schemalessPool(t), DecksDir: decksDir(t), Logger: quiet,

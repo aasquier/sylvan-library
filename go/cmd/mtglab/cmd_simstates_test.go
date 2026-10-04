@@ -155,10 +155,7 @@ func TestTheMatchLedgerSaysWhereAMatchWasPlayed(t *testing.T) {
 		Seats:       map[int]string{1: "arahbo", 2: "gyome"},
 		WallSeconds: 9.5,
 	}
-	rec, err := ledger.NewRecorder(path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rec := ledger.NewRecorder(path, nil)
 	if id := rec.Record(context.Background(), ledger.Match{
 		Run: run, Decks: []*deck.Deck{here, there},
 		Clock: 300, GamesRequested: 1, Hosted: true,

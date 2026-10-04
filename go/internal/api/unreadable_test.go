@@ -50,10 +50,7 @@ func unreadableLibrary(t *testing.T) *API {
 	}
 	t.Cleanup(func() { _ = os.Chmod(decks, 0o750) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = db.Close() })
 	return New(Config{DecksDir: decks, AdminEmail: "alice@example.com", AppDB: db})
 }
@@ -160,10 +157,7 @@ func TestADeckFileThatCannotBeReadIsNotReportedAsMissing(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{DecksDir: decks, AdminEmail: "alice@example.com", AppDB: db})
 
@@ -192,10 +186,7 @@ func TestOneUnparseableDeckDoesNotTakeTheShelfDown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{DecksDir: decks, AdminEmail: "alice@example.com", AppDB: db,
 		Claude: claude.Settings{}})

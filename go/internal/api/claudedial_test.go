@@ -290,10 +290,7 @@ func TestTheDialsSlugCannotWalkOutOfTheLibrary(t *testing.T) {
 		[]byte("name: Real\nstatus: theoretical\ncards: []\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer db.Close()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: root,
 		AdminEmail: "alice@example.com", AppDB: db})

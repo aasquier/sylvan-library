@@ -65,10 +65,7 @@ func schemalessPool(t *testing.T) *pool.Pool {
 // failingPoolAPI is an instance whose library is fine and whose pool is not.
 func failingPoolAPI(t *testing.T) *API {
 	t.Helper()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	t.Cleanup(func() { _ = db.Close() })
 	return New(Config{
 		Pool: schemalessPool(t), DecksDir: decksDir(t),

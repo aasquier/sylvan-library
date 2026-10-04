@@ -97,14 +97,16 @@ func TestClaudeUsageOnABoxWithNoLedgerSaysSoAndCreatesNothing(t *testing.T) {
 	if !strings.Contains(out, "no ledger at") || !strings.Contains(out, d.AppDBPath()) {
 		t.Errorf("a bare box answered:\n%s", out)
 	}
-	if _, err := auth.Open(d.AppDBPath()); err == nil {
-		if db, _ := auth.Open(d.AppDBPath()); db != nil {
-			var n int
-			if err := db.QueryRow("SELECT count(*) FROM claude_usage").Scan(&n); err == nil {
-				t.Error("reading the spend created an app.db")
-			}
-			_ = db.Close()
-		}
+	// `auth.Open` records a DSN and opens nothing, so the proof that reading
+	// the spend minted no file is the *statement*: a count over `claude_usage`
+	// on a box with no `app.db` has to refuse. The two nested opens this
+	// replaces both answered unconditionally, so the check they guarded ran
+	// anyway; one handle says the same thing out loud.
+	db := auth.Open(d.AppDBPath())
+	defer func() { _ = db.Close() }()
+	var n int
+	if err := db.QueryRow("SELECT count(*) FROM claude_usage").Scan(&n); err == nil {
+		t.Error("reading the spend created an app.db")
 	}
 }
 

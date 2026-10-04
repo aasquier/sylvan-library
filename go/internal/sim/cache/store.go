@@ -53,23 +53,27 @@ type Store struct {
 // Failing at Open rather than at the first lookup is deliberate: a cache that
 // discovers its own absence on the hot path discovers it in a worker thread,
 // where the only evidence is a log line nobody reads.
+//
+// The error it answers is the **probe's** below, never [sql.Open]'s: that
+// records the DSN and looks the driver up by name, so for a driver this file's
+// imports register it has no failure to report. The arm that used to stand
+// beside it read as the handling for a volume that did not mount, and the
+// probe one line down is that handling. `internal/auth`'s own open carries the
+// long form of the argument.
 func Open(path string, logger *slog.Logger) (*Store, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	dsn := "file:" + url.PathEscape(path) +
 		"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open app.db for the simulation cache: %w", err)
-	}
+	db, _ := sql.Open("sqlite", dsn)
 	// One writer. SQLite serialises them anyway, and a pool of them would only
 	// convert waiting-in-Go into waiting-on-the-file lock. The file is in WAL
 	// mode -- a persistent property of the file itself -- so this never
 	// blocks a reader.
 	db.SetMaxOpenConns(1)
 	var one int
-	err = db.QueryRow("SELECT 1 FROM sim_cache LIMIT 1").Scan(&one)
+	err := db.QueryRow("SELECT 1 FROM sim_cache LIMIT 1").Scan(&one)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		_ = db.Close()
 		return nil, fmt.Errorf("app.db has no usable sim_cache: %w", err)
@@ -233,11 +237,21 @@ type Stats struct {
 
 // Stats reports the table's contents. A nil store reports a disabled,
 // empty cache, which is what a machine with no `app.db` should say.
+//
+// **And now it does.** `Enabled` is a fact about the engine fingerprint, so a
+// store that is merely unreachable still reports the cache switched on -- it
+// is configured, it just cannot answer right now, and `closedstore_test.go`
+// argues that at length. But the line that built it used to run **before** the
+// nil check, so a *nil* store answered the fingerprint's yes as well, and
+// `mtglab sim cache` over a file it could not open printed `enabled: yes`
+// under a row count of zero: a fallback reading as a fact, and the one pair of
+// sentences this field exists to tell apart. There is no store there to cache
+// into, so there is no caching, and the answer is no.
 func (s *Store) Stats(ctx context.Context) Stats {
-	out := Stats{Enabled: Fingerprint() != "", ByKind: map[string]int{}}
 	if s == nil || s.db == nil {
-		return out
+		return Stats{ByKind: map[string]int{}}
 	}
+	out := Stats{Enabled: Fingerprint() != "", ByKind: map[string]int{}}
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT kind, count(*) AS n, sum(length(result_json)) AS b, "+
 			"min(created_at) AS oldest, max(created_at) AS newest "+

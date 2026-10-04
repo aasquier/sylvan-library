@@ -53,10 +53,7 @@ func triggered(t *testing.T, trigger string) *sql.DB {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	if _, err := db.Exec(trigger); err != nil {
 		t.Fatal(err)
@@ -144,10 +141,7 @@ func TestAnAccountListSaysSoWhenARowCannotBeRead(t *testing.T) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	for _, name := range []string{"ada", "bruno"} {
 		if _, err := Create(ctx, db, name, name+"@example.test", false); err != nil {

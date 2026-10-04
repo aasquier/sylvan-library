@@ -38,10 +38,7 @@ func ownedSQLTier(t *testing.T) (*library.SQLSource, *sql.DB) {
 	if err := authtest.NewScratchDB(path); err != nil {
 		t.Fatal(err)
 	}
-	db, err := auth.OpenReadWrite(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(path)
 	t.Cleanup(func() { _ = db.Close() })
 	if _, err := auth.Create(context.Background(), db, "alice", "alice@example.com", false); err != nil {
 		t.Fatal(err)

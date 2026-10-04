@@ -480,7 +480,7 @@ func ensureMaintainerAtBoot(cfg config.Config) error {
 	// No error asked for: `OpenReadWrite` is `sql.Open`, argued in full at
 	// [openAppDB]. An unreadable file is discovered by the reconciliation
 	// below, which is what this function exists to run.
-	db, _ := auth.OpenReadWrite(cfg.AppDBPath())
+	db := auth.OpenReadWrite(cfg.AppDBPath())
 	defer func() { _ = db.Close() }()
 	return auth.EnsureMaintainer(context.Background(), db, cfg)
 }
