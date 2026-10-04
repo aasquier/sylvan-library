@@ -1,0 +1,20 @@
+#!/bin/sh
+# A JVM too old for Forge, as the version probe sees it.
+#
+# Committed beside `fakejava` for that file's reason, which applies twice over
+# here: a test must never mint an executable (the probe reads a Mac's first-run
+# security scan and a Linux "text file busy" as `Java None`, which is exactly
+# the answer this fixture exists to tell apart from a real one). What varies
+# between the stand-in JVMs is therefore a *file*, not a line a test writes.
+#
+# Java 11 is not an arbitrary choice: it is what `/usr/bin/java` answers on the
+# machine this project is written on, and `javaMajor`'s own comment is about
+# that JVM failing Forge in a way that reads like a Forge bug. The refusal has
+# to name the version it found — `(Java 11)` — so that a reader of the message
+# knows there is a JVM here and it is the wrong one.
+if [ "$1" = "-version" ]; then
+  echo 'openjdk version "11.0.21" 2023-10-17' 1>&2
+  exit 0
+fi
+echo "this JVM is too old to play anything" 1>&2
+exit 1

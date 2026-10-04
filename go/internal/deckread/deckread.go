@@ -25,6 +25,7 @@ package deckread
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -143,15 +144,18 @@ func ChosenArts(ctx context.Context, c *pool.Conn, ids []string) (map[string]Cho
 		return nil, err
 	}
 	defer rows.Close()
+	// The scan's refusal joins the walk's rather than branching here: every
+	// destination is a `*any`, which `database/sql`'s converter has no value to
+	// refuse (`pool.scanRecord` carries the whole argument). The walk's own
+	// verdict is asked below, where it matters.
+	var scanned error
 	for rows.Next() {
 		var v [6]any
 		ptrs := make([]any, len(v))
 		for i := range v {
 			ptrs[i] = &v[i]
 		}
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(ptrs...))
 		image := pool.AsStringPtr(v[1])
 		if image == nil {
 			continue
@@ -160,7 +164,10 @@ func ChosenArts(ctx context.Context, c *pool.Conn, ids []string) (map[string]Cho
 			SetName: pool.AsStringPtr(v[2]), SetCode: strings.ToUpper(pool.AsString(v[3])),
 			Artist: pool.AsStringPtr(v[4]), FlavorText: pool.AsStringPtr(v[5])}
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Tiles is `service._tiles`: the shelf's payload for a run of decks sharing
@@ -831,15 +838,14 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 	defer rows.Close()
 	found := []SearchCard{}
 	oracleIDs := []string{}
+	var scanned error // see [ChosenArts]: a scan into `*any` has no refusal
 	for rows.Next() {
 		var v [11]any
 		ptrs := make([]any, len(v))
 		for i := range v {
 			ptrs[i] = &v[i]
 		}
-		if err := rows.Scan(ptrs...); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(ptrs...))
 		card := SearchCard{
 			Name: pool.AsString(v[0]), ManaCost: pool.AsStringPtr(v[1]), CMC: pool.AsFloat(v[2]),
 			TypeLine: pool.AsStringPtr(v[3]), OracleText: pool.AsStringPtr(v[4]),
@@ -850,7 +856,7 @@ func SearchCards(ctx context.Context, c *pool.Conn, q SearchQuery) ([]SearchCard
 		found = append(found, card)
 		oracleIDs = append(oracleIDs, pool.AsString(v[10]))
 	}
-	if err := rows.Err(); err != nil {
+	if err := errors.Join(scanned, rows.Err()); err != nil {
 		return nil, err
 	}
 	cheapest, err := cheapestPrintings(ctx, c, oracleIDs)
@@ -910,17 +916,23 @@ func cheapestPrintings(ctx context.Context, c *pool.Conn, oracleIDs []string) (m
 		return nil, fmt.Errorf("cheapest printings: %w", err)
 	}
 	defer rows.Close()
+	// `oracle_id` is the one typed destination in this file, and it is read out
+	// of a `GROUP BY` over rows the subquery already matched by id -- so the
+	// NULL that would refuse a `*string` cannot be among them, a NULL matches
+	// no `IN` list. The verdict joins the walk's for [ChosenArts]' reason.
+	var scanned error
 	for rows.Next() {
 		var id string
 		var usd any
-		if err := rows.Scan(&id, &usd); err != nil {
-			return nil, fmt.Errorf("cheapest printings: %w", err)
-		}
+		scanned = errors.Join(scanned, rows.Scan(&id, &usd))
 		if price := AsFloatPtr(usd); price != nil {
 			out[id] = *price
 		}
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, fmt.Errorf("cheapest printings: %w", err)
+	}
+	return out, nil
 }
 
 func AsFloatPtr(v any) *float64 {
@@ -1047,10 +1059,14 @@ func CardsNamed(ctx context.Context, c *pool.Conn, names []string) (NamedCards, 
 		}
 		identity := append([]string{}, rec.ColorIdentity...)
 		sort.Strings(identity)
+		// **Never nil, and the pool is where that is held.** The wire field is a
+		// list every caller ranges over, and the guard that used to stand here
+		// could not be entered by any record this read can hold: `pool`'s own
+		// coercion answers a missing column, a NULL and an empty list with an
+		// empty list, so a card whose keywords the loader never filled arrives
+		// as `[]` rather than as nothing. The property is tested one layer down,
+		// over a pool row whose keyword column really is NULL.
 		keywords := rec.Keywords
-		if keywords == nil {
-			keywords = []string{}
-		}
 		// The three plain strings on the record become pointers here, as
 		// the existing card rows do: the wire field is nullable, and an
 		// empty oracle text is not the same as an absent one.

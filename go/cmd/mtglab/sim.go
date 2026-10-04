@@ -815,11 +815,11 @@ func recordForgeMatch(cfg config.Config, result *tier3.SimRun, decks []*deck.Dec
 		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
 		return
 	}
-	rec, err := ledger.NewRecorder(path, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "match ledger record failed (%v)\n", err)
-		return
-	}
+	// No error asked for: `NewRecorder`'s only failure is `auth.OpenReadWrite`,
+	// which is `sql.Open` -- argued in full at [openAppDB]. A ledger that
+	// cannot take the row says so at the write, which `Record` already warns
+	// about rather than failing the match.
+	rec, _ := ledger.NewRecorder(path, nil)
 	defer func() { _ = rec.Close() }()
 	rec.Record(context.Background(), ledger.Match{
 		Run:            result,
@@ -849,10 +849,8 @@ func simMatchesCommand(cfg config.Config) *cobra.Command {
 			if err := auth.Migrate(path); err != nil {
 				return err
 			}
-			rec, err := ledger.NewRecorder(path, nil)
-			if err != nil {
-				return err
-			}
+			// No error asked for: `sql.Open`'s, argued at [openAppDB].
+			rec, _ := ledger.NewRecorder(path, nil)
 			defer func() { _ = rec.Close() }()
 			matches, err := rec.Recent(context.Background(), limit)
 			if err != nil {

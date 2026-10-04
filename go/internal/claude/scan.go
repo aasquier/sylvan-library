@@ -95,12 +95,7 @@ const ScanDefaultPreset = "consultant"
 // claimed the opposite for some time after it stopped being so.
 func ScanStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := ceilingOr(limit)
-		preset, err := Preset(ScanDefaultPreset)
-		if err != nil {
-			return Stance{}, err
-		}
-		return Clamp(preset, ceil), nil
+		return defaultStance(ScanDefaultPreset, limit), nil
 	}
 	return Resolve(requested, nil, limit)
 }

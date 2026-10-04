@@ -92,11 +92,7 @@ func (a *API) argueSlot(w http.ResponseWriter, r *http.Request) {
 	// Ordered rather than a struct, because `alternatives_dropped` carries a
 	// different SET of keys depending on whether a call happened -- see
 	// claude.DroppedAlternatives.
-	raw, err := wire.MarshalOrdered(report)
-	if a.refuse(w, "argue", err) {
-		return
-	}
-	wire.Raw(w, http.StatusOK, raw)
+	a.rawOrdered(w, "argue", report)
 }
 
 // The sweep: `POST /api/decks/{owner}/{slug}/argue/deck`.

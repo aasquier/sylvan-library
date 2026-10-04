@@ -676,10 +676,7 @@ func TestEveryThemeAskOutcomeMatchesTheGolden(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mode, err := themeMode(ModeThemeConversation, who)
-			if err != nil {
-				t.Fatal(err)
-			}
+			mode := themeMode(ModeThemeConversation, who)
 			got = readAsk(plan, who, mode.Name, row.Turn.turn(mode.Name))
 		}
 		assertSameJSONValue(t, "ask: "+row.Note, got, row.Report)
@@ -713,10 +710,7 @@ func TestEveryThemeProposalOutcomeAgreesWithTheCorpus(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				mode, err := themeMode(ModeThemeProposal, who)
-				if err != nil {
-					t.Fatal(err)
-				}
+				mode := themeMode(ModeThemeProposal, who)
 				got, err = readProposal(ctx, c, plan, who, mode.Name, row.Turn.turn(mode.Name))
 				if err != nil {
 					t.Fatalf("%s: %v", row.Note, err)

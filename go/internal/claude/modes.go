@@ -93,11 +93,20 @@ func (s serverToolSpec) param() (anthropic.ToolUnionParam, error) {
 // built before anything that reads it regardless of what the files are called.
 // Reaching `tools` from here is safe for a different reason -- it is another
 // package, and Go finishes a dependency's initialisation before its importer's.
-var modes = loadModes()
+var modes = loadModes(modesJSON)
 
-func loadModes() map[string]Mode {
+// loadModes builds the registry from the recorded definitions.
+//
+// **The bytes are a parameter**, which is the tree's standing move and here it
+// buys exactly one thing: the two refusals below are a damaged build speaking,
+// and until a caller could hand this function a document neither of them could
+// be shown to still work. The composition is `modes = loadModes(modesJSON)` and
+// nothing else ever calls it with anything but the embed, so what the app loads
+// has not moved. The function touches no package state, so a test may ask it
+// about a document of its own beside every other test in the tree.
+func loadModes(raw []byte) map[string]Mode {
 	var file modeFile
-	if err := json.Unmarshal(modesJSON, &file); err != nil {
+	if err := json.Unmarshal(raw, &file); err != nil {
 		panic(fmt.Sprintf("claude: data/modes.json will not parse: %v", err))
 	}
 	out := make(map[string]Mode, len(file.Modes))
@@ -150,6 +159,29 @@ func GetMode(name string) (Mode, error) {
 		return Mode{}, fmt.Errorf("no such mode %q -- there are %v", name, ModeNames())
 	}
 	return m, nil
+}
+
+// modeOf is the mode one of the constants below names.
+//
+// `GetMode` returns an error because a *request* can carry a mode name:
+// `/api/claude`'s scan route is handed one and has to refuse it in a 422. A
+// constant in this file is a different question. `modes` is built from the
+// recorded definitions before anything reads it, and
+// `TestEveryDefinedModeLoads` holds every constant against the file, so a
+// surface spelling one has nothing to refuse -- and nine of them each carried a
+// two-line hand-off of an error no fixture could produce, with a sentence in it
+// nobody could ever read.
+//
+// A name this package got wrong is still a loud failure, and it happens here
+// rather than at the ninth call site: the whole process stops with the name in
+// the message, which is where a mistake in a constant belongs.
+func modeOf(name string) Mode {
+	m, ok := modes[name]
+	if !ok {
+		panic(fmt.Sprintf("claude: this package asked for the mode %q, which "+
+			"data/modes.json does not define -- there are %v", name, ModeNames()))
+	}
+	return m
 }
 
 // The modes by name. Constants rather than string literals at the call sites,

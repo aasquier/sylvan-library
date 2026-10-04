@@ -20,6 +20,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"fmt"
+	"io"
 	"math/big"
 	"sort"
 	"strings"
@@ -169,11 +170,7 @@ const Caveat = "The wheel is blind dice over the card pool — a fate, then a " 
 func Spin(ctx context.Context, d *deck.Deck, identity map[string]bool,
 	c *pool.Conn, seed *big.Int) (wire.OrderedMap, error) {
 	if seed == nil {
-		fresh, err := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 32))
-		if err != nil {
-			return nil, fmt.Errorf("wheel: %w", err)
-		}
-		seed = fresh
+		seed = mintSpinSeed(crand.Reader)
 	}
 	rng := mt19937.NewFromBig(seed)
 	symbol := Symbols[rng.RandRange(int64(len(Symbols)))]
@@ -315,4 +312,28 @@ func identityColors(identity map[string]bool) []string {
 		}
 	}
 	return out
+}
+
+// mintSpinSeed picks the integer an unseeded spin will be remembered by.
+//
+// The one draw here that is NOT the recorded generator, and the licence is the
+// same one `tarot.mintSeed` and `brew.mintSeed` carry at greater length:
+// `mt19937` exists so that a seed somebody already holds spins the same fate
+// and the same card forever, and nobody holds a seed that has not been minted
+// yet. crypto/rand rather than math/rand so that two spins in the same
+// millisecond are not the same spin.
+//
+// **A panic rather than an error, which is what the two sibling draws do**, and
+// this one used to be the odd one out: it wrapped the refusal and handed it up
+// as a failed spin. Both shapes are unreachable on any platform this runs on, so
+// the choice is about which is honest when they are not -- and a machine with no
+// entropy left would otherwise deal every visitor the same fate out of a fixed
+// seed, silently. The reader is a parameter for the reason theirs are: the loud
+// failure is only loud if something can hear it.
+func mintSpinSeed(entropy io.Reader) *big.Int {
+	fresh, err := crand.Int(entropy, new(big.Int).Lsh(big.NewInt(1), 32))
+	if err != nil {
+		panic(fmt.Sprintf("wheel: no entropy to spin with: %v", err))
+	}
+	return fresh
 }

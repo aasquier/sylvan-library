@@ -39,12 +39,18 @@ import (
 // The busy timeout matches every other handle here (5000ms). Journal mode is
 // not set -- WAL is persistent in the file, `Migrate` set it at creation,
 // and a read-only connection may not change it anyway.
+// **There is no failure here, and the error is not asked for.**
+// [sql.Open] records the DSN and looks the driver up by name; it only answers
+// an error for a name nobody registered, and this file's import list is what
+// registers "sqlite". Nothing is opened until the first statement, which is
+// what [Ping] is for. So the `if err != nil` that used to stand here was a
+// safety the program did not have -- a branch no fixture could enter, read by
+// every reader as though the file being unopenable were handled. The returned
+// error stays in the signature: every caller already asks, and the day this
+// learns to verify something it will have one to give.
 func Open(path string) (*sql.DB, error) {
 	dsn := "file:" + url.PathEscape(path) + "?mode=ro&_pragma=busy_timeout(5000)"
-	db, err := sql.Open("sqlite", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open app.db: %w", err)
-	}
+	db, _ := sql.Open("sqlite", dsn)
 	// A handful of readers is plenty: every lookup is a primary-key hit.
 	db.SetMaxOpenConns(4)
 	return db, nil

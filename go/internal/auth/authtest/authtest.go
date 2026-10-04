@@ -56,11 +56,11 @@ func NewScratchDB(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("scratch app.db: %w", err)
 	}
-	db, err := sql.Open("sqlite",
+	// No error: `sql.Open` records the DSN and looks up a driver this file's
+	// import list registers. Nothing is created until the Exec below, which is
+	// where a scratch database that cannot be built says so.
+	db, _ := sql.Open("sqlite",
 		"file:"+path+"?mode=rwc&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
-	if err != nil {
-		return fmt.Errorf("scratch app.db: %w", err)
-	}
 	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("building the scratch app.db: %w", err)

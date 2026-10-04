@@ -222,6 +222,41 @@ func Preset(name string) (Stance, error) {
 		wire.Quote(name), strings.Join(known, ", "))
 }
 
+// presetOf is a preset THIS package names, as opposed to one a request carried.
+//
+// [Preset] returns an error because the name can come off the wire, and that
+// refusal reaches a 422 body. The four `…DefaultPreset` constants and the names
+// in [PresetNames] are a different question: `presets` is a literal in this file
+// and so are they, held equal by `TestEveryPresetNameResolves`. So the surfaces
+// that spell one had an error to hand on that no request could cause and no
+// reader could ever see — five of them, one per deckless surface plus the dial's
+// own loop.
+//
+// A name this package got wrong stops the process here with the name in it,
+// which is where a mistake in a constant belongs. It is not a silent zero
+// Stance: an all-empty Stance reads as a *stricter* dial than `off` and would
+// turn a misspelling into a surface that quietly stopped working.
+func presetOf(name string) Stance {
+	s, ok := presets[name]
+	if !ok {
+		panic(fmt.Sprintf("claude: this package asked for the stance preset "+
+			"%q, which is not one of %v", name, PresetNames))
+	}
+	return s
+}
+
+// defaultStance is what a surface with no deck and no request answers: its own
+// preset, clamped to what the deployment will honour.
+//
+// One spelling of the four lines each of the three surfaces that name a default
+// preset used to spell for itself; the theme's own default is a Stance literal
+// rather than a name, so it does not come through here. The clamp is not
+// decoration — a hosted instance whose ceiling is `consultant` must not have a
+// surface default itself past it.
+func defaultStance(preset string, limit *Stance) Stance {
+	return Clamp(presetOf(preset), ceilingOr(limit))
+}
+
 // DeckStatused is what DefaultFor needs of a deck, which is one string. The
 // narrow interface is deliberate: this package sits below internal/deck and
 // must not import it, exactly as mana sits below sim.

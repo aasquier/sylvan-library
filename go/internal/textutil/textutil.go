@@ -64,18 +64,25 @@ func SplitJoin(s string) string {
 func Len(s string) int { return utf8.RuneCountInString(s) }
 
 // Head is the first n code points.
+//
+// One walk and one return, which is both faster and smaller than the shape
+// this used to have: a [Len] call to decide whether to cut at all, and then a
+// loop whose own trailing `return s` no caller could ever fall past — the
+// guard had already proved there is an (n+1)th rune to stop at, so that line
+// was a statement Go required and nothing could reach. Cutting at the end of
+// the string unless the walk finds an earlier boundary says the same thing
+// with nothing unreachable in it.
 func Head(s string, n int) string {
-	if Len(s) <= n {
-		return s
-	}
+	cut := len(s)
 	count := 0
 	for i := range s {
 		if count == n {
-			return s[:i]
+			cut = i
+			break
 		}
 		count++
 	}
-	return s
+	return s[:cut]
 }
 
 // lineBoundaries is every character [SplitLines] treats as a line break,

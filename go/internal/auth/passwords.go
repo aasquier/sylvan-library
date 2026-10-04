@@ -34,14 +34,6 @@ const (
 // been refused.
 var ErrWeakPassword = errors.New("weak password")
 
-var params = &argon2id.Params{
-	Memory:      MemoryCostKiB,
-	Iterations:  TimeCost,
-	Parallelism: Parallelism,
-	SaltLength:  saltLength,
-	KeyLength:   keyLength,
-}
-
 // CheckStrength refuses a password that must not be stored.
 func CheckStrength(password string) error {
 	if len(password) > MaxPasswordBytes {
@@ -112,13 +104,19 @@ func Verify(storedHash *string, password string) bool {
 // dummyHash is computed once per process:
 // computing it per call would cost two hashes on an unknown account against
 // one on a known one, the same timing signal pointing the other way.
-var dummyHash = func() string {
-	h, err := argon2id.CreateHash("mtglab-dummy-password-for-timing-parity", params)
-	if err != nil {
-		panic(err)
-	}
-	return h
-}()
+//
+// **The salt is a row of zeroes, and that is deliberate.** This hash is never
+// stored, never written to `app.db` and never compared against a real
+// password: it exists so that verifying nothing costs what verifying
+// something costs, and a decoy's salt protects no secret. Drawing a real one
+// meant asking the operating system for entropy while the package was still
+// initialising, and panicking at import time if it ever said no -- a failure
+// mode a timing decoy has no business having. `hashWithSalt` is the same
+// encoder every stored hash goes through, so the string is a valid PHC hash
+// at the pinned profile and `ComparePasswordAndHash` does the same work over
+// it that it would over anybody's.
+var dummyHash = hashWithSalt("mtglab-dummy-password-for-timing-parity",
+	make([]byte, saltLength))
 
 // VerifyDummy burns a verification against a hash of nothing, for unknown
 // accounts. The result is thrown away; the work is the point.

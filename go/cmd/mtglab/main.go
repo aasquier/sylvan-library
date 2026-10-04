@@ -90,11 +90,29 @@ func newRoot(cfg config.Config, forge tier3.Settings, pipe claude.Endpoint) *cob
 	return root
 }
 
+// main is the process: the arguments it was started with, the stream it
+// complains on, and the status it leaves behind. One line, because every line
+// in it is a line no test can stand in for -- [os.Args] and [os.Exit] belong to
+// the process rather than to this program, and the thing between them is
+// [runProcess], which a test can run as many times as it likes.
 func main() {
-	err := newRoot(config.Load(), tier3.LoadSettings(), claude.EndpointFromEnv()).Execute()
-	if code := exitCode(err, os.Stderr); code != 0 {
-		os.Exit(code)
-	}
+	os.Exit(runProcess(os.Args[1:], os.Stderr))
+}
+
+// runProcess is the binary's whole body with the process handed in: the words
+// after the command's name, and where a refusal is written. It answers with
+// the status a shell reads.
+//
+// Separated from [main] for the reason every other setting in this tree is a
+// value (ADR 39): `main` reaches for three process globals and cannot be
+// called twice, while this takes two of them as arguments and can be asked
+// what `mtglab frobnicate` does without a shell.
+func runProcess(argv []string, stderr io.Writer) int {
+	root := newRoot(config.Load(), tier3.LoadSettings(), claude.EndpointFromEnv())
+	// Cobra would read `os.Args[1:]` itself; handed over instead, because a
+	// caller that can say which words to run is a caller a test can be.
+	root.SetArgs(argv)
+	return exitCode(root.Execute(), stderr)
 }
 
 // exitCode is what the process leaves behind, and what it says on the way —
@@ -120,8 +138,8 @@ func exitCode(err error, stderr io.Writer) int {
 }
 
 // The environment is read exactly three times in this process, all of them on
-// the line above: [config.Load] for where things live and which switches are
-// on, [tier3.LoadSettings] for the Forge and Fly half, and
+// [runProcess]'s first line: [config.Load] for where things live and which
+// switches are on, [tier3.LoadSettings] for the Forge and Fly half, and
 // [claude.EndpointFromEnv] for the Anthropic credential. Each is a value from
 // that point on. There is deliberately no `settings()` helper any more -- a
 // function that reads the environment on demand is a global variable wearing

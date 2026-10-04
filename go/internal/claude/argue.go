@@ -405,10 +405,7 @@ func Argue(ctx context.Context, conn *pool.Conn, d *deck.Deck, card string,
 				"this deck still works."), nil
 	}
 
-	mode, err := GetMode(ModeSlotArgument)
-	if err != nil {
-		return nil, err
-	}
+	mode := modeOf(ModeSlotArgument)
 	opening, err := argueOpening(facts, req.Focus)
 	if err != nil {
 		return nil, err
