@@ -92,9 +92,26 @@ func (a *API) accountsDB() (*sql.DB, bool) {
 	if _, err := os.Stat(a.dbPath); err != nil {
 		return nil, false
 	}
-	db, err := auth.OpenReadWrite(a.dbPath)
-	if err != nil {
-		a.log.Warn("app.db exists but could not be opened for writing", "error", err)
+	// **The handle is proved before it is kept**, and that is the whole reason
+	// the degrade below can fire at all. `auth.OpenReadWrite` is `sql.Open`,
+	// which records the DSN and opens nothing — so for years the only thing
+	// this could discover was that the path existed, and a file that was *there
+	// and not a database* (half a restore, a download landed on the wrong name,
+	// a volume mounted over a stub) was discovered by the first INSERT instead,
+	// which is exactly where `auth.PingWritable`'s own comment says a failure
+	// must not be discovered. One statement, once, on the lazy path only: the
+	// handle the door opened at start has already been pinged at boot.
+	//
+	// The ping is now the *only* thing asked, because the open no longer
+	// offers a failure to fold in beside it: an `if err == nil` over an error
+	// that is always nil, and an `if db != nil` over a handle that is never
+	// nil, read as two guards and were two statements that could not do
+	// anything. `auth.Open`'s own comment carries the argument.
+	db := auth.OpenReadWrite(a.dbPath)
+	if err := auth.PingWritable(context.Background(), db); err != nil {
+		_ = db.Close()
+		a.log.Warn("app.db exists but does not answer as an accounts database",
+			"error", err)
 		return nil, false
 	}
 	a.lazyWriteDB = db

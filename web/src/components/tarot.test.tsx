@@ -215,12 +215,16 @@ describe('the pot, before anything is said', () => {
     expect(document.querySelector('.cauldron-beat')!.textContent).toBe(line)
   })
 
-  it('credits the painting in the room the painting is in', async () => {
+  it('names no painter, because the hut is footage and not a painting',
+     async () => {
     await knock()
-    // A committed public-domain oil rather than a hotlinked card crop, so the
-    // Fan Content deal is not what is being kept here — the habit is.
-    expect(screen.getByText(/John William Waterhouse/)).toBeTruthy()
-    expect(screen.getByText(/The Magic Circle/)).toBeTruthy()
+    // The Waterhouse oil this room opened with is gone
+    // (`assets/agatha/PROVENANCE.md` says where), and a credit for a picture
+    // that is not in the room would be the one lie in it. What IS in the
+    // room is the plate, with its still as the floor.
+    expect(screen.queryByText(/Waterhouse/)).toBeNull()
+    expect(screen.queryByText(/The Magic Circle/)).toBeNull()
+    expect(document.querySelector('.cauldron-plate')).not.toBeNull()
   })
 
   it('hands the way in to a control that wears the room', async () => {

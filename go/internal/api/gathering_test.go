@@ -275,10 +275,7 @@ func (s *sayings) ReportPartial(done, total int, partial any) {
 func TestTheUpkeepReadingNamesTheForgeTheLastMatchWasPlayedWith(t *testing.T) {
 	t.Parallel()
 	dbPath := appDB(t)
-	db, err := auth.OpenReadWrite(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.OpenReadWrite(dbPath)
 	t.Cleanup(func() { _ = db.Close() })
 	recordMatch(t, db, "2.0.98")
 	recordMatch(t, db, "2.0.99")

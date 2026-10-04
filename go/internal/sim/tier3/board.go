@@ -1066,15 +1066,17 @@ func (b *board) tap(id int, tapped bool) {
 // `name` started sending the change too, `stats` found nothing left to send
 // and the land row stopped moving (`TestALandThatAnimatesChangesRows`). The
 // dictionary itself is never revised: see [board.name].
+//
+// There is no nil to guard against here: [board.change] always answers a
+// change, handing an id the dictionary does not hold a throwaway one that
+// nothing ever collects. A guard that read `c == nil` stood here for a while
+// and could not fire.
 func (b *board) retype(id int, types string) {
 	if types == "" || b.types[id] == types {
 		return
 	}
 	b.types[id] = types
 	c := b.change(id)
-	if c == nil {
-		return
-	}
 	c.Types = types
 	if zone := b.zone[id]; zone == ZoneBattlefield || zone == ZoneLand {
 		if drawn, ok := drawnZone("Battlefield", types); ok && drawn != zone {

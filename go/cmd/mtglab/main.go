@@ -23,6 +23,36 @@ import (
 	"github.com/aasquier/sylvan-library/go/internal/sim/tier3"
 )
 
+// family is a command that exists to hold subcommands: `decks`, `users`,
+// `sim` and the rest. It runs nothing of its own, but it is deliberately
+// *runnable*, and that is the whole reason it is built here rather than as a
+// bare `&cobra.Command{Use, Short}` at each site.
+//
+// **A non-runnable command answers a typo with its help text and a green
+// exit.** cobra consults `Args` only after it has decided a command is
+// runnable; a command with no `RunE` short-circuits to help before that, so
+// its `Args`, set or not, is never read. `mtglab decks frobnicate` therefore
+// printed the family's help and exited 0 -- a misspelt verb in a runbook line
+// or a cron entry reporting success. The root escapes by accident: cobra's
+// legacy argument rule refuses an unknown name *at the root only*, which is
+// also why the root does not use this helper -- that rule carries the "did you
+// mean" suggestions [cobra.NoArgs] lacks, and setting `Args` on a
+// non-runnable root switches the rule off without putting anything in its
+// place.
+//
+// With [cobra.NoArgs] and a `RunE` that prints the help, a bare
+// `mtglab decks` still answers with its help, and `mtglab decks frobnicate`
+// answers `unknown command "frobnicate" for "mtglab decks"` and a non-zero
+// exit. `familycommands_test.go` drives every family and the root.
+func family(use, short string) *cobra.Command {
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+	}
+}
+
 // newRoot is the whole command tree, assembled around one [config.Config].
 //
 // **The configuration is an argument, not a lookup.** ADR 39 made the
@@ -60,11 +90,29 @@ func newRoot(cfg config.Config, forge tier3.Settings, pipe claude.Endpoint) *cob
 	return root
 }
 
+// main is the process: the arguments it was started with, the stream it
+// complains on, and the status it leaves behind. One line, because every line
+// in it is a line no test can stand in for -- [os.Args] and [os.Exit] belong to
+// the process rather than to this program, and the thing between them is
+// [runProcess], which a test can run as many times as it likes.
 func main() {
-	err := newRoot(config.Load(), tier3.LoadSettings(), claude.EndpointFromEnv()).Execute()
-	if code := exitCode(err, os.Stderr); code != 0 {
-		os.Exit(code)
-	}
+	os.Exit(runProcess(os.Args[1:], os.Stderr))
+}
+
+// runProcess is the binary's whole body with the process handed in: the words
+// after the command's name, and where a refusal is written. It answers with
+// the status a shell reads.
+//
+// Separated from [main] for the reason every other setting in this tree is a
+// value (ADR 39): `main` reaches for three process globals and cannot be
+// called twice, while this takes two of them as arguments and can be asked
+// what `mtglab frobnicate` does without a shell.
+func runProcess(argv []string, stderr io.Writer) int {
+	root := newRoot(config.Load(), tier3.LoadSettings(), claude.EndpointFromEnv())
+	// Cobra would read `os.Args[1:]` itself; handed over instead, because a
+	// caller that can say which words to run is a caller a test can be.
+	root.SetArgs(argv)
+	return exitCode(root.Execute(), stderr)
 }
 
 // exitCode is what the process leaves behind, and what it says on the way —
@@ -90,8 +138,8 @@ func exitCode(err error, stderr io.Writer) int {
 }
 
 // The environment is read exactly three times in this process, all of them on
-// the line above: [config.Load] for where things live and which switches are
-// on, [tier3.LoadSettings] for the Forge and Fly half, and
+// [runProcess]'s first line: [config.Load] for where things live and which
+// switches are on, [tier3.LoadSettings] for the Forge and Fly half, and
 // [claude.EndpointFromEnv] for the Anthropic credential. Each is a value from
 // that point on. There is deliberately no `settings()` helper any more -- a
 // function that reads the environment on demand is a global variable wearing

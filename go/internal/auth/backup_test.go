@@ -20,10 +20,7 @@ func TestBackupCopiesALiveAppDB(t *testing.T) {
 	}
 
 	// A live writer stays open across the backup, as the serving app would.
-	writer, err := auth.OpenReadWrite(src)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writer := auth.OpenReadWrite(src)
 	defer func() { _ = writer.Close() }()
 	if _, err := writer.Exec(
 		"INSERT INTO users (username, email, password_hash, is_admin, created_at) VALUES ('gyome', 'g@example.com', 'x', 0, '2026-08-24T00:00:00+00:00')",
@@ -40,10 +37,7 @@ func TestBackupCopiesALiveAppDB(t *testing.T) {
 		t.Fatalf("backup reports schema version %d; the ladder tops out past 11", version)
 	}
 
-	copyDB, err := auth.Open(dest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	copyDB := auth.Open(dest)
 	defer func() { _ = copyDB.Close() }()
 	var copied int
 	if err := copyDB.QueryRow("PRAGMA user_version").Scan(&copied); err != nil {

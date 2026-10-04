@@ -90,3 +90,22 @@ func BenchmarkDeckFromText(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkShelfAllRemembered is the same visit with the process's memory in
+// place -- the route's shape since the memo landed: a fresh FileSource per
+// visit over one Memo, the files unchanged between visits. The gap between
+// this and BenchmarkShelfAll is what a visit stopped costing.
+func BenchmarkShelfAllRemembered(b *testing.B) {
+	ctx := context.Background()
+	src := benchShelf(b, 25, 100).(*library.FileSource)
+	memo := library.NewMemo()
+	for b.Loop() {
+		all, err := library.NewFileSource(src.Root, false).WithMemo(memo).All(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(all) != 25 {
+			b.Fatalf("read %d decks", len(all))
+		}
+	}
+}

@@ -110,11 +110,7 @@ func deckAPI(t *testing.T, set claude.Settings, withAppDB bool) (*API, func()) {
 		AdminEmail: "alice@example.com"}
 	var db *sql.DB
 	if withAppDB {
-		var err error
-		db, err = auth.Open(appDB(t))
-		if err != nil {
-			t.Fatal(err)
-		}
+		db = auth.Open(appDB(t))
 		cfg.AppDB = db
 	}
 	return New(cfg), func() {

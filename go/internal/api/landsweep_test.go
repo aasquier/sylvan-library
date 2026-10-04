@@ -39,10 +39,7 @@ func newSweepRig(t *testing.T) *sweepRig {
 	t.Helper()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	dbPath := appDB(t)
-	db, err := auth.Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(dbPath)
 	t.Cleanup(func() { _ = db.Close() })
 	store, err := cache.Open(dbPath, quiet)
 	if err != nil {

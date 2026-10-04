@@ -27,10 +27,11 @@ func Backup(ctx context.Context, path, dest string) (int, error) {
 	if _, err := os.Stat(dest); err == nil {
 		return 0, fmt.Errorf("refusing to overwrite %s; move or remove it first", dest)
 	}
-	db, err := Open(path)
-	if err != nil {
-		return 0, err
-	}
+	// [Open] has no failure to report -- it builds a DSN and names a driver,
+	// and the argument is written out there. The first thing that can fail is
+	// the pragma read below, which is also the first thing that touches the
+	// file, so that is where a missing or unreadable `app.db` is discovered.
+	db := Open(path)
 	defer func() { _ = db.Close() }()
 
 	var version int

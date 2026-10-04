@@ -271,7 +271,15 @@ func (s *staticSite) etagFor(full string, info os.FileInfo) string {
 
 // etagCounts is the memo's hit/miss count since construction, for tests to
 // hold the *serving path* to actually reaching the memo -- the counter half
-// of the cache rule, never a rendered number (commandment 10).
+// of the cache rule.
+//
+// [New] hands it to the API as `api.Config.ETagCounts`, which is the only
+// way it leaves this package: the import runs door -> api and the site is
+// built before the API is, so a reader passed down is the only shape
+// available. It surfaces on `GET /api/admin/stats/system`, behind the admin
+// prefix the middleware refuses before routing -- machine facts for the one
+// admin, next to the schema rung and the resident set. Nothing a player can
+// see renders it, and nothing should (commandment 10).
 func (s *staticSite) etagCounts() (hits, misses int) {
 	s.etagMu.Lock()
 	defer s.etagMu.Unlock()

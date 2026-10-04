@@ -1,9 +1,15 @@
 /**
  * Card-table sounds, synthesised.
  *
- * Web Audio, not audio files: the repo ships no recordings, pays no licence
+ * Web Audio, not audio files: the table ships no recordings, pays no licence
  * questions and adds nothing to the bundle — a riffle is a run of short
  * bursts of band-passed noise, which is very nearly what a riffle *is*.
+ *
+ * **One exception, and it is argued rather than slipped in.** A room that is footage ships the sound its render came with
+ * (`components/roomtone.tsx` plays the bed; `clip()` below plays a reaction's
+ * own second of it). Those are Aaron's own output, like the picture, so the
+ * licence question is the one the picture already answered; what they cost is
+ * bytes, and each is a few seconds of AAC rather than a track.
  *
  * Two rules, both structural:
  *
@@ -259,6 +265,113 @@ export function wheelTurn(degrees: number, durMs: number): void {
  * scheduled from a timer finds a context already running — and answers with
  * two soft taps so the switch is heard flipping.
  */
+/**
+ * One recorded sound, once — a reaction's own audio in a room that is
+ * footage (`components/cauldron.tsx`). Gated like everything here: nothing
+ * plays, and nothing is fetched, unless the switch is on. Plain `Audio`
+ * rather than the synth graph, because a decoded file has nothing to shape;
+ * the browser's own autoplay rule applies, and a refusal is silence rather
+ * than an error anybody sees.
+ */
+export function clip(url: string, volume = 1): void {
+  if (!soundOn()) return
+  if (typeof Audio === 'undefined') return
+  const a = new Audio(url)
+  a.volume = volume
+  let p: Promise<void> | undefined
+  try {
+    p = a.play() as Promise<void> | undefined
+  } catch {
+    return
+  }
+  if (p && typeof p.catch === 'function') p.catch(() => undefined)
+}
+
+/* ------------------------------------------------------------- the beds
+ *
+ * A room's own sound, looped through this graph rather than through an
+ * `<audio loop>` element — because the element cannot loop AAC without a
+ * gap. The codec pads every file with a few dozen milliseconds of silence at
+ * each end (its priming and its padding), the element plays them, and a
+ * three-second simmer stutters once every three seconds. Heard on Aaron's
+ * seventh walk. A decoded `AudioBuffer` looped by an `AudioBufferSourceNode`
+ * is sample-accurate, and the loop points below are read off the decoded
+ * samples so whatever silence the decoder leaves is outside the loop.
+ *
+ * One bed at a time: a room is one place. Decoded buffers are kept per URL
+ * so leaving and re-entering a room does not fetch and decode it twice. */
+let bedNode: AudioBufferSourceNode | null = null
+/** The start that is still decoding; stopping before it lands cancels it. */
+let bedToken: { cancelled: boolean } | null = null
+const bedBuffers = new Map<string, Promise<AudioBuffer>>()
+
+/** The first and last sample above the floor, in seconds: the loop points. */
+function loopPoints(buffer: AudioBuffer): [number, number] {
+  const floor = 0.002
+  const data = buffer.getChannelData(0)
+  let a = 0
+  let b = data.length - 1
+  while (a < b && Math.abs(data[a] ?? 0) < floor) a++
+  while (b > a && Math.abs(data[b] ?? 0) < floor) b--
+  return [a / buffer.sampleRate, (b + 1) / buffer.sampleRate]
+}
+
+function decodeBed(c: AudioContext, url: string): Promise<AudioBuffer> {
+  let pending = bedBuffers.get(url)
+  if (!pending) {
+    pending = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((bytes) => c.decodeAudioData(bytes))
+    bedBuffers.set(url, pending)
+    // A failed fetch is not remembered, or the room would be silent for the
+    // life of the page over one dropped request.
+    pending.catch(() => bedBuffers.delete(url))
+  }
+  return pending
+}
+
+/**
+ * Start a room's bed, looped and gapless. Answers `false` when there is no
+ * graph to play it through — the switch is off, or there is no Web Audio
+ * at all — so the caller can fall back to an element, which is what
+ * `components/roomtone.tsx` does in a browser without one (and in jsdom).
+ */
+export function bedStart(url: string, volume = 1): boolean {
+  if (!soundOn() || typeof AudioContext === 'undefined') return false
+  bedStop()
+  const token = { cancelled: false }
+  bedToken = token
+  play((c) => {
+    void decodeBed(c, url).then((buffer) => {
+      if (token.cancelled) return
+      const node = c.createBufferSource()
+      node.buffer = buffer
+      node.loop = true
+      const [start, end] = loopPoints(buffer)
+      node.loopStart = start
+      node.loopEnd = end
+      const gain = c.createGain()
+      gain.gain.value = volume
+      node.connect(gain)
+      gain.connect(master ?? c.destination)
+      node.start(0, start)
+      bedNode = node
+    }).catch(() => undefined)
+  })
+  return true
+}
+
+/** Stop the bed, if one is playing or about to. */
+export function bedStop(): void {
+  if (bedToken) bedToken.cancelled = true
+  bedToken = null
+  if (bedNode) {
+    try { bedNode.stop() } catch { /* already stopped */ }
+    bedNode.disconnect()
+    bedNode = null
+  }
+}
+
 export function wake(): void {
   play((c) => {
     const t = c.currentTime

@@ -353,14 +353,27 @@ func TestSimCacheListsAndClears(t *testing.T) {
 	d := simHome(t, false)
 	path := filepath.Join(d.DataDir, "app.db")
 
-	// An absent app.db is read as an empty one, never minted -- the door's
-	// rule is that a reader never acquires a database, and the printed
-	// words are identical to a real empty store's.
+	// An absent app.db is read, never minted -- the door's rule is that a
+	// reader never acquires a database.
+	//
+	// **And it no longer reads as a working empty cache.** This assertion used
+	// to want `enabled: yes` here, on the argument that the printed words
+	// should be identical to a real empty store's -- and that sentence was the
+	// bug. `openSimStore` answers nil for three different boxes: one with no
+	// `app.db` at all, one whose ladder would not run, and one whose file
+	// would not open. All three printed `enabled: yes` over `rows: 0`, which
+	// is the one pairing `enabled` exists to tell apart from an empty cache
+	// that works -- so the state the field was built to make visible was the
+	// state it hid. A box with nothing to cache into is not caching, and says
+	// so; a store that is *attached* and merely erroring still reports the
+	// cache configured, which is a different sentence and `cache`'s own
+	// `closedstore_test.go` argues it.
 	out, err := d.run(t, "sim", "cache")
 	if err != nil {
 		t.Fatalf("sim cache: %v", err)
 	}
-	if want := "store:   " + path + "\nenabled: yes\nrows:    0 (0.0 kB)\n"; out != want {
+	if want := "store:   " + path +
+		"\nenabled: no -- results are not cached\nrows:    0 (0.0 kB)\n"; out != want {
 		t.Errorf("empty cache = %q, want %q", out, want)
 	}
 
@@ -408,6 +421,16 @@ func TestSimCacheListsAndClears(t *testing.T) {
 	}
 	if !strings.Contains(out, "rows:    0 (0.0 kB)\n") {
 		t.Errorf("cache did not empty\n%s", out)
+	}
+	// **The other half of the pair, and the reason the first assertion is a
+	// fix rather than a rename.** This is a real store over a real `app.db`
+	// with nothing in it -- zero rows and caching on -- and it has to read
+	// differently from the box at the top that had no store at all. Without
+	// this line the change above could be satisfied by a `Stats` that always
+	// answered no.
+	if !strings.Contains(out, "enabled: yes\n") {
+		t.Errorf("an empty cache over a real app.db reads as switched off, "+
+			"which is the sentence a box with no app.db gets\n%s", out)
 	}
 }
 
@@ -486,10 +509,7 @@ func TestSimMatchesRendersTheLedger(t *testing.T) {
 		Seats:       map[int]string{1: "arahbo", 2: "gyome"},
 		WallSeconds: 12.5,
 	}
-	rec, err := ledger.NewRecorder(path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rec := ledger.NewRecorder(path, nil)
 	if id := rec.Record(context.Background(), ledger.Match{
 		Run: run, Decks: []*deck.Deck{arahbo, gyome},
 		Clock: 300, GamesRequested: 2, Hosted: false,

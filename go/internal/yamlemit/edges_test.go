@@ -151,7 +151,7 @@ func TestTheRoundTripCheckSaysNoFourSeparateWays(t *testing.T) {
 		name  string
 		text  string
 		key   string
-		value any
+		value string
 	}{
 		{"the fold produced more than one key", "a: 1\nb: 2\n", "a", "1"},
 		{"the key is not in what came back", "a: 1\n", "b", "1"},
@@ -161,27 +161,20 @@ func TestTheRoundTripCheckSaysNoFourSeparateWays(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			ok, err := roundTrips(tc.text, tc.key, tc.value)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			if ok {
+			if roundTrips(tc.text, tc.key, tc.value) {
 				t.Fatal("the check accepted it")
 			}
 		})
 	}
-	// A value the style cannot render at all is a different answer from "the
-	// fold was not faithful": the check reports the error rather than
-	// quietly asking the caller to try again unfolded, which would loop.
-	if _, err := roundTrips("a: x\n", "a", 1.5); err == nil {
-		t.Fatal("a value with no spelling was answered as a failed fold")
-	}
 	// And a fold that really does round-trip is accepted, so the sweep above
 	// is not passing on a check that refuses everything.
-	ok, err := roundTrips("why: Green.\n", "why", "Green.")
-	if err != nil || !ok {
-		t.Fatalf("a faithful fold was refused: %v %v", ok, err)
+	if !roundTrips("why: Green.\n", "why", "Green.") {
+		t.Fatal("a faithful fold was refused")
 	}
+	// The fifth way of saying no used to be a value with no spelling at all,
+	// answered as an error. It is gone with the `any`: only a string folds,
+	// `Render` refuses the rest before the check is reached, and a case no
+	// caller could produce is not a case to keep.
 }
 
 func TestThePlainWriterKeepsABreakRunAsABlankLine(t *testing.T) {

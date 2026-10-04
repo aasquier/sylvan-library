@@ -33,12 +33,11 @@ import (
 // refuses to create one.
 func TestAFaultyHandleOverNothingFailsAtTheConnectionRatherThanLater(t *testing.T) {
 	t.Parallel()
-	db, _, err := faultyHandle(filepath.Join(t.TempDir(), "absent.db"), "rw")
-	if err != nil {
-		// The handle is built from a DSN, so `sql.OpenDB` itself cannot fail;
-		// if a future driver makes it fail, that is the right answer too.
-		return
-	}
+	// Building the handle cannot fail -- it is a DSN and a connector, and
+	// `faultyHandle`'s own comment argues why it no longer pretends otherwise
+	// -- so the refusal has to arrive at the first connection, and that is
+	// what this asks for.
+	db, _ := faultyHandle(filepath.Join(t.TempDir(), "absent.db"), "rw")
 	t.Cleanup(func() { _ = db.Close() })
 	if err := db.PingContext(context.Background()); err == nil {
 		t.Fatal("a handle over a file that does not exist answered a ping")

@@ -121,10 +121,7 @@ func DraftRationales(ctx context.Context, d *deck.Deck, cards []string,
 	if !effective.AllowsCalls() {
 		return nil, IntakeOutcome{Stance: effective, Reason: draftOffReason}, nil
 	}
-	mode, err := GetMode(ModeRationaleDraft)
-	if err != nil {
-		return nil, IntakeOutcome{}, err
-	}
+	mode := modeOf(ModeRationaleDraft)
 
 	wanted := foldedSet(cards)
 	out := []Draft{}
@@ -206,10 +203,7 @@ func FileCards(ctx context.Context, d *deck.Deck, cards []string,
 	if !effective.AllowsCalls() {
 		return nil, IntakeOutcome{Stance: effective, Reason: draftOffReason}, nil
 	}
-	mode, err := GetMode(ModeIntakeFiling)
-	if err != nil {
-		return nil, IntakeOutcome{}, err
-	}
+	mode := modeOf(ModeIntakeFiling)
 
 	wanted := foldedSet(cards)
 	out := []Filing{}
@@ -274,10 +268,7 @@ func DescribeDeck(ctx context.Context, d *deck.Deck,
 	if !effective.AllowsCalls() {
 		return Description{}, IntakeOutcome{Stance: effective, Reason: draftOffReason}, nil
 	}
-	mode, err := GetMode(ModeDeckDescription)
-	if err != nil {
-		return Description{}, IntakeOutcome{}, err
-	}
+	mode := modeOf(ModeDeckDescription)
 	var payload Description
 	asked, err := askIntake(ctx, mode, effective, req, describeOpening(d), &payload)
 	if err != nil {
@@ -361,12 +352,7 @@ const IntakeDefaultPreset = "consultant"
 // the same bug.
 func IntakeStanceFor(requested any, limit *Stance) (Stance, error) {
 	if requested == nil {
-		ceil := ceilingOr(limit)
-		preset, err := Preset(IntakeDefaultPreset)
-		if err != nil {
-			return Stance{}, err
-		}
-		return Clamp(preset, ceil), nil
+		return defaultStance(IntakeDefaultPreset, limit), nil
 	}
 	return Resolve(requested, nil, limit)
 }

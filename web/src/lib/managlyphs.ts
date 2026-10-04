@@ -14,9 +14,12 @@
  * both halves of that argument and still puts the official art on screen:
  * the real symbols are served from *this app's own origin* out of a runtime
  * cache, and these drawings are what a pip falls back to when that cache is
- * cold and the network is away. Two jobs remain theirs alone: the fallback,
- * and the pentagram's vertices, which place `GLYPH_PATH` in their own
- * coordinate space as part of one hand-drawn diagram. Roughly 2 kB in the
+ * cold and the network is away. One job remains theirs alone: the fallback —
+ * in prose, in a cost, and on the colour wheel's vertices, which once wore
+ * these paths as part of one hand-drawn diagram and now wear the official
+ * symbol like every other pip, with `GLYPH_PATH` behind it (Aaron's ruling,
+ * on the walk: the wheel is the one place a newcomer learns the five marks,
+ * and it taught different drawings from the cards). Roughly 2 kB in the
  * bundle, no requests, and it works offline — which is exactly what a
  * fallback is for.
  *

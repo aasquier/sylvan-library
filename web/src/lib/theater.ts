@@ -32,6 +32,67 @@ export function theaterRows(partial: unknown): ForgeGameRow[] {
   return Array.isArray(rows) ? (rows as ForgeGameRow[]) : []
 }
 
+/**
+ * A stretch of time in the room's words rather than in bare seconds.
+ *
+ * Everything in the Coliseum used to render as a raw count — `seconds: 312`,
+ * "called off at 300s" — which is a unit a machine chose. Three hundred
+ * seconds is five minutes and nobody has ever thought about it in any other
+ * way; a newcomer least of all (commandment 2). Under a minute it stays in
+ * seconds, because "0m 47s" is a worse sentence than "47s" and a bout that
+ * short is genuinely a matter of seconds.
+ *
+ * Lives here rather than in the room because the stage needs it too, and two
+ * spellings of a duration is how one surface starts saying "5m" where its
+ * neighbour says "300s" about the same fight.
+ */
+export function spell(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds))
+  if (whole < 60) return `${whole}s`
+  const minutes = Math.floor(whole / 60)
+  const rest = whole % 60
+  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
+}
+
+/**
+ * What is left of a match, measured off the bouts it has already fought.
+ *
+ * **The one thing a person watching a match is not told.** The stage says how
+ * many games have landed and draws a bar, and a match is the longest wait in
+ * this application — ten whole games of Commander, minutes each. "Played four
+ * of ten" answers how far in; it does not answer whether to wait or to go and
+ * make tea, and the generic sentence under the feed spans a factor of twenty
+ * ("a few seconds … two minutes").
+ *
+ * Returns null whenever there is nothing honest to say: nothing left to fight,
+ * or fewer than two games to measure. **Two is the floor and it is a real
+ * decision** — one game is a sample of one, and a first game is the slowest of
+ * the match because the forge lights from cold, so an estimate drawn from it
+ * alone would promise a wait roughly double the truth.
+ *
+ * **The median, never the mean** — the house's own rule for Forge's numbers,
+ * and here it is what stops one wide board where a pilot thought for two
+ * minutes from doubling the figure for the eight quick games around it. On an
+ * even sample it takes the **upper** of the two middles rather than averaging
+ * them: deliberately pessimistic, because this file's own history records what
+ * happens when a wait outlives its estimate — it reads as a broken page, and
+ * running short of a guess nobody minds.
+ *
+ * Every finished game counts toward the pace, a draw and a clock-out included:
+ * they are not wins, but they are minutes somebody sat through, and the
+ * question here is time rather than score.
+ */
+export function whatIsLeft(
+  rows: readonly ForgeGameRow[], games: number,
+): { games: number; seconds: number } | null {
+  const left = games - rows.length
+  if (left <= 0 || rows.length < 2) return null
+  const sorted = rows.map((r) => Math.max(0, r.seconds)).sort((x, y) => x - y)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  if (median == null) return null
+  return { games: left, seconds: median * left }
+}
+
 /** What to call a deck in a line that has to stay one line.
  *
  * A deck is *usually* named for its commander and then for what it does —

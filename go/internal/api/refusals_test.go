@@ -336,10 +336,7 @@ func TestAnotherAccountsPrivateDeckIsAbsentOnEveryRoute(t *testing.T) {
 func TestAStrangerWhoCanSeeADeckStillCannotChangeIt(t *testing.T) {
 	t.Parallel()
 	decks := decksDir(t)
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{Pool: pooltest.Open(t), DecksDir: decks,
 		AdminEmail: "alice@example.com", AppDB: db})
@@ -480,10 +477,7 @@ func TestAnArtifactNameThatIsNotADeliverableIsRefused(t *testing.T) {
 // refresh.
 func TestEveryDeckReadDegradesRatherThanFailingWithoutAPool(t *testing.T) {
 	t.Parallel()
-	db, err := auth.Open(appDB(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := auth.Open(appDB(t))
 	defer func() { _ = db.Close() }()
 	a := New(Config{DecksDir: decksDir(t), AdminEmail: "alice@example.com", AppDB: db})
 

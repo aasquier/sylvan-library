@@ -17,10 +17,7 @@ import (
 // snippet pasted around CLAUDE.md and the mtg-lab skill, so the lookup is
 // the binary's own.
 func cardsCommand(cfg config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "cards",
-		Short: "Ask the card pool directly",
-	}
+	cmd := family("cards", "Ask the card pool directly")
 	cmd.AddCommand(cardsShowCommand(cfg))
 	return cmd
 }

@@ -259,7 +259,7 @@ func TestTheRunningTotalIsAnFsumAndNotASum(t *testing.T) {
 	// floats.Fsum call. That distinction is the whole test: recomputing the
 	// sum here passes against a weightedSample that adds in a loop, which was
 	// confirmed by mutation before this was rewritten.
-	_, totals := weightedSample(mt19937.New(0), len(Spread))
+	_, totals := weightedSample(mt19937.New(0), FullDeck, len(Spread))
 	if len(totals) != len(c.PoolTotals) {
 		t.Fatalf("the sampler used %d totals, the corpus records %d",
 			len(totals), len(c.PoolTotals))

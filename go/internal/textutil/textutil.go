@@ -26,6 +26,7 @@ package textutil
 import (
 	"strings"
 	"time"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -63,18 +64,25 @@ func SplitJoin(s string) string {
 func Len(s string) int { return utf8.RuneCountInString(s) }
 
 // Head is the first n code points.
+//
+// One walk and one return, which is both faster and smaller than the shape
+// this used to have: a [Len] call to decide whether to cut at all, and then a
+// loop whose own trailing `return s` no caller could ever fall past — the
+// guard had already proved there is an (n+1)th rune to stop at, so that line
+// was a statement Go required and nothing could reach. Cutting at the end of
+// the string unless the walk finds an earlier boundary says the same thing
+// with nothing unreachable in it.
 func Head(s string, n int) string {
-	if Len(s) <= n {
-		return s
-	}
+	cut := len(s)
 	count := 0
 	for i := range s {
 		if count == n {
-			return s[:i]
+			cut = i
+			break
 		}
 		count++
 	}
-	return s
+	return s[:cut]
 }
 
 // lineBoundaries is every character [SplitLines] treats as a line break,
@@ -152,4 +160,71 @@ func Isoformat(t time.Time) string {
 		return t.Format("2006-01-02T15:04:05") + "+00:00"
 	}
 	return t.Format("2006-01-02T15:04:05.000000") + "+00:00"
+}
+
+// Unescape turns a JSON-style `\uXXXX` escape that survived into a string
+// back into the character it names, surrogate pairs included, and leaves
+// everything else exactly as it was.
+//
+// A model asked for JSON sometimes writes an escape *inside* the text of a
+// field — `—` where it meant an em dash — and after the one decode the
+// wire is owed, the string carries a literal backslash-u that a page then
+// prints as six characters of punctuation nobody wrote. Seen on the
+// storyteller's first question ("which story this deck wants to be —
+// so tell me"). This is the narrowest repair: only well-formed
+// `\u` escapes are touched, an unpaired surrogate is left as it was rather
+// than turned into U+FFFD, and `\n` or a stray backslash are not this
+// function's business — they are what somebody typed.
+func Unescape(s string) string {
+	if !strings.Contains(s, `\u`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		r, ok := hexEscape(s, i)
+		if !ok {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		i += 6
+		if utf16.IsSurrogate(r) {
+			if r2, ok2 := hexEscape(s, i); ok2 && utf16.IsSurrogate(r2) {
+				if joined := utf16.DecodeRune(r, r2); joined != utf8.RuneError {
+					b.WriteRune(joined)
+					i += 6
+					continue
+				}
+			}
+			// A lone half: not a character, so it stays the text it was.
+			b.WriteString(s[i-6 : i])
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// hexEscape reads `\uXXXX` at byte i, if that is what is there.
+func hexEscape(s string, i int) (rune, bool) {
+	if i+6 > len(s) || s[i] != '\\' || s[i+1] != 'u' {
+		return 0, false
+	}
+	var r rune
+	for _, c := range s[i+2 : i+6] {
+		var d rune
+		switch {
+		case c >= '0' && c <= '9':
+			d = c - '0'
+		case c >= 'a' && c <= 'f':
+			d = c - 'a' + 10
+		case c >= 'A' && c <= 'F':
+			d = c - 'A' + 10
+		default:
+			return 0, false
+		}
+		r = r<<4 | d
+	}
+	return r, true
 }

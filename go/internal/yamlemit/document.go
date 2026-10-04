@@ -100,6 +100,21 @@ func (e *emitter) node(value any, simpleKey bool) error {
 	}
 }
 
+// keyNode writes a mapping key, in either of the two positions a key can sit
+// in.
+//
+// `node`'s scalar arm asks `scalarOf` for the spelling and can be refused: a
+// value whose Go type has none. A key cannot be. `Pair.Key` is a string, and a
+// string always has a spelling -- so this is that arm with the refusal left
+// out, rather than a refusal threaded back through two call sites that no
+// payload could ever reach. It writes the same bytes the arm wrote, which is
+// what `testdata/documents.json` holds it to.
+func (e *emitter) keyNode(key string, simpleKey bool) {
+	e.increaseIndent(true)
+	e.processScalar(key, stylePlain, resolvesToString(key), simpleKey)
+	e.popIndent()
+}
+
 // blockMapping writes a block mapping: each key in its simple or long form,
 // then its value.
 func (e *emitter) blockMapping(m Map) error {
@@ -107,9 +122,7 @@ func (e *emitter) blockMapping(m Map) error {
 	for _, p := range m {
 		e.writeIndent()
 		if simpleEnoughForAKey(p.Key) {
-			if err := e.node(p.Key, true); err != nil {
-				return err
-			}
+			e.keyNode(p.Key, true)
 			// The value follows on the same line, after the `:`.
 			e.writeIndicator(":", false, false, false)
 		} else {
@@ -119,9 +132,7 @@ func (e *emitter) blockMapping(m Map) error {
 			// key comes from a URL segment (`PUT .../notes/{key}`), so the
 			// state is reachable by somebody rather than only by a fuzzer.
 			e.writeIndicator("?", true, false, true)
-			if err := e.node(p.Key, false); err != nil {
-				return err
-			}
+			e.keyNode(p.Key, false)
 			// The value gets its own line under the `:`.
 			e.writeIndent()
 			e.writeIndicator(":", true, false, true)

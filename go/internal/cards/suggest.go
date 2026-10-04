@@ -2,6 +2,7 @@ package cards
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/aasquier/sylvan-library/go/internal/pool"
@@ -148,16 +149,18 @@ func Suggest(ctx context.Context, c *pool.Conn, text string, limit int) ([]Sugge
 		return nil, err
 	}
 	defer rows.Close()
+	var scanned error // see [SetCodes]
 	for rows.Next() {
 		var s Suggestion
 		var tier int
-		if err := rows.Scan(&s.Name, &s.Score, &tier); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&s.Name, &s.Score, &tier))
 		s.Via = tierNames[tier]
 		out = append(out, s)
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Suggestion is one offered name, how alike it is to what was typed, and

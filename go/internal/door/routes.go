@@ -63,11 +63,16 @@ func newRouteTable(routes []api.Route) (*routeTable, error) {
 		if r.Pattern != NormalisePath(r.Pattern) {
 			return nil, fmt.Errorf("route pattern %q is not canonical", r.Pattern)
 		}
+		// **No empty-segment check here, and the reason is three lines up.**
+		// `NormalisePath` is `path.Clean` plus a trailing-slash trim, and its
+		// output has no empty segment in it -- `//api/decks` normalises to
+		// `/api/decks` and `/api/decks/` to `/api/decks` -- so the canonical
+		// check above has already refused every pattern that could carry one.
+		// A refusal that cannot fire is worse than no refusal: it reads as the
+		// thing that catches `/api//decks`, and the thing that catches
+		// `/api//decks` is "not canonical".
 		segs := strings.Split(strings.TrimPrefix(r.Pattern, "/"), "/")
 		for _, s := range segs {
-			if s == "" {
-				return nil, fmt.Errorf("route pattern %q has an empty segment", r.Pattern)
-			}
 			if strings.ContainsAny(s, "{}") && !paramRe.MatchString(s) {
 				return nil, fmt.Errorf("route pattern %q has a malformed parameter %q", r.Pattern, s)
 			}

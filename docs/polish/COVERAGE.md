@@ -70,6 +70,10 @@ lever and a grind is visible before the work starts.
 | floor in `ci.yml` | 95.0 (set at a measured 96.6, 2026-09-24) | |
 | merged `main` after the cleanup step, 2026-09-28 | **97.0%** (run 36504824056) | |
 | floor in `ci.yml` | **95.5** (ratcheted 2026-09-29 at that 97.0; Aaron: "ratchet", the gap is kept) | |
+| the night lane of 2026-10-03, either side of its own nine statements | **97.0%** flat | 97.00% → **97.04%** |
+| **the climb to 99, 2026-10-03 (eight lanes, one integration PR)** | **99.4%** | 136 missing of 21,694, 85 functions |
+| wave two, 2026-10-03 (three lanes on the pool seam and the `sql.Open` / `crypto/rand` classes) | **99.5%** | 106 missing of 21,677, 67 functions |
+| floor in `ci.yml` | **98.0** (ratcheted 2026-10-03 at the arm64 leg's 99.4 on #549; the gap is kept; next click 98.5 at a printed 99.7) | |
 
 **Leg two is the leg that says the climb is over**, and the number is the
 argument: 96.6 → 96.7, eleven statements, from four fixes that were each worth
@@ -105,8 +109,8 @@ package costs coverage" trap below, paid knowingly and kept small — the first
 `authtest/faulty.go` paid forty-nine of them. **CI's arm64 print on the merged
 branch is the authority; neither lane's local number is.**
 
-The gate is at 95.5 and the tree is over 97 because Aaron asked for exactly
-that pair: a diff can cost a few tenths of honest refactoring without going
+The gate is at 98.0 and the tree is over 99 because Aaron asked, on
+2026-09-29, for exactly this pair's shape (then 95 under 96): a diff can cost a few tenths of honest refactoring without going
 red, and a diff that costs a whole point is what the floor exists to notice.
 
 **How the climb was paid for.** Nine lanes, one per package group, each
@@ -151,15 +155,81 @@ exists.
 
 ## Left deliberately
 
+> **Reopened by Aaron on 2026-10-03.** His ask — *"get our test coverage up
+> to 99% … you might have to rewrite some stubborn code to be more testable"*
+> — turned this list from branches-to-skip into branches whose honest closure
+> needs a code change, and licensed the change. Eight Opus lanes, one per
+> package group, read every entry below and answered each one of three ways,
+> in order of preference: **reach it** (a fixture that produces the fault),
+> **hand the value in** (a seam whose default is itself tested), or **delete a
+> branch that is dead by a fact about the code**, with the argument in a
+> comment at the site. 652 missing → 136, 97.0 → 99.4. The entries
+> below are kept as they stood, each annotated with what became of it, because
+> the *shape* of each one is still the useful part — and three of them turned
+> out to be wrong, which is worth more than the statements.
+>
+> **What closed, by class.** *A scan into `*any` cannot fail* — folded into the
+> walk's own `rows.Err()` verdict across `pool`, `deckread`, `library`,
+> `cards`; nothing dropped. *`sql.Open` never fails for a registered driver* —
+> deleted inside `auth`, `authtest`, `night`, `door`, `cmd/mtglab`, `api`
+> (modernc.org/sqlite implements `driver.Driver` only, probed not assumed);
+> the exported signatures still carry the error, so the CALLERS' arms are wave
+> two's. *`RowsAffected`/`LastInsertId` after a successful `Exec`* — deleted in
+> `night`'s store and `auth.Create`, the count still checked. *Guards over
+> embedded data* — `GetMode(constant)` became `modeOf(name)` which panics by
+> name; `tools.go`'s nil arms moved to a load-time check; the `init`s became
+> `loadX(raw []byte)` seams driven with bad documents. *`crypto/rand` failing*
+> in `tarot`, `brew`, `wheel`, `shelves` — entropy is an `io.Reader` handed in,
+> the default tested once. *The second read that cannot fail* —
+> `writeTargetWith` hands back the writer `writeTarget` already resolved. *The
+> three `karsten` memo caps* — `remembering(table, key, value, limit)`. *The
+> `deckread` dossier's ten* — the pool seam below. *`prompt.secret`'s pty* —
+> `prompt.tty terminal`, whose default is drivable without a pty because
+> `term.ReadPassword` refuses a non-tty fd; the 2026-09-29 closure is reopened
+> honestly.
+>
+> **The seam the queue asked for exists**: `pool.NewOver(path, log, connect)`
+> with `pool.Connect func(ctx, path) (*sql.DB, error)`, zero value byte-for-byte
+> the old `acquire`; reached from tests through `pooltest.OpenFaultyPool(t)` /
+> `pooltest.FaultyPoolOver(t, path)` with `fault.After(n)` and
+> `fault.RowsAfter(n)`. A Pool memoises `Columns`/`GetCards`, so a fresh Pool
+> per budget; the budget is spent across every statement including `Columns`'
+> one-row-per-column, so sweep a range; one pool file per parallel subtest.
+>
+> **Three entries were wrong.** `simMulliganCommand`'s non-flat `BEST:` arm did
+> NOT need a deck the fixture cannot express — flatness is measured against
+> the default, and 36 lands + 63 Sol Rings at seed 7 reports +0.61.
+> `ApplyBulk`'s fold-error arms are reachable with nothing hand-built:
+> `PlanBulk`'s pre-check is `if err == nil`, so a deck whose `cards:` is a flow
+> sequence walks past it. And `decklist.digitValue`'s "unreachable" fallback is
+> **reachable and a bug**: U+1D7CE–U+1D7FF is one contiguous run of fifty Nd
+> code points, so `digitValue('𝟙')` answers 0 where Python's `int()` (the
+> recorded semantics) says 1 — a pasted `𝟙 Sol Ring` reads as quantity 0. Left
+> unfixed on purpose: a behaviour change in a grammar held to frozen corpora
+> is Aaron's call, and no test was written for the one input the arm gets
+> right, because that would make a broken function read as covered.
+>
+> **New classes, from the lanes that hit them.** *DuckDB connects eagerly at
+> `sql.Open`*, so `pool.Open`'s ping can never be the first failure. *The
+> DuckDB appender type-asserts the concrete driver conn*, so a wrapped faulty
+> connector fails at the appender rather than at its budget — `rebuild.finish`'s
+> four are unreachable by any connector fixture. *`tier3.homeDirFrom`* wants
+> `os.UserHomeDir` to fail in a process that has `HOME` — the `prompt.secret`
+> kind of entry, seam present, default unreachable, not worth removing the
+> platform fallback. *The `GOCACHE` is shared across worktrees*: a test that
+> locates `testdata/` by source path can read a sibling lane's tree, which is
+> why forge failures under parallel lanes name another lane's `fakejava`.
+
 Every lane named what it judged unreachable and why, so that a future pass
 reads this list before spending an hour on a branch that cannot be entered
 honestly. **A branch whose comment says it is unreachable is not coverage to
 take**; calling past the guard proves nothing and leaves a test that reads
 as meaningful to whoever finds it next.
 
-- `deckyaml.orderedValue`'s map cases and `sortedKeys` (only reachable from
-  them), and `checkCompanion`'s `condition == ""` — the two standing entries,
-  still standing.
+- `deckyaml.orderedValue`'s map cases and `sortedKeys` — **closed 2026-10-03**
+  by an in-package call with what a decoder that stopped honouring
+  `UseOrderedMap` would hand it. `checkCompanion`'s `condition == ""` — the
+  one standing entry, still standing.
 - **Second reads that cannot fail after a first succeeded**: `src.ReadText`
   in `internal/api/edits.go` after `writeTarget`'s `Get`; the duplicate
   `library.WriterFor` calls in `lifecycle.go`; `commanderRecords` after the
@@ -236,8 +306,16 @@ as meaningful to whoever finds it next.
   `pooltest.OpenFaulty` is exactly that pool, but `deckread` reaches it through
   a `*pool.Pool`, and a Pool opens its own file inside `acquire`. One field on
   `Pool` closes this and three other packages' equivalents; it is a daybreak
-  item (White, 2026-09-26) rather than something a coverage lane took on its
-  own.
+  item rather than something a coverage lane took on its own.
+  **Re-queued 2026-10-03 (White) after this paragraph was found pointing at a
+  queue entry that was not there**: the 2026-09-26 item left `DAYBREAK.md`
+  during the 09-28 regroup without a ruling, and a coverage lane four nights
+  later read this sentence, went looking for the item, and found nothing. It is
+  now the largest non-deliberate gap in the tree — ten statements, 1.5% of
+  everything still missing, in one function — which is the whole argument for
+  asking again rather than writing it into the list above. A fact recorded in
+  prose is a claim to re-check: this one rotted in the file whose own job is to
+  say so.
 
 The 2026-09-26 grind added four more, and they are **classes** rather than
 branches — each one names a shape to recognise rather than a line to skip:
@@ -516,6 +594,44 @@ the one database it could not reach:
     the same arms through `SweepBulk` and assert the thing that matters — that a
     file the sweep cannot confidently name is left where it is.
 
+The night lane of 2026-10-03 added two, and the first is a **sweep** rather
+than a fixture — it names a shape to go looking for across the whole tree:
+
+36. **The seam's own default.** Every injection in this tree leaves behind a
+    one-line wrapper composing the real thing — `LoadSettingsFrom(os.Getenv)`,
+    `DownloadBulkFrom(ctx, BulkIndex, …)`, `nightPlayer{a}.Play` over
+    `playNightBout` — and by construction every test drives the *injected*
+    half. So the wrapper is the line the deployed binary runs and no test does,
+    and it sits at exactly 0% until somebody goes looking. Lever 8 found two of
+    them by noticing; the sweep finds the rest, and `grep -rn 'os.Getenv'`
+    plus the 0% rows of `-func` is the whole method. What makes each one worth
+    a test rather than a shrug is that a wrong argument in a wrapper is
+    invisible: a blank lookup, a mirror URL, a different method, `return 0,
+    nil`. Three shapes of assertion, one per kind:
+    **a fact of this process** (`LoadSettings().PathList` must equal
+    `os.Getenv("PATH")` — the one variable copied verbatim rather than
+    defaulted, and set in every process that can run a Go test);
+    **the URL in a refusal** (`http.Transport.RoundTrip` selects on
+    `ctx.Done()` before it dials, so a pre-cancelled context is refused with
+    no network and `http.Client` wraps it in a `*url.Error` carrying the URL
+    it was going to ask — 0.00s, no stub); and
+    **agreement rather than a restated message** (over the thinnest state with
+    a definite answer, the seam and the method it delegates to must answer the
+    same way, whatever that way is).
+37. **A doctrine the tree applies everywhere and enforces nowhere is the claim
+    to make checkable** — lever 27 with the target chosen by *how the rule is
+    stated* rather than by what a checklist greps. "A reader of the process
+    became a lookup handed in" is in `CLAUDE.md`, in ADR 39 and ADR 40, and in
+    four package comments; nothing held it, and the failure it prevents is not
+    in the diff that breaks it — it arrives weeks later as a `t.Setenv`
+    somebody could not avoid beside a `t.Parallel`. `processreaders_test.go`
+    is the register (seven argued readers, held equal both ways). Two things
+    it taught about writing one: match the **selector** and not the
+    `CallExpr`, because this tree's own registered readers pass `os.Getenv`
+    *as a value* (`envOr(os.Getenv, …)`); and cover every spelling
+    (`Getenv`, `LookupEnv`, `Environ`, `ExpandEnv`) or a different word is the
+    way around it.
+
 ## Corrections to this file
 
 **A corrupt pool is not a failing pool.** #290 predicted that pointing
@@ -626,6 +742,15 @@ and `ci.yml` gated on the other.
   None`, which reads like a broken JVM. The fix is one committed executable
   (`testdata/fakejava`) and per-test **data** it reads from the subprocess's
   cwd, which `spawn` already makes the Forge home.
+- **`OpenWriter` makes its own parent, so "the directory is not there" is not
+  a fixture.** `pool.OpenWriter` calls `os.MkdirAll` on the file's directory
+  before `sql.Open`, so the only way to fail it from outside is a parent that
+  is not writable — and then `removeBuild`, which runs first, calls
+  `os.Remove` on a name that does not exist inside it. Linux answers ENOENT
+  there (which `removeBuild` reads as absence and ignores, correctly) but that
+  is a lookup-before-permission ordering rather than a promise, so the fixture
+  lands on the *already covered* branch on any platform that checks the other
+  way round. One statement, two architectures in the gate: not worth it.
 - **A test fixture in a non-test package costs coverage.** The first
   `authtest/faulty.go` wrapped every optional driver interface with a
   fallback; the driver implements all of them, so 49 fallback statements sat

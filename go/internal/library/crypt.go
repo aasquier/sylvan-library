@@ -341,6 +341,7 @@ func (s *SQLSource) crypt(ctx context.Context) ([]sqlCryptEntry, error) {
 	}
 	defer rows.Close()
 	out := []sqlCryptEntry{}
+	var scanned error // see [SQLSource.Slugs]
 	for rows.Next() {
 		var (
 			id      int64
@@ -348,9 +349,7 @@ func (s *SQLSource) crypt(ctx context.Context) ([]sqlCryptEntry, error) {
 			text    string
 			deleted sql.NullString
 		)
-		if err := rows.Scan(&id, &slug, &text, &deleted); err != nil {
-			return nil, err
-		}
+		scanned = errors.Join(scanned, rows.Scan(&id, &slug, &text, &deleted))
 		e := Entombed{ID: cryptID(strconv.FormatInt(id, 10)), Slug: slug, Name: slug}
 		if deleted.Valid {
 			// The column's own format. A parse that fails leaves the zero
@@ -364,7 +363,10 @@ func (s *SQLSource) crypt(ctx context.Context) ([]sqlCryptEntry, error) {
 		}
 		out = append(out, sqlCryptEntry{entry: e, id: id})
 	}
-	return out, rows.Err()
+	if err := errors.Join(scanned, rows.Err()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Restore clears the mark, which is this tier's whole undo.

@@ -83,7 +83,7 @@ import { MatchTheater } from '../components/theater'
 import { type Arriving, fallenBy, type Speed, type StagedBeat, useReel }
   from '../lib/reel'
 import {
-  beatLine, beatWon, playerTurns, shortName, theaterBeats, theaterRows,
+  beatLine, beatWon, playerTurns, shortName, spell, theaterBeats, theaterRows,
   turnMarks as turnMarksOf, turnsTaken,
 } from '../lib/theater'
 import { CrossedSwordsGlyph } from '../components/glyphs'
@@ -676,24 +676,6 @@ function ArenaFootnote() {
       coliseum. {ARENA_CARD.printing} — art by {ARENA_CARD.artist}.
     </p>
   )
-}
-
-/**
- * A stretch of time in the room's words rather than in bare seconds.
- *
- * Everything here used to render as a raw count — `seconds: 312`, "called off
- * at 300s" — which is a unit a machine chose. Three hundred seconds is five
- * minutes and nobody has ever thought about it in any other way; a newcomer
- * least of all (commandment 2). Under a minute it stays in seconds, because
- * "0m 47s" is a worse sentence than "47s" and a bout that short is genuinely a
- * matter of seconds.
- */
-function spell(seconds: number): string {
-  const whole = Math.max(0, Math.round(seconds))
-  if (whole < 60) return `${whole}s`
-  const minutes = Math.floor(whole / 60)
-  const rest = whole % 60
-  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
 }
 
 /**

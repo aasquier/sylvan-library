@@ -67,7 +67,68 @@ func (a *API) statsSystem(w http.ResponseWriter, r *http.Request) {
 			{Key: "used_bytes", Value: used},
 			{Key: "free_bytes", Value: free},
 		}},
+		{Key: "caches", Value: a.cacheCounts()},
 	})
+}
+
+// cacheCounts is the `caches` view: how often each of this process's three
+// memories answered from memory, and how often it had to do the work.
+//
+// **Why the counts exist at all.** A cache can be correct, fully tested, and
+// never once consulted. This app shipped exactly that -- a memo keyed on a
+// per-request handle in a process where every request opened its own -- and
+// no test could have caught it, because every test it had passed. Only a
+// counter can, so each of the three caches in the tree keeps one:
+//
+//   - `tier1` -- ADR 18's stored simulation results (`cache.Store.Counts`);
+//   - `shelf` -- the file tier's memory of parsed deck files
+//     (`library.Memo.Counts`), which is why a second visit to `/api/decks`
+//     parses nothing;
+//   - `etag` -- the door's static-file ETag memo (`staticSite.etagCounts`).
+//
+// Counting them is only half the rule, and this route is the other half: a
+// counter nothing ever reads out of a *running* instance proves nothing
+// about the instance. Each count is this process's own since boot, like
+// every other number on this panel.
+//
+// **Why the door's is handed in rather than reached for.** `internal/door`
+// imports this package, never the reverse, and it builds the static site
+// before it builds this API -- so [Config.ETagCounts] is a reader the
+// composition root passes down. That is the door's own doctrine (a reader of
+// the process becomes a lookup handed in), not a layering breach.
+//
+// **Why a missing source is `null` and not `{0, 0}`.** Zeros read as "this
+// cache exists and has never been used", which is a bug worth chasing;
+// absence reads as "there is no such cache in this process", which is not.
+// An API built without a door has no ETag memo, and an instance with no
+// `app.db` has no simulation cache -- both are ordinary states (a test, a
+// bare laptop) and neither is a dead cache.
+func (a *API) cacheCounts() wire.OrderedMap {
+	var tier1, shelf, etag any
+	if a.simCache != nil {
+		tier1 = cacheRow(a.simCache.Counts())
+	}
+	if a.deckMemo != nil {
+		shelf = cacheRow(a.deckMemo.Counts())
+	}
+	if a.etagCounts != nil {
+		hits, misses := a.etagCounts()
+		etag = cacheRow(int64(hits), int64(misses))
+	}
+	return wire.OrderedMap{
+		{Key: "tier1", Value: tier1},
+		{Key: "shelf", Value: shelf},
+		{Key: "etag", Value: etag},
+	}
+}
+
+// cacheRow is one memory's pair, in the order the register reads them:
+// what it saved, then what it cost.
+func cacheRow(hits, misses int64) wire.OrderedMap {
+	return wire.OrderedMap{
+		{Key: "hits", Value: hits},
+		{Key: "misses", Value: misses},
+	}
 }
 
 // schemaApplied reads `user_version` off `app.db` through a bare read-only
@@ -109,11 +170,15 @@ func (a *API) appDBReading() (opens any, version any) {
 	if _, err := os.Stat(a.dbPath); err != nil {
 		return nil, nil
 	}
-	db, err := sql.Open("sqlite", "file:"+url.PathEscape(a.dbPath)+"?mode=ro")
-	if err != nil {
-		a.log.Warn("could not read app.db schema version", "error", err)
-		return false, nil
-	}
+	// **The error `sql.Open` declares is not asked for, because it cannot
+	// arrive.** `sql.Open` records the DSN and opens nothing unless the driver
+	// implements [driver.DriverContext], and this one does not — so there is no
+	// parse for it to refuse, and the warn-and-degrade arm that used to stand
+	// here could not be entered by any fixture. The fault this reading exists
+	// for — a file that is there and is not a database — lands on the statement
+	// below, where the one arm belongs and where
+	// `TestTheSchemaReadingIsAbsentRatherThanWrong` drives it.
+	db, _ := sql.Open("sqlite", "file:"+url.PathEscape(a.dbPath)+"?mode=ro") //nolint:errcheck // argued above
 	defer func() { _ = db.Close() }()
 	var applied int
 	if err := db.QueryRow("PRAGMA user_version").Scan(&applied); err != nil {
@@ -193,8 +258,16 @@ func sizeOf(path string) *int64 {
 	if !info.IsDir() {
 		return nil
 	}
+	// **The walk's own error is not asked for, because the callback never
+	// returns one.** [filepath.WalkDir] hands back whatever the callback hands
+	// it, and this one answers `nil` to every entry it cannot read — a vanished
+	// file, a directory this process may not open — because a storage figure
+	// that refused to add up over one unreadable entry would report *nothing*
+	// where it could report nearly everything. With no error path out of the
+	// callback there is no error path out of the walk, and the arm that used to
+	// stand here could not be entered by any fixture.
 	var total int64
-	err = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil //nolint:nilerr // a vanished entry is skipped, as rglob skips it
 		}
@@ -203,9 +276,6 @@ func sizeOf(path string) *int64 {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil
-	}
 	return &total
 }
 

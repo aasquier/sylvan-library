@@ -50,11 +50,10 @@ type Recorder struct {
 // the auth side's (5000ms) so two writers collide as a short wait rather
 // than as an error, and foreign keys are on because SQLite keeps that per
 // connection and `deck_log` has one.
+// The error it returns is [ping]'s, and only [ping]'s: opening offers none,
+// for the reason [openReadWrite] gives.
 func NewRecorder(path string, logger *slog.Logger) (*Recorder, error) {
-	db, err := openReadWrite(path)
-	if err != nil {
-		return nil, err
-	}
+	db := openReadWrite(path)
 	// `sql.Open` connects lazily, so the missing file and the missing table
 	// both surface here or not at all. They surface **here on purpose**:
 	// Record must never fail an edit, so the loud failure belongs at startup,

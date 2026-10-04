@@ -61,6 +61,7 @@ import roomStillUrl from '../assets/seance/seance-room-still.webp'
 import roomWebmUrl from '../assets/seance/seance-room-loop.webm'
 import { ThemeInterview } from './theme'
 import { ErrorNote, Spinner } from './ui'
+import { roomFootage } from '../lib/roomfootage'
 import { VideoBackdrop } from './videofx'
 
 /** The table survives a reload, for the reason the transcript does: a reading
@@ -704,6 +705,13 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   // later. The cleanup re-arms the wait, because a fresh deal un-completes
   // the spread and the next reveal has earned the same beat this one got.
   const [waited, setWaited] = useState(false)
+  // Where a footage room hangs its own two controls (`ThemeInterview`'s
+  // "Start over" and the way out): a slot in this table's control row, so
+  // the four buttons over a tavern are one line in the top corner rather than
+  // two stacked rows (Aaron's fourth walk). A callback ref into state, because
+  // the room needs the element itself to portal into and a `useRef` would not
+  // re-render when it mounts.
+  const [controlsHost, setControlsHost] = useState<HTMLElement | null>(null)
   useEffect(() => {
     if (!allTurned || !turnedHere) return
     const t = window.setTimeout(() => setWaited(true), 1600)
@@ -711,21 +719,17 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
   }, [allTurned, turnedHere])
   const settled = allTurned && (!turnedHere || waited)
 
-  // Tell the page when the prop is the event. Computed here rather than
-  // reusing `dealing` below because hooks cannot follow the early returns,
-  // and the two must agree: this is `dealing || simmering || shuffling` by
-  // another route. Cleanup fires `false` so leaving the door restores the
-  // chrome. `shuffling` stands alone because only the dealing reader ever
-  // shuffles, and during her shuffle `table.persona` is not yet written.
-  //
-  // Both props end their ceremony the same way, through `table.read`: the
-  // spread lingers with all three cards up until the querent knocks, and the
-  // pot simmers full-size until they come to the table. Only what they are
-  // waiting for differs.
-  const ceremonyActive = shuffling
-    || (seated !== null && dealsTarot(seated)
-      && !(allTurned && settled && table.read))
-    || (seated !== null && brewsACauldron(seated) && !table.read)
+  // Tell the page when the room is the event, which is the whole time
+  // anybody is seated. This used to be only the prop's ceremony — the deal,
+  // the simmer, the shuffle — and the page's masthead and doors came back the
+  // moment the cards were read or the pot was folded. Aaron's ruling on the
+  // first footage walk widened it to the room itself: a tavern
+  // with "Start a deck" and three mode tabs over it is "very distracting",
+  // and every room has its own way out (the leave control and "Start over"),
+  // so the doors are not needed for leaving. `shuffling` stands alone because
+  // during the dealing reader's shuffle `table.persona` is not yet written.
+  // Cleanup fires `false` so leaving the door restores the chrome.
+  const ceremonyActive = shuffling || seated !== null
   useEffect(() => {
     onCeremony?.(ceremonyActive)
   }, [ceremonyActive, onCeremony])
@@ -990,6 +994,9 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
             </p>
           )}
           <span className="ml-auto flex items-center gap-2">
+            {/* `contents`: whatever the room portals in here lays out as this
+                row's own flex items, in front of the table's. */}
+            <span ref={setControlsHost} className="contents" />
             <SoundToggle />
             {/* A spread costs one integer to remember, and the consequence
                 nobody saw until Aaron went looking for Magic cards on the
@@ -1154,14 +1161,11 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
               is not going to say what.</strong>{' '}
               Three things go in tonight, and you bring all three.
             </p>
-            {/* The picture is credited in the room it is in. A committed
-                public-domain oil rather than a hotlinked card crop, so the
-                Fan Content deal is not what is being kept here — the habit
-                is, and the habit is the point. */}
-            <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              The hut is John William Waterhouse&rsquo;s <em>The Magic
-              Circle</em>, 1886.
-            </p>
+            {/* No credit line: the hut is footage of Aaron's own
+                (`assets/agatha/PROVENANCE.md`), and a credit for a picture
+                that is not in the room would be the one lie in it. The
+                Waterhouse oil this room opened with is credited there, in
+                the past tense. */}
           </div>
         </div>
       )}
@@ -1173,6 +1177,7 @@ export function TarotTable({ onPick, onLeave, onCeremony }: {
         <ThemeInterview key={`${chosen.key}:${table.seed ?? 'none'}`}
                         persona={chosen.key} seed={table.seed}
                         pot={brews ? pot : null}
+                        controlsHost={roomFootage(chosen.key) ? controlsHost : null}
                         intro={intro} onPick={onPick} onLeave={onLeave} />
       )}
     </section>

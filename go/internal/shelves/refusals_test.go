@@ -13,6 +13,7 @@ package shelves
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -247,7 +248,7 @@ func TestWriteAtomicReportsEveryWayThePathCanRefuse(t *testing.T) {
 	if err := os.WriteFile(blocked, []byte("file"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeAtomic(filepath.Join(blocked, "W.svg"), []byte("x")); err == nil {
+	if err := writeAtomic(filepath.Join(blocked, "W.svg"), []byte("x"), rand.Reader); err == nil {
 		t.Fatal("a directory was made inside a file")
 	}
 
@@ -257,7 +258,7 @@ func TestWriteAtomicReportsEveryWayThePathCanRefuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(readonly, 0o700) })
-	if err := writeAtomic(filepath.Join(readonly, "W.svg"), []byte("x")); err == nil {
+	if err := writeAtomic(filepath.Join(readonly, "W.svg"), []byte("x"), rand.Reader); err == nil {
 		t.Fatal("a staged file was written into a read-only directory")
 	}
 
@@ -267,7 +268,7 @@ func TestWriteAtomicReportsEveryWayThePathCanRefuse(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(occupied, "inside"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeAtomic(occupied, []byte("x")); err == nil {
+	if err := writeAtomic(occupied, []byte("x"), rand.Reader); err == nil {
 		t.Fatal("a file was renamed over a directory")
 	}
 	entries, err := os.ReadDir(filepath.Dir(occupied))
@@ -283,7 +284,7 @@ func TestWriteAtomicReportsEveryWayThePathCanRefuse(t *testing.T) {
 	// And the ordinary case still lands, so the sweep above is not passing
 	// because writeAtomic refuses everything.
 	target := filepath.Join(root, "good", "W.svg")
-	if err := writeAtomic(target, []byte("<svg/>")); err != nil {
+	if err := writeAtomic(target, []byte("<svg/>"), rand.Reader); err != nil {
 		t.Fatalf("an ordinary write: %v", err)
 	}
 	if got, _ := os.ReadFile(target); string(got) != "<svg/>" {
