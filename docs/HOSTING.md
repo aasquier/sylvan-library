@@ -83,6 +83,32 @@ fly tokens create deploy -a sylvan-library -n github-actions-deploy -x 8760h
 gh secret set FLY_API_TOKEN --repo aasquier/sylvan-library
 ```
 
+### Dependabot and the bundle
+
+`web_dist/` is committed and CI refuses a PR whose bundle does not match
+its source. Dependabot moves the two npm manifests and cannot run the build,
+so every frontend bump that changed emitted bytes (#427, #523, #556) went
+red on that gate with the whole suite green above it. The `frontend` job now
+rebuilds the bundle on a Dependabot run and pushes the commit to the bot's
+branch itself — **with its own token**, because a push made with the
+workflow's `GITHUB_TOKEN` starts no checks and would park the PR on a commit
+nothing had tested.
+
+The token is `DEPENDABOT_BUNDLE_TOKEN`: a fine-grained personal access token
+on `aasquier/sylvan-library` only, with **Contents: read and write** and
+nothing else, stored as a **Dependabot** secret rather than an Actions one
+(a run Dependabot starts sees only the Dependabot store). Set a one-year
+expiry; when it lapses, Dependabot's frontend PRs go red again with a step
+that names this section. Mint it at
+<https://github.com/settings/personal-access-tokens/new>, then:
+
+```bash
+gh secret set DEPENDABOT_BUNDLE_TOKEN --app dependabot --repo aasquier/sylvan-library
+```
+
+Never comment `@dependabot rebase` or `recreate` on a PR after the bundle
+commit lands — either throws that commit away and the PR is red again.
+
 ## Refreshing the pool
 
 Scryfall publishes daily; monthly by hand is plenty. `/api/health` says
