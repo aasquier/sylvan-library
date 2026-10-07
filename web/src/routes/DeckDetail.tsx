@@ -1527,8 +1527,19 @@ export default function DeckDetail() {
                         `CardFacePlate` rather than the two of them directly:
                         a card that is painted twice gets a mark that turns it
                         over, and every other card in the 99 -- which is nearly
-                        all of them -- is drawn exactly as it was. */}
-                    <CardFacePlate card={card} />
+                        all of them -- is drawn exactly as it was.
+
+                        `deck-card-art` is the painting's width, and the
+                        stylesheet moves it: under a hand the crop grows from
+                        64px to a plate you can actually read, the row gets
+                        taller with it and the rows below slide down to make
+                        room (Aaron, 2026-10-06: *"a zoom or accordion like
+                        effect as you move over them"*). It is a width, never
+                        a `transform` -- the held-up card `CardHover` raises
+                        is `position: fixed` and rendered in place, and a
+                        transform on anything above it would become its
+                        containing block (`fixedoverlay_test.go`). */}
+                    <CardFacePlate card={card} artClassName="deck-card-art" />
                     <div className="min-w-0 flex-1 basis-52">
                       <div className="flex flex-wrap items-baseline gap-2">
                         {/* `reachable`: before this, a keyboard could not land
