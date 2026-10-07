@@ -7130,6 +7130,75 @@ button:hover .tarot-fan-card {
   border-color: color-mix(in srgb, var(--vine) 40%, var(--hairline));
 }
 
+/* ------------------------------------------- the zoom, and the accordion
+ *
+ * The row's first reply was light: a wash, a warmed hairline, a ring walking
+ * the edge. Aaron liked it and asked for weight as well (2026-10-06: *"I would
+ * also like a zoom or accordion like effect as you move over them"*). Both
+ * words are answered by one lever, and it is a **width**: the art crop in the
+ * row grows from 64px to 104px under a hand, which is the zoom -- the painting
+ * is simply drawn larger, nothing is done to it -- and because the crop keeps
+ * its aspect the row gets taller, and the rows below slide down to make room,
+ * which is the accordion. One property, two effects, and the list stays one
+ * column of honest boxes rather than a thing that overlaps itself.
+ *
+ * **Why the row does not move.** The obvious zoom is `transform: scale()` on
+ * the row, and it is the one thing this rule may never do: the card
+ * `CardHover` holds up beside the cursor is `position: fixed` and rendered in
+ * place inside this very row, and any transform on an ancestor becomes the
+ * containing block for a fixed descendant (CSS Transforms 1, §3). The token
+ * shelf shipped exactly that bug and `fixedoverlay_test.go` carries the
+ * measurement: a preview placed against a 340px plate instead of the window,
+ * off the bottom of the screen. So the lift here is a shadow, which moves
+ * nothing, and the shadow carries a breath of the vine because a black drop
+ * on a night-dark room is nothing at all -- `.card-peek` learned that one
+ * screen up. `rowzoom_test.go` holds the line: the hover rule may not grow a
+ * `transform`.
+ *
+ * **Why the width lives on the painting and not on the plate.** `CardFacePlate`
+ * is a positioning context for the flip mark, and the mark sits in the
+ * painting's corner; the painting's own box is what has to grow for the mark
+ * to stay where it was drawn. The class is handed in through `artClassName`,
+ * which is the one prop every caller of that plate actually varies.
+ *
+ * **Two gates.** `(hover: hover)`: a phone's `:hover` is sticky -- it lands on
+ * a tap and stays until the next one -- and a row that stays grown after the
+ * thumb has left it is a list that has stopped lining up. The thumb has the
+ * sheet; this is for the hand that moves. `(prefers-reduced-motion:
+ * no-preference)`: a row growing under a pointer is layout moving, and the
+ * other rows moving with it is more of it; someone who asked the room to hold
+ * still keeps the light and loses the motion entirely, rather than being
+ * handed the same jump without its easing.
+ *
+ * The curve is the `.btn` family's ease-out -- fast off the mark and settling,
+ * the way a card is picked up rather than the way a drawer slides -- and the
+ * width and the shadow share one duration so the row arrives as one thing. */
+.deck-card-art {
+  width: 4rem;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .deck-card-row {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .deck-card-art {
+    transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .deck-card-row:not(.action-pick):not(.entombing):is(:hover, :focus-within) {
+    /* Above its neighbours so the shadow lays on them rather than under. */
+    z-index: 1;
+    box-shadow:
+      0 10px 24px rgb(0 0 0 / 0.22),
+      0 2px 6px rgb(0 0 0 / 0.16),
+      0 0 18px color-mix(in srgb, var(--vine) 16%, transparent);
+  }
+  .deck-card-row:not(.action-pick):not(.entombing):is(:hover, :focus-within) .deck-card-art {
+    width: 6.5rem;
+  }
+}
+
 .card-peek {
   border-radius: 12px;
   box-shadow:

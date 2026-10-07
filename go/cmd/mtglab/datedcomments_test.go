@@ -182,7 +182,18 @@ const (
 	// needs to know that "maybe their name too" is a sentence somebody said
 	// and not a decision a stylesheet drifted into. The date is what makes
 	// the four read as one sitting rather than as four independent tastes.
-	webDatedCommentCeiling = 269
+	//
+	// 269 → 270 on the branch that made the 99 zoom under a hand. One line,
+	// in `index.css` above `.deck-card-art`, and it is the ask quoted,
+	// attributed and dated — *"I would also like a zoom or accordion like
+	// effect as you move over them"* — in the precedent of every paragraph
+	// above. It earns the date because the row already had a reply Aaron
+	// liked, and a session reading a grown row and a shifted list as too much
+	// motion needs to know it was asked for, on top of the light, rather than
+	// drifted into. (The deck page's own comment on the same change is inside
+	// a JSX block this guard's line rule does not count, which is why one
+	// request is one line here and not two.)
+	webDatedCommentCeiling = 270
 )
 
 // slack is the ratchet's give, and it is the difference between a gate and a
