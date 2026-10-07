@@ -1790,6 +1790,22 @@ describe('DeckDetail card art', () => {
     await screen.findByText(DECK.name)
     expect(screen.getByText(/chosen art/i)).toBeTruthy()
   })
+
+  // The zoom and the accordion are one width in the stylesheet, and the
+  // stylesheet can only grow a class the markup wears: every row of the 99
+  // hands its plate `deck-card-art` rather than resting on the plate's own
+  // `w-16` default. jsdom lays nothing out, so the growth itself is held by
+  // `rowzoom_test.go` against the committed bundle; this pins the half the
+  // DOM can see.
+  it('dresses every painting in the 99 so the stylesheet can grow it under a hand', async () => {
+    const { container } = renderUnfolded()
+    await screen.findByText(DECK.name)
+    const rows = container.querySelectorAll('.deck-card-row')
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.querySelector('.deck-card-art')).toBeTruthy()
+    }
+  })
 })
 
 /**
