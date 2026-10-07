@@ -12,8 +12,10 @@ on:
 
 # Least privilege. `dependency-review.yml` has said this since it landed and
 # this file never did, which meant the whole suite ran with whatever the
-# repository default happened to be. Nothing here writes: no job pushes an
-# image, comments on a PR, or updates a check.
+# repository default happened to be. One job writes, and only to a branch
+# Dependabot opened -- `frontend` raises its own grant to say so and argues
+# it at the step that uses it. No job pushes an image, comments on a PR, or
+# updates a check.
 permissions:
   contents: read
 
@@ -31,8 +33,29 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The one grant above `contents: read` in this file. It exists for
+    # "Rebuild the bundle for Dependabot" below and for nothing else: the
+    # write is to Dependabot's own branch, by a token that lives only in that
+    # step's environment, after the checkout has been told to keep the
+    # workflow's own credentials out of the tree (`persist-credentials`).
+    # On a run Dependabot did not start, every write path here is skipped and
+    # the grant is unused.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Dependabot's branch itself rather than the merge ref, so a bundle
+          # built here is built from exactly the commit it will be pushed on
+          # top of. Everyone else keeps the merge ref the gate has always
+          # measured against. The expression reads "the head ref when
+          # Dependabot opened this, otherwise the action's default".
+          ref: ${{ github.actor == 'dependabot[bot]' && github.head_ref || '' }}
+          # `npm ci` runs every dependency's install scripts, and this job can
+          # now write to a branch. A token left in the checkout is a token
+          # handed to code the job just downloaded -- so none is left, and the
+          # one write below brings its own, for one command.
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version-file: web/.nvmrc
@@ -66,6 +89,57 @@ jobs:
 
       - run: npm run build
         working-directory: web
+
+      # Dependabot moves `package.json` and `package-lock.json` and cannot run
+      # the build, so every bump that changed emitted bytes -- a Vite patch, a
+      # runtime dependency -- failed the gate below by construction, with the
+      # typecheck, the lint and the whole suite green above it. #427, #523 and
+      # #556 each read as a broken dependency and were nothing of the kind;
+      # each was fixed by a person fetching the branch, building, and pushing
+      # the bundle. This is that routine, run by the job that already did the
+      # build.
+      #
+      # **Why the push needs its own token.** A push made with the workflow's
+      # `GITHUB_TOKEN` starts no workflow runs -- GitHub's rule against runs
+      # that trigger themselves -- so the PR's head would move to a commit
+      # nothing had tested, and a protected branch waits forever on a check
+      # that will never be reported. `DEPENDABOT_BUNDLE_TOKEN` is a
+      # fine-grained token with Contents read/write on this repository and
+      # nothing else, stored as a *Dependabot* secret (a run Dependabot starts
+      # sees that store, not the Actions one). A push with it starts the run
+      # for the new commit, whose actor is the token's owner rather than
+      # Dependabot, so this step is skipped on that run and the gate measures
+      # the bundle it just committed. One rebuild, one new run, no loop.
+      # docs/HOSTING.md ("Dependabot and the bundle") says how to mint it.
+      #
+      # Without the secret the step refuses rather than pushing with the
+      # wrong token: a PR parked on an untested commit is worse than a red
+      # check that names the fix.
+      - name: Rebuild the bundle for Dependabot
+        if: github.actor == 'dependabot[bot]'
+        env:
+          BUNDLE_TOKEN: ${{ secrets.DEPENDABOT_BUNDLE_TOKEN }}
+        run: |
+          if git diff --quiet -- web_dist; then
+            echo "Dependabot's bump left the bundle byte-identical; nothing to commit"
+            exit 0
+          fi
+          git diff --stat -- web_dist
+          if [ -z "$BUNDLE_TOKEN" ]; then
+            echo "::error::web_dist/ is stale after Dependabot's bump, and DEPENDABOT_BUNDLE_TOKEN is not set."
+            echo "A push with the workflow's own token would start no checks, so this step refuses."
+            echo "Either add the Dependabot secret (docs/HOSTING.md, 'Dependabot and the bundle')"
+            echo "or rebuild by hand:  npm --prefix web run build  -- then commit web_dist/ and push to this branch."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- web_dist
+          git commit -q \
+            -m "The committed bundle is rebuilt over Dependabot's manifests" \
+            -m "Dependabot moved package.json and package-lock.json and cannot run the build, so the bytes under web_dist/ were one bump behind the manifests. This is the frontend job rebuilding them (ci.yml, 'Rebuild the bundle for Dependabot'); nothing under web/src changed."
+          git push "https://x-access-token:${BUNDLE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${GITHUB_HEAD_REF}"
+          echo "pushed the rebuilt bundle to ${GITHUB_HEAD_REF}; the run for that commit is the one that counts"
 
       # web_dist/ is committed so the app runs without Node. That
       # only holds if it actually matches the source -- otherwise someone
