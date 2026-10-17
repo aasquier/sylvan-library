@@ -19,7 +19,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Coliseum, DeckTile } from '../lib/api'
-import Settings, { windowWords, zoneWords } from './Settings'
+import { windowWords, zoneWords } from '../lib/night'
+import Settings from './Settings'
 
 vi.mock('../lib/api', async () => ({
   // Real, both of them. `deckUrl` is the only thing that says where a deck

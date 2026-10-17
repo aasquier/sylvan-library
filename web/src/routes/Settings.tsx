@@ -54,23 +54,7 @@ import { Link } from 'react-router-dom'
 import { type ColiseumNight, type DeckTile, api, deckUrl, errorMessage } from '../lib/api'
 import { ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { FieldHint } from '../components/hint'
-
-/** The operator's zone switch as a place a person would name: the last
- *  segment of `America/Los_Angeles`, underscores returned to spaces. The wire
- *  form is a technology's name for a city and never renders (commandment 10). */
-export function zoneWords(zone: string): string {
-  const city = zone.split('/').pop() ?? zone
-  return city.replace(/_/g, ' ')
-}
-
-/** `01:00-04:00` as the two clocks a sentence needs. A window in any other
- *  shape renders as itself rather than as nothing: the hall echoes what the
- *  operator wrote, and a blank where a time should be hides a misconfigured
- *  instance from the one person who would fix it. */
-export function windowWords(window: string): string {
-  const [open, close] = window.split('-')
-  return open && close ? `from ${open} to ${close}` : window
-}
+import { windowWords, zoneWords } from '../lib/night'
 
 /** Grand Coliseum's original printing. The arena the night games are
  *  played in, which is half of what this room decides — and a land, so it is

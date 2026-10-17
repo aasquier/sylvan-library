@@ -5232,9 +5232,18 @@ sit.
     finding; `go test -race -count=1 ./cmd/mtglab/` alone afterwards, **ok
     in 39.7s**, against the finished bundle. **Lesson for the brief: the
     bundle rebuild goes before the race suite, never beside it.** `npm
-    --prefix web run check` green (tsc, oxlint, Vitest). Bundle rebuilt in
-    8.55s; **one file changed: `web_dist/assets/Settings.js`** — Red and
-    Green stay disjoint. `data/app.db` dated Oct 3 before and after.
+    --prefix web run check` **was read as green and was not**: the first run
+    went through `| tail -15`, so the exit code read was `tail`'s, and
+    oxlint's `react(only-export-components)` warning on two helpers exported
+    from a route file reached CI's `frontend` job (red in 15 s) before it
+    reached this lane. The warning's own advice is the fix — the two word
+    helpers live in `web/src/lib/night.ts` now — and the check re-run with
+    no pipe on it: **exit 0, 94 files, 1,681 tests**. **A gate's exit code is
+    never read through a pipe; redirect to a file and `echo $?`** — the
+    second lesson tonight for the brief, and the cheaper of the two. Bundle
+    rebuilt in the foreground afterwards; **one file changed:
+    `web_dist/assets/Settings.js`** — Red and Green stay disjoint.
+    `data/app.db` dated Oct 3 before and after.
   - Daybreak recipe: 16 on White's branch → **17** on this one.
 
 ## Black — Ruthless Efficiency
