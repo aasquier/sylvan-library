@@ -139,6 +139,26 @@ the Coliseum).
 
 ## Open — a few clicks in the repository settings
 
+**White: the `frontend` job raises `contents: write` for a push that brings
+its own token, so the grant protects nothing and widens what every action in
+that job is handed.** #558's rebuild step pushes with `DEPENDABOT_BUNDLE_TOKEN`
+(a fine-grained token, Contents read/write on this repository only), the
+checkout keeps the workflow's own token out of the tree, and no step in
+`ci.yml` references `github.token` — but the `permissions:` block still turns
+the token the job's third-party actions receive by default from read to write,
+on the one job that runs `npm ci`'s install scripts over packages Dependabot
+just bumped. Read tonight: the secret is **not minted yet** — #561's step
+refused on 2026-10-14 with the sentence written for it — so the rebuild path
+has never run and the grant has never been exercised. · *Cost of leaving it:*
+nothing today; a write-scoped token in a job that executes freshly-downloaded
+code is the shape every supply-chain write-up starts with, and the line that
+argues it is wrong about what it is for. · **Recommendation:** mint the secret
+(HOSTING, "Dependabot and the bundle" — `gh secret set DEPENDABOT_BUNDLE_TOKEN
+--app dependabot`), delete the three-line `permissions:` block and its comment
+from the `frontend` job in the same branch, and let #561's next run prove
+both at once. A workflow change is proven only by CI, which is why the night
+did not land it. Ledger: White, 2026-10-16 (rainbow, night).
+
 **Blue: the Coliseum has never fought a night, because the two switches that
 open it were never set on the instance — and this line spent a month reading
 as if it waited on something else.** `MTGLAB_NIGHT_WINDOW` and
@@ -225,6 +245,27 @@ items 1–2; answered as far as possible 2026-09-26.
 > answer a stale green. When the last one is in, one `npm --prefix web run
 > build` on `main` should write **no** diff — that is the proof the three
 > partial rebuilds compose, and it costs a minute.
+
+**White: the door sends five hardening headers and has never sent a
+`Content-Security-Policy`, and nothing in the ledger or the ADRs has ever
+ruled on one.** `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+`Permissions-Policy` and HSTS are on every response; a CSP is on none, and
+`grep -i content-security` over `go/`, the ledger and `docs/adr/` is empty.
+· *Cost of leaving it:* an injection anywhere a card name, a deck's `why` or a
+Claude turn is rendered runs with the signed-in player's full reach —
+`HttpOnly` keeps the cookie itself and nothing keeps the API calls a script
+could make. Nothing is known to be injectable; a CSP is the net under the
+claim. · **What it would have to allow is measured in the ledger** (zero
+inline scripts, 28 `cards.scryfall.io` image URLs and no other fetched origin,
+WebAssembly and a Worker in the card reader, 912 React `style={{…}}`
+attributes that `style-src` should not block but may), so the first draft is
+written there. · **Recommendation:** land it as
+`Content-Security-Policy-Report-Only` first — violations go to the browser
+console, no endpoint needed — then walk a deck page, the card reader, the
+Coliseum's video, the tarot table and the Admin panel with the console open,
+and flip the header name once the console is quiet. Two deploys you watch; a
+header that can blank a room is not a night change. Ledger: White, 2026-10-16
+(rainbow, night).
 
 **Red: the third clause of commandment 17 is built and waiting for your eye —
 three classes took the press reply, the register fell from fifteen to ten, and
