@@ -49,11 +49,15 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 		Zones   []reference.ZoneArt `json:"zones"`
 		Pool    bool                `json:"pool"`
 		Dropped int                 `json:"dropped"`
+		// Night is the Coliseum at Night's standing arrangement, set beside
+		// the zones for the same reason: it is a fact about the instance,
+		// not the pool, and it answers whether or not a pool does.
+		Night nightSchedule `json:"night"`
 	}
 
 	source := reference.Arenas()
 	out := answer{Arenas: make([]arena, 0, len(source)),
-		Zones: reference.Zones()}
+		Zones: reference.Zones(), Night: a.nightSchedule()}
 	for i := range source {
 		src := &source[i]
 		out.Arenas = append(out.Arenas, arena{
@@ -113,6 +117,37 @@ func (a *API) coliseum(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wire.JSON(w, http.StatusOK, out)
+}
+
+// nightSchedule is the night as the hall tells it: whether a window is set
+// at all, and — when it is — the operator's own two switches echoed back
+// (`01:00-04:00`, `America/Los_Angeles`), for the frontend to turn into
+// words. The settings room's one sentence about the torches reads off this
+// rather than carrying a claim of its own, because the claim it carried
+// ("the torches are not lit yet") outlived the instance's first night by two
+// weeks without a test noticing: a rendered string asserting a deployment
+// fact is drift nothing in a suite can see. Unscheduled is the zero value,
+// so the two string fields are blank exactly when `scheduled` is false and a
+// client that reads them without checking renders nothing rather than a
+// wrong clock.
+type nightSchedule struct {
+	Scheduled bool   `json:"scheduled"`
+	Window    string `json:"window"`
+	Zone      string `json:"zone"`
+}
+
+// nightSchedule reads the runner the door tied in. No runner is an instance
+// with no `app.db` — a night with nowhere to keep its rows is not scheduled,
+// whatever the switches say.
+func (a *API) nightSchedule() nightSchedule {
+	if a.nightRunner == nil {
+		return nightSchedule{}
+	}
+	set := a.nightRunner.Settings()
+	if !set.Scheduled {
+		return nightSchedule{}
+	}
+	return nightSchedule{Scheduled: true, Window: set.Window.String(), Zone: set.Zone.String()}
 }
 
 // `GET /api/coliseum/standings`: what the ledger has learned from the matches
