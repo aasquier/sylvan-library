@@ -19,7 +19,8 @@ state, never checklists.
 
 *Licensing/free-use (triple-checked) · security & isolation · testing discipline*
 
-- **Last run:** 2026-10-03 (night, the mutation lane). Previous: 2026-10-03
+- **Last run:** 2026-10-16 (rainbow, night). Previous: 2026-10-03 (night,
+  the mutation lane), 2026-10-03
   (night, the coverage lane), 2026-10-02
   (solo, daylight), 2026-09-26 (rainbow,
   and its second leg — the grind), 2026-09-24 (the coverage climb, outside
@@ -33,6 +34,212 @@ state, never checklists.
   *lessons* still hold — several are why this run went where it went — but no
   number, path or test name below is a current fact. Where a guard from that
   era did **not** cross, this run says so by name.
+
+### 2026-10-16 (rainbow, night) — the no-penny clause becomes a guard, the door has never sent a Content-Security-Policy, and a write grant no step uses
+
+Leg one of the serial rainbow, run solo with the `claude` seat signed out
+(checked 20:45 PDT: the deployed root renders the sign-in page, `/api/auth/me`
+answers `authenticated: false`), so everything below that needed a session is
+**owed** and says so. Branch `polish/white-2026-10-16`.
+
+- **The numbers, taken first and recorded with the load.** `go test -race
+  -coverpkg=./... -count=1 ./...` over 52 packages: **green, 8m06s wall**
+  (`real 485.82`, user 2208 s), load 3.68 before, past **419** during, 72
+  after — the five-fold swing the reference warns of, measured on one run.
+  `-func` total **99.5%**, the guard at 99.0 keeps its half-point.
+  `uptime` at the start: 3.68 / 4.33 / 4.27.
+- **Mutation, `internal/yamlemit`, first baseline** (throwaway worktree,
+  `gremlins unleash ./internal/yamlemit/`, 2m06s, load ≈26 at the start):
+
+  ```
+  Killed: 176, Lived: 42, Not covered: 23
+  Timed out: 0, Not viable: 0, Skipped: 0
+  Test efficacy: 80.73%
+  Mutator coverage: 90.46%
+  ```
+
+  The lowest efficacy of any kernel baselined so far (floats 91.4 after its
+  lane, mana 94.6, textutil 90.0, mt19937 91.6, compile 85), and the survivors
+  have one shape: **35 of 42 are `CONDITIONALS_BOUNDARY`, nearly all in
+  `emit.go`'s writers** — the printable-rune ranges of the double-quoted
+  escape rule (`emit.go:237`, `:536`: `ch >= 0xA0 && ch <= 0xD7FF`,
+  `ch >= 0xE000 && ch <= 0xFFFD`, every bound), the end-of-text sentinels
+  (`:437`, `:460`: `ch >= 0`), the fold widths (`:91` `width >
+  bestIndent*2`, `:144` `e.column < indent`), the single-quote split (`:497`
+  `start < end`) and `document.go:171`'s `runeLen(key) < 128`. That is the
+  digit bound in a **third** package, one over from `mana` and `compile`: a
+  writer's bounds are pinned only by a text that sits on them, and the frozen
+  corpus holds no key of exactly 128 runes, no U+00A0, no U+D7FF, no U+FFFD.
+  Not touched tonight — forty-two survivors is a lane, not a line — and
+  `yamlemit` is **not** one of the five fingerprinted packages, so the next
+  mutation lane may add the sitting-on-the-bound cases as tests freely. Six
+  of the 23 NOT COVERED are `switch` case expressions (the 10-03 trap, same
+  reading); `emit.go:115/117` and `:348` are the honest ones.
+- **Landed: commandment 9's second sentence is a test.**
+  `go/cmd/mtglab/monetization_test.go` — `TestNothingHereTakesAPenny` sweeps
+  the project's own source (`web/src`, `web/public`, `web/index.html`,
+  non-test Go, the toolbox, `scribe/`, the Dockerfiles, `fly.toml`) for the
+  hosts a payment, donation or ad goes through, and
+  `TestThePennyReaderStillSeesAPenny` keeps the reader honest. The White
+  checklist's *"no monetization surface exists, even vestigially … a
+  well-meaning 'buy me a coffee' is a violation here"* was a grep somebody
+  remembered to run each cycle; it is the standing question — *which absolute
+  claim is enforced by nothing* — answered for the one clause of the Fan
+  Content Policy a tired session is likeliest to breach by accident.
+  Mutation-verified: a `ko-fi.com` line appended to
+  `web/src/lib/claudecopy.ts` fails it by `path:line: mark`; restored, tree
+  clean. Two conservatisms argued in the file: **hostnames, not words**
+  (the keeper's copy says "donated material"; *partner* is a Magic keyword,
+  so the affiliate marks are `?partner=`/`&partner=`), and **the bundle is
+  out of scope by measurement** — `web_dist/assets/reader.js` carries the
+  OCR library's own `package.json` as a string, `funding:
+  opencollective.com/tesseractjs` included, a backer's note nobody renders.
+  Baseline over the tracked tree before the guard: the vocabulary matches
+  only this ledger, npm's `funding` metadata in `package-lock.json` (90
+  lines), and that bundle string. The one shop link in the tree,
+  `tcgplayer.com/massentry` (`tokens.tsx:318`), carries no affiliate
+  parameter.
+- **(open) The deployed door sends five hardening headers and no
+  `Content-Security-Policy`, and no ledger entry or ADR has ever ruled on
+  one.** `door.securityHeaders` sets `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` and HSTS;
+  read live tonight on `GET /`, exactly those and `cache-control: no-cache`.
+  `grep -i content-security` over `go/`, the ledger and `docs/adr/` returns
+  nothing. *What it costs to leave:* an injection anywhere a card name, a
+  deck's `why` or a Claude turn is rendered runs with the session's full
+  reach — `HttpOnly` keeps the cookie itself, and nothing keeps the API calls
+  a script could make as the signed-in player. *What a policy would have to
+  allow, measured so the morning does not re-derive it:* `index.html` carries
+  **zero inline scripts** (one `type=module` script, three `modulepreload`s,
+  one stylesheet, a `data:` SVG favicon, a `preconnect` to
+  `cards.scryfall.io`); the bundle references **28** `https://cards.scryfall.io`
+  URLs and no other fetched origin (the rest — `github.com`, `react.dev`,
+  `console.anthropic.com`, `fly-metrics.net`, `tcgplayer.com` — are `href`s
+  a reader clicks); `Import.js` and `reader.js` instantiate **WebAssembly**
+  and the reader starts a **Worker**; the videos and fonts are same-origin;
+  `web/src` holds **912** `style={{…}}` attributes, which React applies
+  through the CSSOM and which `style-src` therefore does **not** block — a
+  claim the report-only pass below is precisely for testing. So the shape is
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src
+  'self'; img-src 'self' data: https://cards.scryfall.io; style-src 'self';
+  connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action
+  'self'`, with `style-src` the one directive whose first draft may be wrong.
+  **Recommendation:** land it as `Content-Security-Policy-Report-Only` first
+  — the browser reports violations to its own console with no endpoint needed
+  — walk the deck page, the card reader, the Coliseum's video, the tarot table
+  and the Admin panel with the console open, then flip the header name. Two
+  watched deploys, both Aaron's; a header that can blank a room is not a
+  night change under any reading of commandment 16.
+- **(open) #558's `frontend` job raises `contents: write` for a push that
+  uses its own token, so the grant is held by no step.** The security read
+  the task file asked for: the push is `git push
+  https://x-access-token:${BUNDLE_TOKEN}@…`, `BUNDLE_TOKEN` is the
+  fine-grained `DEPENDABOT_BUNDLE_TOKEN` (Contents read/write on this
+  repository only, Dependabot's secret store, HOSTING §"Dependabot and the
+  bundle"), `persist-credentials: false` keeps the workflow's `GITHUB_TOKEN`
+  out of the checkout, and `grep github.token\|GITHUB_TOKEN` over `ci.yml`
+  finds it only in comments. What the `permissions:` block does change is
+  the scope of the token every third-party action in the job receives by
+  default (`actions/setup-node`'s `token` input is `github.token`), from
+  read to write, on the one job that runs `npm ci`'s install scripts over
+  packages Dependabot just bumped. The step's `if` and the secret store both
+  hold: a fork's actor is never `dependabot[bot]` and a fork never sees the
+  Dependabot store; `GITHUB_HEAD_REF` reaches the shell as an environment
+  variable, not an expression, so the branch name cannot inject. *Measured
+  tonight:* the secret is **not minted** — #561's step refused on 2026-10-14
+  with the sentence written for it (`DEPENDABOT_BUNDLE_TOKEN is not set`), so
+  the rebuild path has never run and the grant has never been exercised.
+  **Recommendation:** delete the three-line `permissions:` block and the
+  comment that argues it, in the same morning the secret is minted, and let
+  #561's next run prove both. A workflow change is proven only by CI, so it
+  is queued rather than landed.
+- **The three Dependabot pull requests, read and left for Aaron.** #559
+  (`go`): `anthropic-sdk-go` 1.78.0 → 1.80.0, `x/crypto` 0.57 → 0.58,
+  `x/sys`, `x/term`, `x/tools` one minor each; `dependency-review` pass, all
+  checks green. #560 (`actions`): `setup-node` 7.0.0 → 7.1.0 and
+  `codeql-action` 4.38.2 → 4.38.3, both re-pinned by sha; green. #561
+  (`frontend`): six devDependencies — `vite` 8.3.1 → 8.3.4, `vitest` 5.0.2 →
+  5.0.3, `@vitejs/plugin-react` 6.1.1 → 6.1.2, `jsdom` 30.1.1 → 30.1.2,
+  `oxlint` 1.85 → 1.87, `@types/node` — `dependency-review` pass, `frontend`
+  **red for the designed reason above**, not for the bump. Nothing in the
+  three touches a licence class (the Go sweep below) or a served origin.
+- **Licence sweep, 2026-10-16.** `go-licenses report ./...`: 31 third-party
+  modules — **19 MIT, 10 BSD-3-Clause, 2 Apache-2.0, 1 Unknown**, and the
+  Unknown is `modernc.org/mathutil@v1.7.1`, the standing classifier miss:
+  its `LICENSE` opens *"Redistribution and use in source and binary forms …"*
+  — BSD-3 by its own text, the fifth run to read it so. `animist verify`:
+  **every recipe `held`, zero drift**. Committed binaries: 13 directories
+  (78 under `assets/tarot`, 24 `coliseum`, 11 `wheel`, 11 `ambience`, 9
+  `agatha`, 6 `seance`, 4 `fonts`, 4 `web/public`, 3 each `storyteller`,
+  `simulator`, `learn`, `claude`, `barkeep`), **each with a `PROVENANCE.md`**
+  and `mediaprovenance_test.go` holding them; nothing hand-placed. The
+  licence gate still has no `--force` (`grep -i force tools/animist/` finds
+  only `enforce_height`). #557's CSS adds no `filter` and grows a *width*
+  on hover by design — its `rowzoom_test.go` argues why not a `transform`,
+  and `cardimagery_test.go`'s three pass in the suite.
+- **Security and isolation, the standing reads.** Open CodeQL alerts: **0**.
+  Session cookie: `httponly; max-age=1209600; path=/; samesite=lax` held by
+  the golden in `TestLoginHandsBackTheCookieTheGoldenRecords`, `Secure` by
+  `TestASecureInstanceMarksTheCookieSecure` — I went looking for this as an
+  unguarded claim and it is guarded, which is worth a line so the next run
+  does not. Argon2id `MemoryCostKiB = 19_456`, `TimeCost = 2`: OWASP's first
+  recommended tuple. `AsDict(true)` has **one** non-test caller
+  (`api/admin.go:124`), held by `addressreach_test.go`; the CLI reads
+  `user.Email` directly in `users.go:360`, which that register names.
+  Tokens: `#token=` fragment only (`auth/invites.go:69`). String-built SQL:
+  one `fmt.Sprintf("INSERT INTO %s …")` and it is `pooltest`'s fixture table
+  name. Rate limit answers `Retry-After` (`accounts.go:286`). Routes added
+  since 10-03: none — `door/routes.go`'s only change is the removal of an
+  empty-segment refusal `NormalisePath` had already made unreachable, argued
+  in place. Skip census: 102 `t.Skip` lines in 57 files, the register
+  `skipcensus_test.go` ran green in the suite.
+- **The live walk, public surface only.** `/api/health` 200 — pool true,
+  35,460 oracle cards, 109,332 printings, bulk files 2026-10-02, 25 decks,
+  `pool_age_days` 15, `disk_free_mb` 2538, `schema_version` 17. `/api/decks`
+  **401**; `/api/admin/stats` **401** (no session is refused before the
+  admin check — the 403 is for a signed-in non-admin, which the seat could
+  not be tonight); `GET /../../etc/passwd` with `--path-as-is` answers the
+  SPA shell (3 shell markers, 0 `root:` lines) and `/assets/../../../etc/passwd`
+  **404** — #126's fix holds live. `HEAD /` is the documented 405.
+  **The determinism replay is owed:** `/api/tarot/reading?seed=1909` and
+  `/api/brew/reading?seed=1909` both **401** without a session, as the route
+  table says (`PublicPaths` is seven routes and neither is one), and curl
+  gets 401 where the seat's JS fetch would not. Last full pass 2026-10-02;
+  the recorded 741-byte / 503-byte sha256s stand until the seat is signed in.
+- **Considered and rejected.** (a) *Sweeping `web_dist/` in the penny guard*
+  — the tesseract funding string makes it cry wolf on day one. (b) *A
+  word-based vocabulary* ("donate", "sponsor") — two false alarms in the
+  keeper's copy before the first run. (c) *Closing `yamlemit`'s survivors
+  tonight* — forty-two cases across eight functions is the next mutation
+  lane's whole evening, not a surgical addition to this one. (d) *Dropping
+  the `contents: write` grant on this branch* — a workflow edit the night
+  cannot prove.
+- **A first attempt went red on `go (arm64)` for a reason this branch cannot
+  have caused, and the cause is UNPROVEN.** PR #562's first run: every other
+  required check green, `go (amd64)` green on the same bytes, and the arm64
+  coverage step failing one test — `internal/claude`'s
+  `TestTheTurnCeilingIsAnErrorAndNotAnAnswer`, with `converse_test.go:61:
+  request N was not JSON: unexpected end of JSON input` for **every one** of
+  the stub's requests 0–6 and `the script ran out: request 6 had no reply`
+  three times (the SDK's two retries of the stub's 500). The test last moved
+  at #289; `main`'s last four arm64 runs are green; nothing on this branch
+  reaches `internal/claude`. Locally, 40 runs under the same `-coverpkg`
+  instrumentation and 10 under `-race` all pass. Two facts worth the next
+  session's minute: the fixture reads the body with `body, _ :=
+  io.ReadAll(r.Body)`, so a *truncated* body and an *empty* one produce the
+  same message and the read error that would tell them apart is thrown away —
+  a one-line `t.Errorf` on that error is the diagnostic the next occurrence
+  needs; and `scriptedAPI` writes `served`, `requests` and `raw` from the
+  handler goroutine with no lock, which `-race` has never reported but which
+  is the shape of the brief's "a test about work in flight" class. Re-run
+  once, honestly, on the final bytes; recorded here so a second sighting is a
+  pattern and not a surprise.
+- **Queue movement: +2** (the policy and the grant), both above with their
+  marker and both in `DAYBREAK.md`; the daybreak recipe reads **16** after
+  this entry — and **14** on `origin/main` before it, where the night brief
+  said 13: a count written into prose, rotted by one, exactly as the queue's
+  own paragraph warns. Nothing retired — the two standing White items (the nine
+  `pip/torch` alerts, the prose extractor) were not re-read, per the task.
 
 ### 2026-10-03 (daylight, the climb to 99) — eight lanes, one landing, and a list of unreachable branches that mostly were not
 
