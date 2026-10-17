@@ -18,8 +18,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DeckTile } from '../lib/api'
-import Settings from './Settings'
+import type { Coliseum, DeckTile } from '../lib/api'
+import Settings, { windowWords, zoneWords } from './Settings'
 
 vi.mock('../lib/api', async () => ({
   // Real, both of them. `deckUrl` is the only thing that says where a deck
@@ -31,6 +31,7 @@ vi.mock('../lib/api', async () => ({
   errorMessage: (await vi.importActual<typeof import('../lib/api')>('../lib/api')).errorMessage,
   api: {
     decks: vi.fn(),
+    coliseum: vi.fn(),
     setShared: vi.fn(),
     setColiseumAtNight: vi.fn(),
     setEveryDeckShared: vi.fn(),
@@ -77,6 +78,17 @@ const MIXED: DeckTile[] = [
   deck({ slug: 'arahbo', name: 'Arahbo, Roar of the World', shared: false }),
 ]
 
+/** The hall's answer, reduced to the one key this room reads. The arenas and
+ *  zones are the Coliseum page's business and an empty list is a shape the
+ *  wire really produces for them. */
+function hall(scheduled: boolean, window = '01:00-04:00',
+  zone = 'America/Los_Angeles'): Coliseum {
+  return {
+    arenas: [], zones: [], pool: false, dropped: 0,
+    night: scheduled ? { scheduled, window, zone } : { scheduled, window: '', zone: '' },
+  }
+}
+
 function renderSettings() {
   return render(<MemoryRouter><Settings /></MemoryRouter>)
 }
@@ -92,6 +104,9 @@ beforeEach(() => {
   // module-level state that outlives the test, so call counts accumulate and
   // "called once" quietly means "once this test, plus last test's".
   vi.mocked(api.decks).mockReset().mockResolvedValue(MIXED)
+  // An unlit arena by default: the state every other test was written
+  // against, and the one a fresh instance is in.
+  vi.mocked(api.coliseum).mockReset().mockResolvedValue(hall(false))
   vi.mocked(api.setShared).mockReset().mockResolvedValue({} as never)
   vi.mocked(api.setColiseumAtNight).mockReset().mockResolvedValue({} as never)
   vi.mocked(api.setEveryDeckShared).mockReset()
@@ -316,13 +331,59 @@ describe('the room’s own bones', () => {
     expect(screen.getByText(/Grand Coliseum/)).toBeTruthy()
   })
 
-  it('never claims the night games are running', async () => {
+  // Whether the torches are lit is the hall's fact, not this file's. The room
+  // carried the sentence itself once and it outlived the instance's first
+  // night by a fortnight with this suite green — a test that asserts a caption
+  // against itself cannot tell you the caption is wrong — so the three tests
+  // below each hand the room a different hall and read what it says.
+  it('says the torches are unlit only when the hall says there is no window', async () => {
     renderSettings()
     await screen.findByText('Gyome, Master Chef')
-    // The panel promises a thing that has not started. The copy has to be in
-    // the future tense, and "the torches are not lit" is the sentence that
-    // carries it.
-    expect(screen.getByText(/torches are not lit yet/i)).toBeTruthy()
+    expect(await screen.findByText(/torches are not lit yet/i)).toBeTruthy()
+    expect(screen.queryByText(/torches are lit\./i)).toBeNull()
+  })
+
+  it('says when the arena opens, in words, when a night is scheduled', async () => {
+    vi.mocked(api.coliseum).mockResolvedValue(hall(true))
+    renderSettings()
+    await screen.findByText('Gyome, Master Chef')
+    const lit = await screen.findByText(/torches are lit\./i)
+    // The window in words and the zone as a place — never the wire's
+    // `America/Los_Angeles`, which is a technology's name for a city
+    // (commandment 10).
+    expect(lit.textContent).toMatch(/from 01:00 to 04:00/)
+    expect(lit.textContent).toMatch(/Los Angeles time/)
+    expect(lit.textContent).not.toMatch(/America\//)
+    expect(screen.queryByText(/torches are not lit yet/i)).toBeNull()
+  })
+
+  it('makes no claim about the torches while the hall has not answered', async () => {
+    // A hall that never answers, and a hall one deploy behind the bundle
+    // (no `night` key at all): both leave the room not knowing, and not
+    // knowing must not render as "unlit".
+    vi.mocked(api.coliseum).mockRejectedValue(new Error('the coliseum is dark'))
+    renderSettings()
+    await screen.findByText('Gyome, Master Chef')
+    expect(screen.queryByText(/torches are not lit yet/i)).toBeNull()
+    expect(screen.queryByText(/torches are lit\./i)).toBeNull()
+    expect(screen.getByText(/When the arena opens after dark/)).toBeTruthy()
+    cleanup()
+
+    vi.mocked(api.coliseum).mockResolvedValue({ ...hall(false), night: undefined })
+    renderSettings()
+    await screen.findByText('Gyome, Master Chef')
+    expect(screen.queryByText(/torches are not lit yet/i)).toBeNull()
+    expect(screen.queryByText(/torches are lit\./i)).toBeNull()
+  })
+
+  it('turns the operator’s two switches into words', () => {
+    expect(windowWords('01:00-04:00')).toBe('from 01:00 to 04:00')
+    // A window the hall wrote in some other shape renders as itself: a blank
+    // where a time should be would hide a misconfigured instance.
+    expect(windowWords('all night')).toBe('all night')
+    expect(zoneWords('America/Los_Angeles')).toBe('Los Angeles')
+    expect(zoneWords('Europe/London')).toBe('London')
+    expect(zoneWords('UTC')).toBe('UTC')
   })
 
   it('links each deck to itself and toggles beside it with buttons', async () => {

@@ -403,6 +403,34 @@ animates on a loop, so there is no cycle time to wait out; the hero video on
 that page is an 11-second loop and is not part of this. · **Recommendation:**
 merge it. Ledger: Green, 2026-10-03 (night, the Coliseum).
 
+**Blue: the Settings room has said "the torches are not lit yet" through
+sixteen fought nights; it now reads the schedule off the hall, and the new
+sentence renders, so it waits for your eye.** You set the two night switches
+on 2026-10-03 and the log shows the arena has opened every night since (run
+16 opened 01:00 and closed 04:00 this morning, six bouts, one of them
+failed), but the room behind the gear carried its own sentence and no bundle
+can know what an operator set. `GET /api/coliseum` now answers a `night`
+object (scheduled, window, zone — your switches echoed back) and the room has
+three states: lit, with the window in words; unlit, as before; and no claim at
+all while the hall has not answered, because "we could not ask" must not
+render as "unlit". Go and Vitest tests on all three, each broken once and
+watched fail. · *Cost of leaving it:* the one room where a person decides
+whether their deck fights at night tells them nothing happens — and anyone
+who trusted it has decks sitting out nights they meant to enter. · **Where to
+look:** `mtglab-ui` in `.claude/launch.json` (the Go server on 8765 serves
+the committed bundle; auth is off locally), then **`/settings`, the panel
+headed *Coliseum at Night*** and the hint mark beside its heading. On this
+Mac the switches are not set, so both should read the **unlit** sentence —
+which is the truth for the laptop. To see the lit one locally, start the
+server by hand with the two switches in its environment
+(`MTGLAB_NIGHT_WINDOW=01:00-04:00 MTGLAB_NIGHT_ZONE=America/Los_Angeles
+./mtglab ui --port 8765`, not a `launch.json` entry — that file is never
+rewritten) and reload: *"The torches are lit. The arena opens every night
+from 01:00 to 04:00, Los Angeles time…"*, and the hint's note says the same
+in a line. Nothing animates there, so there is no cycle to wait out. ·
+**Recommendation:** merge it; the deployed room then reads the lit sentence
+the moment the deploy lands, with no switch to set. Ledger: Blue, 2026-10-16.
+
 ## Open — a migration window
 
 **Black: prompt-cache *writes* are invisible in both usage ledgers, so the

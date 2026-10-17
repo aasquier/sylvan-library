@@ -57,10 +57,10 @@ export interface DeckSummary {
   /** Whether the owner has entered this deck for Coliseum at Night.
    *
    *  **Nothing runs on it yet**, and that is the whole point of it existing:
-   *  it is consent recorded before there is anything to consent to, so the
-   *  first night is played with decks whose owners chose them. Any copy built
-   *  on this field has to say so — a control that reads as though it starts
-   *  something today would be a lie the settings room tells.
+   *  it is consent recorded ahead of the night, so every night is played
+   *  with decks whose owners chose them. Whether a night is scheduled at all
+   *  is the hall's to say (`Coliseum.night`), never this field's, and the
+   *  settings room reads it from there rather than asserting either way.
    *
    *  False on every deck the showcase serves, which is a real answer there
    *  rather than a missing one: those decks cannot hold this yet, and
@@ -3016,6 +3016,21 @@ export interface Coliseum {
   pool: boolean
   /** Names the pool could not resolve, dropped rather than guessed. */
   dropped: number
+  /** The Coliseum at Night's standing arrangement. Optional because a key
+   *  added to the wire arrives `undefined` from an instance one deploy behind
+   *  the bundle, and the settings room must then say nothing about the
+   *  torches rather than read "unknown" as "unlit". */
+  night?: ColiseumNight
+}
+
+/** Whether the arena opens after dark, and when. `window` and `zone` are the
+ *  operator's own switches echoed back — `01:00-04:00`, `America/Los_Angeles`
+ *  — and are blank exactly when `scheduled` is false. They are turned into
+ *  words by the room that shows them; the zone's wire form never renders. */
+export interface ColiseumNight {
+  scheduled: boolean
+  window: string
+  zone: string
 }
 
 /** One contestant's tally, with the interval that says how much to believe it.

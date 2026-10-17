@@ -17,11 +17,16 @@
  *   is readable by anybody signed in here and by nobody else — there are no
  *   unlisted links and nothing outside the door (ADR 22), which is why the
  *   copy never says "public".
- * - **Coliseum at Night** is new, and **it does nothing yet**. That is not a
- *   caveat to bury: a switch that reads as though it starts something tonight
- *   would be the interface lying, and this room is the one place a person
- *   decides it. So every sentence about it is in the future tense, and the
- *   panel says the torches are unlit rather than implying a fire.
+ * - **Coliseum at Night** is the standing consent for the night games, and
+ *   **whether there are night games is not this room's to assert.** The
+ *   arena opens when two switches are set on the instance, and this file
+ *   once carried "the torches are not lit yet" as a sentence of its own — true
+ *   for a month, then false for a fortnight of fought nights, with every test
+ *   green, because a bundle cannot know what an operator set. So the panel
+ *   reads the schedule off the hall (`Coliseum.night`) and has three honest
+ *   states: lit, with the window in words; unlit, in the future tense; and
+ *   *no claim at all* while the hall has not answered, because "we could not
+ *   ask" and "the torches are out" are different sentences.
  *
  * **The master switch is three-state, and it has to be.** A shelf where some
  * decks are shared and some are not is the ordinary case — it is what every
@@ -46,11 +51,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { type DeckTile, api, deckUrl, errorMessage } from '../lib/api'
+import { type ColiseumNight, type DeckTile, api, deckUrl, errorMessage } from '../lib/api'
 import { ErrorNote, PageMasthead, Spinner } from '../components/ui'
 import { FieldHint } from '../components/hint'
 
-/** Grand Coliseum's original printing. The arena the night games will be
+/** The operator's zone switch as a place a person would name: the last
+ *  segment of `America/Los_Angeles`, underscores returned to spaces. The wire
+ *  form is a technology's name for a city and never renders (commandment 10). */
+export function zoneWords(zone: string): string {
+  const city = zone.split('/').pop() ?? zone
+  return city.replace(/_/g, ' ')
+}
+
+/** `01:00-04:00` as the two clocks a sentence needs. A window in any other
+ *  shape renders as itself rather than as nothing: the hall echoes what the
+ *  operator wrote, and a blank where a time should be hides a misconfigured
+ *  instance from the one person who would fix it. */
+export function windowWords(window: string): string {
+  const [open, close] = window.split('-')
+  return open && close ? `from ${open} to ${close}` : window
+}
+
+/** Grand Coliseum's original printing. The arena the night games are
  *  played in, which is half of what this room decides — and a land, so it is
  *  a place rather than a person, which is what a settings room is. */
 const COLISEUM_ART =
@@ -189,6 +211,10 @@ function MasterSwitch({ state, tally: count, busy, disabled, columnName, verb, o
 export default function Settings() {
   const [decks, setDecks] = useState<DeckTile[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** The night's schedule as the hall tells it. `null` until the hall has
+   *  answered, and still `null` if it never does — rendered as *no claim*,
+   *  never as "unlit", because a room that cannot ask does not know. */
+  const [night, setNight] = useState<ColiseumNight | null>(null)
   /** Which single control is mid-write. One at a time on purpose: two writes
    *  against one shelf would race to re-read it, and the loser would paint a
    *  state that is one press out of date. */
@@ -227,6 +253,15 @@ export default function Settings() {
       const failure = await load()
       if (live) setError(failure)
     })()
+    // The schedule, once: it is a fact about the instance and no write on
+    // this page changes it, so it rides outside `load`, which re-runs after
+    // every press. A hall that does not answer leaves `night` null on
+    // purpose — the shelf is this room's business and still renders; the
+    // torches line simply makes no claim. An instance one deploy behind the
+    // bundle answers with no `night` at all, which is the same silence.
+    void api.coliseum()
+      .then((hall) => { if (live && hall.night) setNight(hall.night) })
+      .catch(() => {})
     return () => { live = false }
   }, [load])
 
@@ -349,15 +384,35 @@ export default function Settings() {
                 Coliseum at Night
                 <FieldHint
                   name="Coliseum at Night"
-                  says="A standing answer, given early. When the arena starts running games after dark, the decks entered here are the ones that will play."
-                  note="Nothing happens tonight — the torches are not lit yet.">
+                  says="A standing answer. When the arena runs its games after dark, the decks entered here are the ones that play."
+                  note={night === null
+                    ? undefined
+                    : night.scheduled
+                      ? `Tonight's games run ${windowWords(night.window)}, ${zoneWords(night.zone)} time.`
+                      : 'Nothing happens tonight — the torches are not lit yet.'}>
                   <HintMark />
                 </FieldHint>
               </h2>
               <p className="mt-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                The torches are not lit yet. When the arena opens after dark,
-                the decks entered here are the ones that will be called down —
-                so you can choose now and be on the card for the first night.
+                {/* Three sentences for three states, and the third is the one
+                    that matters: until the hall has answered, this room has
+                    no idea whether the torches are lit and must not guess. */}
+                {night === null && (
+                  <>When the arena opens after dark, the decks entered here are
+                  the ones that will be called down — so you can choose now and
+                  be on the card.</>
+                )}
+                {night !== null && night.scheduled && (
+                  <>The torches are lit. The arena opens every night{' '}
+                  {windowWords(night.window)}, {zoneWords(night.zone)} time, and
+                  the decks entered here are the ones called down to fight —
+                  withdraw one and it sits the next night out.</>
+                )}
+                {night !== null && !night.scheduled && (
+                  <>The torches are not lit yet. When the arena opens after dark,
+                  the decks entered here are the ones that will be called down —
+                  so you can choose now and be on the card for the first night.</>
+                )}
               </p>
               <div className="mt-3">
                 <MasterSwitch

@@ -455,3 +455,10 @@ func (r *Runner) sampleKey(now time.Time) string {
 // what the route layer holds, and the store rides along rather than being
 // wired twice.
 func (r *Runner) Store() *Store { return r.store }
+
+// Settings is the night as it was resolved at boot — whether a window is set
+// at all, and when it opens. A surface that tells a person whether the
+// torches are lit reads this rather than carrying a sentence of its own: the
+// settings room said "not lit yet" for a fortnight of fought nights, because
+// a rendered string asserting a deployment fact is drift nothing tests.
+func (r *Runner) Settings() Settings { return r.set }

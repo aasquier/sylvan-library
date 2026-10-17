@@ -3036,12 +3036,13 @@ record is here because that is where a licence record belongs.
 TypeScript/React craft · the `tools/` toolbox · Claude-first docs & memory ·
 the spirit of Magic*
 
-- **Last run:** 2026-10-02 (night) — **its entry is at the END of this
-  section, not the top**, after the 09-26 rainbow's, which first appended
-  there because four lanes ran in parallel that day and each wrote at its own
-  section's foot so the colours could not conflict.
-  Previous: 2026-09-26 (rainbow), 2026-09-19 (rainbow), 2026-09-12 (rainbow), 2026-09-05 (rainbow,
-  night), 2026-08-24 (rainbow), 2026-08-19 (rainbow), 2026-08-18.
+- **Last run:** 2026-10-16 (rainbow, night) — **its entry is at the END of
+  this section, not the top**, after the 10-02 and 09-26 entries, which first
+  appended there because four lanes ran in parallel that day and each wrote
+  at its own section's foot so the colours could not conflict.
+  Previous: 2026-10-02 (night), 2026-09-26 (rainbow), 2026-09-19 (rainbow),
+  2026-09-12 (rainbow), 2026-09-05 (rainbow, night), 2026-08-24 (rainbow),
+  2026-08-19 (rainbow), 2026-08-18.
 - **The `os.Getenv` count changes definition at 2026-09-26, so read the trend
   in two halves.** Every entry from 2026-08-23 to 2026-09-19 quotes one number
   from `grep -c 'os.Getenv\|os.LookupEnv'`, which adds up three unlike things:
@@ -5068,6 +5069,173 @@ is where the last run is now and the next reader looks there first.
     branch's); `time.Sleep` sites in tests 14 (15 on 10-02 afternoon).
   - 214 non-test Go files; 55 packages with doc comments; 7 families and 35
     commands in the tree.
+
+### 2026-10-16 (rainbow, night) — the torches were lit a fortnight ago and the room still said they were not; the hall says it now
+
+Leg two of a stacked night (branched from White's tip, PR against
+`polish/white-2026-10-16`), the Nightbound rules governing, about forty-five
+minutes of budget; appended at the section's foot where the last two runs
+sit.
+
+- **(open) The Settings room's one sentence about the Coliseum at Night was
+  false for a fortnight with every test green, and the fix renders — so it is
+  built to a green pull request and held for Aaron's eye (commandment 16).**
+  The instance, read tonight through the env-token workaround: `fly secrets
+  list` shows **`MTGLAB_NIGHT_WINDOW` and `MTGLAB_NIGHT_ZONE` deployed** (nine
+  names in all, the seven of 10-02 plus these two), and `fly logs` carries
+  the boot line *"the coliseum runs at night" window=01:00-04:00
+  zone=America/Los_Angeles bouts=6 per_account=2 games=10*, then *"the night
+  opened" run=16 night=2026-10-17 bouts=6 closes=2026-10-17T11:00:00Z* at
+  08:00Z, one *"job failed" kind=night.forge err="the match broke off before
+  it reached a result"* at 08:17Z, and *"the night finished" run=16
+  skipped=0* at 11:00Z. **Sixteen night runs**, and the room behind the gear
+  still said *"The torches are not lit yet"* — in the panel, in the hint
+  mark's note, and in `Settings.test.tsx`, where a test asserted the caption
+  against itself and so could never tell anyone the caption was wrong (the
+  09-26 lesson, *a test written against a claim cannot tell you the claim is
+  wrong*, in its purest form: the claim was about a deployment, and a bundle
+  cannot know what an operator set).
+  - **The wire carries the fact now.** `GET /api/coliseum` answers a `night`
+    object — `{scheduled, window, zone}`, the two strings the operator's own
+    switches echoed back (`01:00-04:00`, `America/Los_Angeles`) and blank
+    exactly when `scheduled` is false — set beside `zones` before the pool is
+    opened, so it answers with no pool at all. `night.Runner.Settings()` is
+    the one-line accessor the route reads; no runner (an instance with no
+    `app.db`) is not scheduled, whatever the switches say.
+    `coliseumnight_test.go` holds the three states: no runner, a runner with
+    no window, a scheduled night echoing its window and zone verbatim.
+  - **The room has three honest states, and the third is the point.** Lit:
+    *"The torches are lit. The arena opens every night from 01:00 to 04:00,
+    Los Angeles time, and the decks entered here are the ones called down to
+    fight — withdraw one and it sits the next night out."* Unlit: the old
+    sentence, in the future tense. **And no claim at all** while the hall
+    has not answered or answers without the key (an instance one deploy
+    behind the bundle) — because "we could not ask" and "the torches are
+    out" are different sentences, and a room that folds them together has
+    rebuilt the untruth with a fallback. `windowWords` and `zoneWords` turn
+    the switches into words; the zone's wire form is a technology's name for
+    a city and never renders (commandment 10), and a window in any other
+    shape renders as itself rather than as a blank that would hide a
+    misconfigured instance. The hint mark's note follows the same three
+    states. `Coliseum.night` is **optional** on the TypeScript side on
+    purpose — a new wire key arrives `undefined` from an older server, and
+    the type says so rather than a `?? false` reading as a fact.
+  - **Mutation-verified both halves, restored, the restores grepped.** Go:
+    `if !set.Scheduled` → `if set.Scheduled` fails
+    `TestAScheduledNightEchoesItsWindowAndZoneAsTheOperatorWroteThem` and
+    `TestARunnerWithNoWindowIsNotAScheduledNight` by name. TypeScript: the
+    exact bug the third test exists for — `setNight(hall.night ?? {scheduled:
+    false…})` in place of `if (hall.night) setNight(hall.night)` — fails
+    *makes no claim about the torches while the hall has not answered*. Four
+    Vitest tests replace the one that asserted the caption; 20 pass in the
+    file.
+  - **Considered and rejected:** a new `GET /api/coliseum/night` route (a
+    route is deny-by-default behind the door and its sweeps derive from the
+    served table — right, and bigger than surgical at night); reading
+    `/api/admin/night` (403 by prefix to everyone the room is for); and a
+    frontend-only rewording to "lit" (the same bug facing the other way: the
+    next time the switches move, the bundle is wrong again). The hall is
+    fetched whole for one key — it resolves a few dozen names through the
+    pool in one query, and the room already paints a Coliseum card; a
+    lighter route is the trade to make if that ever shows in a profile.
+  - **Where to look** is in the daybreak line. No CSS moved (`index.css` is
+    Red's); the bundle files this leg rebuilt are listed under *Measured*.
+- **The one night fault seen in the log is not Blue's and is recorded for
+  Green:** one of run 16's six bouts failed at 08:17Z with *"the match broke
+  off before it reached a result. Send the two decks in again"* — the
+  interactive match's own sentence, through `api.forgeTrouble`, so the
+  diagnosis is in the log above it and not here. Whether a night's failed
+  bout is replayed, and how often one fails, is the Coliseum's facet.
+- **Boot and config, the two numbers, unchanged:** **2 process reads**
+  outside tests (both `internal/flymetrics`' argued fallbacks) and **6
+  composition-root hand-ins** (`cmd/mtglab/ui.go` ×2, `config.Load`,
+  `claude.EndpointFromEnv`, `claude.SettingsFromEnv`, `tier3.LoadSettings`);
+  the naive grep reads 15 in 7 files, as on 10-02. `.env.example` **35
+  documented against 43 in code** (42 on 10-02), the eight outside all read
+  by `_test.go` files only — `MTGLAB_A_VARIABLE_NOBODY_SETS`, `MTGLAB_X`,
+  `MTGLAB_OLD_SHIM_URL`, `MTGLAB_TEST_HOLD_POOL`, `MTGLAB_TEST_POOL`,
+  `MTGLAB_TEST_SERVE_CHILD`, `MTGLAB_LIVE_CLAUDE`, `MTGLAB_LIVE_FORGE`; zero
+  non-test files name any of them — and held by `configrecord_test.go`; both
+  `comm` directions empty for shipping names. `fly secrets list` answers
+  **9 names**, every one with a reader, the two new ones the night's.
+- **Modern-Go inventory (non-test), one line moved:** `interface{}` 0 ·
+  `ioutil` 0 · `rand.Seed` 0 · `strings.Title` 0 · `sort.Slice` 3 (the same
+  three, ruled 10-02) · `sort.SliceStable` 21 · `sort.Strings` 63 ·
+  `sort.Ints` 4 · `sync.RWMutex` 0 · `sync.Mutex` 23 · `errgroup` 0 ·
+  `wg.Add(` 0 · `wg.Go(` 4 · `go` statements 4 (the same four) · `sync.Once`
+  2 · `slices.` 47 · `maps.` 1 · `atomic.` 14 · **`errors.Join` 42 (2 on
+  10-02)** · counting loops 28 by a `for i := 0; i < n` grep (10-02's 20 was
+  a different recipe, unrecorded; not comparable). The `errors.Join` jump is
+  where the climb to 99 (#549/#553) closed error paths by joining a deferred
+  close's error to the call's — the modern spelling, not a finding; the
+  per-file spread is in the measured block. `go.dev` not re-read tonight;
+  the Go 1.28 reopen trigger stands.
+- **The three seams the climb wrote, read as Blue:** `pool.NewOver` is a
+  constructor rather than an exported field *because every other thing a
+  Pool knows is read under `p.mu`* — argued where it stands;
+  `auth.Open` drops `sql.Open`'s error on the argument that the only error
+  that call can return is an unregistered driver, which the import makes
+  impossible, and the fault a missing file produces lands on the first
+  statement through the handle — argued at length in the doc comment, and
+  the right call; `cache.Stats` on a nil store answers `Enabled: false`
+  with the fallback-reads-as-a-fact argument in its comment. Nothing to fix;
+  all three carry their why.
+- **TS craft, audit only:** 0 regex lookbehind, 0 `forwardRef`/`memo`/
+  `defaultProps` across 121 non-test files (116 on 10-02); 13 `lazy(() =>
+  import` lines, the README's claim held. `web/src` moved in two commits
+  since 10-03 (#557's row zoom, #540's rooms), both read, nothing to flag.
+- **Docs and memory:** CLAUDE.md names 8 paths by their bare name rather
+  than from the root (`.gremlins.yaml`, `boundary_test.go`, `ci.yml`,
+  `configrecord_test.go`, `data/modes.json`, `mutants.yml`, `testdata/`,
+  `swaps.md`); every one resolves by suffix to exactly where its sentence
+  says it is (`go/`, `internal/claude`, `.github/workflows`, `cmd/mtglab`,
+  35 `testdata/` directories), and `swaps.md` is a deck artifact's name —
+  the same reading as 10-02, now with the recipe written down: a root-
+  anchored existence check over CLAUDE.md cries wolf eight times, which is
+  White's suffix-resolver finding from the other side. Memory **208 files**
+  (190 on 10-02); no relative-date or duplicate sweep tonight — out of
+  budget, owed to the next Blue run.
+- **The spirit of Magic, sweep half only:** the one rendered copy this leg
+  wrote is the torches sentences, and they speak the room's own tongue —
+  torches, the arena, *called down to fight*, *sits the next night out* —
+  with the clock in plain figures a newcomer can act on (commandment 2
+  bounds the costume). **No shelf fact-check and no visit to the
+  fortune-teller's table tonight**, both owed: the budget went to the one
+  untruth the brief named, and a claim this run did not check is not a
+  claim it holds.
+- **Package docs:** 52 directories hold non-test Go files tonight; 10-02's
+  "55 packages with doc comments" counted by an unrecorded recipe, so the
+  two are not comparable and the next run should write its recipe down.
+  Not re-read for argument tonight.
+- **Queued for Aaron:** the one `(open)` record above — a rendering change,
+  held for the morning walk; the daybreak line carries where to look.
+- **Deferred, triggers unchanged:** the "Shuffling up…" flavour pair; the
+  three local env readers; the dropped-name counter; pprof's live half; the
+  local sdk's go1.26.8 point release; and now the memory sweep, the shelf
+  fact-check and the tarot visit, all owed to the next Blue run because
+  this one spent its budget on the torches.
+- **Measured (2026-10-16 night, written 2026-10-17 06:54–07:40 PDT, this
+  Mac, one lane):**
+  - `errors.Join` by file (non-test): the full `uniq -c` is in the pull
+    request body rather than here; it is a spread over the packages the
+    climb touched, no file above a handful.
+  - 2,927 `func Test` lines under `go/` (2,619 on 10-02; the climb to 99 is
+    the difference); `time.Sleep` sites in tests 17 (14); 214 non-test Go
+    files (unchanged).
+  - Go gauntlet, from `go/`: `gofmt -l .` prints nothing; `go vet ./...`
+    clean; `golangci-lint run ./...` **0 issues, 1m45s**; `go test -race
+    -count=1 ./...` **5m31s wall (07:01:17 → 07:06:48), every package ok but
+    one** — `cmd/mtglab`'s `TestEveryOverlayClassIsStillInTheBundle` found
+    no `web_dist/assets/index.css` at 07:02, because the bundle rebuild was
+    running at the same minute and Vite empties `assets/` before it writes
+    — a race this lane caused by overlapping its own two steps, not a
+    finding; `go test -race -count=1 ./cmd/mtglab/` alone afterwards, **ok
+    in 39.7s**, against the finished bundle. **Lesson for the brief: the
+    bundle rebuild goes before the race suite, never beside it.** `npm
+    --prefix web run check` green (tsc, oxlint, Vitest). Bundle rebuilt in
+    8.55s; **one file changed: `web_dist/assets/Settings.js`** — Red and
+    Green stay disjoint. `data/app.db` dated Oct 3 before and after.
+  - Daybreak recipe: 16 on White's branch → **17** on this one.
 
 ## Black — Ruthless Efficiency
 
