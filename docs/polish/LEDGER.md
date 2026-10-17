@@ -214,6 +214,26 @@ answers `authenticated: false`), so everything below that needed a session is
   lane's whole evening, not a surgical addition to this one. (d) *Dropping
   the `contents: write` grant on this branch* — a workflow edit the night
   cannot prove.
+- **A first attempt went red on `go (arm64)` for a reason this branch cannot
+  have caused, and the cause is UNPROVEN.** PR #562's first run: every other
+  required check green, `go (amd64)` green on the same bytes, and the arm64
+  coverage step failing one test — `internal/claude`'s
+  `TestTheTurnCeilingIsAnErrorAndNotAnAnswer`, with `converse_test.go:61:
+  request N was not JSON: unexpected end of JSON input` for **every one** of
+  the stub's requests 0–6 and `the script ran out: request 6 had no reply`
+  three times (the SDK's two retries of the stub's 500). The test last moved
+  at #289; `main`'s last four arm64 runs are green; nothing on this branch
+  reaches `internal/claude`. Locally, 40 runs under the same `-coverpkg`
+  instrumentation and 10 under `-race` all pass. Two facts worth the next
+  session's minute: the fixture reads the body with `body, _ :=
+  io.ReadAll(r.Body)`, so a *truncated* body and an *empty* one produce the
+  same message and the read error that would tell them apart is thrown away —
+  a one-line `t.Errorf` on that error is the diagnostic the next occurrence
+  needs; and `scriptedAPI` writes `served`, `requests` and `raw` from the
+  handler goroutine with no lock, which `-race` has never reported but which
+  is the shape of the brief's "a test about work in flight" class. Re-run
+  once, honestly, on the final bytes; recorded here so a second sighting is a
+  pattern and not a surprise.
 - **Queue movement: +2** (the policy and the grant), both above with their
   marker and both in `DAYBREAK.md`; the daybreak recipe reads **16** after
   this entry — and **14** on `origin/main` before it, where the night brief
